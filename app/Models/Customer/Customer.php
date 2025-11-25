@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Models\Customer;
+
+use App\Models\Order\Order;
+use App\Models\Platform\PlatformMapping;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+
+class Customer extends Model
+{
+    protected $fillable = [
+        'source',
+        'first_name',
+        'last_name',
+        'email',
+        'phone',
+        'address_line1',
+        'address_line2',
+        'city',
+        'state',
+        'postal_code',
+        'country',
+        'notes',
+    ];
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    public function platformMappings(): MorphMany
+    {
+        return $this->morphMany(PlatformMapping::class, 'entity');
+    }
+
+    public function getFullNameAttribute(): string
+    {
+        return trim("{$this->first_name} {$this->last_name}");
+    }
+}
