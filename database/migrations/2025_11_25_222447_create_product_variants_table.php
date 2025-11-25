@@ -17,9 +17,6 @@ return new class extends Migration
             $table->string('sku')->unique();
             $table->string('barcode')->unique();
             $table->string('title')->nullable();
-            $table->string('option1')->nullable(); // e.g., Color
-            $table->string('option2')->nullable(); // e.g., Size
-            $table->string('option3')->nullable(); // e.g., Material
             $table->decimal('price', 10, 2);
             $table->decimal('cost_price', 10, 2)->nullable();
             $table->integer('inventory_quantity')->default(0);

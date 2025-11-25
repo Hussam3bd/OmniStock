@@ -33,4 +33,12 @@ class Product extends Model
     {
         return $this->morphMany(PlatformMapping::class, 'entity');
     }
+
+    public function variantOptions(): BelongsToMany
+    {
+        return $this->belongsToMany(VariantOption::class, 'product_variant_options')
+            ->withPivot('position')
+            ->withTimestamps()
+            ->orderByPivot('position');
+    }
 }

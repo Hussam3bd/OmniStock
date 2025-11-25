@@ -7,6 +7,7 @@ use App\Models\Order\OrderItem;
 use App\Models\Platform\PlatformMapping;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
@@ -17,9 +18,6 @@ class ProductVariant extends Model
         'sku',
         'barcode',
         'title',
-        'option1',
-        'option2',
-        'option3',
         'price',
         'cost_price',
         'inventory_quantity',
@@ -58,5 +56,11 @@ class ProductVariant extends Model
     public function platformMappings(): MorphMany
     {
         return $this->morphMany(PlatformMapping::class, 'entity');
+    }
+
+    public function optionValues(): BelongsToMany
+    {
+        return $this->belongsToMany(VariantOptionValue::class, 'product_variant_option_values')
+            ->withTimestamps();
     }
 }
