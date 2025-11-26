@@ -68,6 +68,37 @@ class ProductVariant extends Model implements HasMedia
             ->withTimestamps();
     }
 
+    /**
+     * Get the option value for a specific variant option.
+     * This is used for table grouping.
+     */
+    public function getOptionValueForOption(int $variantOptionId): ?VariantOptionValue
+    {
+        return $this->optionValues
+            ->where('variant_option_id', $variantOptionId)
+            ->first();
+    }
+
+    /**
+     * Get the grouping key for a specific variant option.
+     */
+    public function getOptionKeyForGroup(int $variantOptionId): string
+    {
+        $value = $this->getOptionValueForOption($variantOptionId);
+
+        return $value ? (string) $value->id : 'none';
+    }
+
+    /**
+     * Get the grouping title for a specific variant option.
+     */
+    public function getOptionTitleForGroup(int $variantOptionId): string
+    {
+        $value = $this->getOptionValueForOption($variantOptionId);
+
+        return $value ? __($value->value) : __('No value');
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('images')
