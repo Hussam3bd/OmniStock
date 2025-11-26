@@ -10,6 +10,11 @@ class EditProduct extends EditRecord
 {
     protected static string $resource = ProductResource::class;
 
+    public static function getNavigationLabel(): string
+    {
+        return __('Basic Information');
+    }
+
     protected function getHeaderActions(): array
     {
         return [

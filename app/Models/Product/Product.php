@@ -4,25 +4,25 @@ namespace App\Models\Product;
 
 use App\Models\Platform\PlatformMapping;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Product extends Model
+class Product extends Model implements HasMedia
 {
+    use InteractsWithMedia;
+
     protected $fillable = [
-        'product_group_id',
+        'model_code',
+        'gtin',
         'title',
         'description',
         'vendor',
         'product_type',
         'status',
     ];
-
-    public function productGroup(): BelongsTo
-    {
-        return $this->belongsTo(ProductGroup::class);
-    }
 
     public function variants(): HasMany
     {
@@ -40,5 +40,12 @@ class Product extends Model
             ->withPivot('position')
             ->withTimestamps()
             ->orderByPivot('position');
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('images')
+            ->useFallbackUrl('/images/no-image.png')
+            ->useFallbackPath(public_path('/images/no-image.png'));
     }
 }

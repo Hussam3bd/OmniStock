@@ -10,9 +10,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class ProductVariant extends Model
+class ProductVariant extends Model implements HasMedia
 {
+    use InteractsWithMedia;
+
     protected $fillable = [
         'product_id',
         'sku',
@@ -62,5 +66,12 @@ class ProductVariant extends Model
     {
         return $this->belongsToMany(VariantOptionValue::class, 'product_variant_option_values')
             ->withTimestamps();
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('images')
+            ->useFallbackUrl('/images/no-image.png')
+            ->useFallbackPath(public_path('/images/no-image.png'));
     }
 }

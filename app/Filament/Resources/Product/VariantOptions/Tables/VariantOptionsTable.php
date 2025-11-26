@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\Product\ProductGroups\Tables;
+namespace App\Filament\Resources\Product\VariantOptions\Tables;
 
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -8,19 +8,30 @@ use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
-class ProductGroupsTable
+class VariantOptionsTable
 {
     public static function configure(Table $table): Table
     {
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->searchable(),
-                TextColumn::make('created_at')
-                    ->dateTime()
+                    ->label(__('Option Name'))
+                    ->searchable()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
+                    ->formatStateUsing(fn (string $state): string => __($state)),
+
+                TextColumn::make('values_count')
+                    ->label(__('Values'))
+                    ->counts('values')
+                    ->sortable()
+                    ->formatStateUsing(fn (int $state): string => __(':count values', ['count' => $state])),
+
+                TextColumn::make('position')
+                    ->label(__('Order'))
+                    ->sortable(),
+
+                TextColumn::make('created_at')
+                    ->label(__('Created'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -35,6 +46,7 @@ class ProductGroupsTable
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('position');
     }
 }
