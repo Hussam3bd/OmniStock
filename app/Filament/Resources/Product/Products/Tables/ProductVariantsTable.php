@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Product\Products\Tables;
 
+use App\Filament\Actions\AdjustStockAction;
 use App\Models\Product\ProductVariant;
 use App\Models\Product\VariantOption;
 use Filament\Actions\Action;
@@ -199,43 +200,7 @@ class ProductVariantsTable
                     ]),
             ])
             ->recordActions([
-                Action::make('adjust_stock')
-                    ->label(__('Adjust'))
-                    ->icon('heroicon-o-calculator')
-                    ->color('primary')
-                    ->schema([
-                        Forms\Components\TextInput::make('quantity')
-                            ->label(__('Quantity Change'))
-                            ->required()
-                            ->numeric()
-                            ->helperText(__('Enter positive to add, negative to subtract'))
-                            ->default(0),
-
-                        Forms\Components\Textarea::make('note')
-                            ->label(__('Note'))
-                            ->rows(2)
-                            ->placeholder(__('Optional note for this adjustment')),
-                    ])
-                    ->action(function (ProductVariant $record, array $data): void {
-                        $quantityBefore = $record->inventory_quantity;
-                        $quantityChange = (int) $data['quantity'];
-                        $quantityAfter = $quantityBefore + $quantityChange;
-
-                        $record->update([
-                            'inventory_quantity' => $quantityAfter,
-                        ]);
-
-                        Notification::make()
-                            ->title(__('Stock adjusted'))
-                            ->body(__(':sku: :before → :after', [
-                                'sku' => $record->sku,
-                                'before' => $quantityBefore,
-                                'after' => $quantityAfter,
-                            ]))
-                            ->success()
-                            ->send();
-                    }),
-
+                AdjustStockAction::make(),
                 DeleteAction::make(),
             ])
             ->toolbarActions([

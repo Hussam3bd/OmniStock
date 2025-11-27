@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Product\Products\Tables;
 
+use App\Filament\Actions\AdjustStockAction;
 use App\Models\Inventory\InventoryMovement;
 use App\Models\Product\ProductVariant;
 use App\Models\Product\VariantOption;
@@ -120,93 +121,73 @@ class ProductInventoryTable
                     }),
             ])
             ->recordActions([
-                Action::make('adjust_stock')
-                    ->label(__('Adjust Stock'))
-                    ->icon('heroicon-o-calculator')
-                    ->color('primary')
-                    ->schema([
-                        Forms\Components\Select::make('type')
-                            ->label(__('Movement Type'))
-                            ->options([
-                                'received' => __('Received (Purchase)'),
-                                'sold' => __('Sold (Manual)'),
-                                'returned' => __('Returned'),
-                                'damaged' => __('Damaged/Lost'),
-                                'adjustment' => __('Adjustment'),
-                                'correction' => __('Correction'),
-                            ])
-                            ->required()
-                            ->native(false)
-                            ->live(),
-
-                        Forms\Components\TextInput::make('quantity')
-                            ->label(__('Quantity Change'))
-                            ->required()
-                            ->numeric()
-                            ->helperText(fn ($get): string => match ($get('type')) {
-                                'received', 'returned' => __('Enter positive number to add stock'),
-                                'sold', 'damaged' => __('Enter positive number to reduce stock'),
-                                default => __('Enter positive for increase, negative for decrease'),
-                            })
-                            ->rules([
-                                fn ($get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
-                                    if (in_array($get('type'), ['sold', 'damaged']) && $value < 0) {
-                                        $fail(__('For :type, enter a positive number', ['type' => __($get('type'))]));
-                                    }
-                                },
-                            ]),
-
-                        Forms\Components\Textarea::make('reference')
-                            ->label(__('Notes/Reference'))
-                            ->rows(3)
-                            ->placeholder(__('e.g., Order #123, Supplier invoice #456, etc.')),
-                    ])
-                    ->action(function (Model $record, array $data): void {
-                        $quantityBefore = $record->inventory_quantity;
-
-                        // Calculate quantity change based on type
-                        $quantityChange = match ($data['type']) {
-                            'received', 'returned' => abs((int) $data['quantity']),
-                            'sold', 'damaged' => -abs((int) $data['quantity']),
-                            default => (int) $data['quantity'],
-                        };
-
-                        $quantityAfter = $quantityBefore + $quantityChange;
-
-                        // Update variant stock
-                        $record->update([
-                            'inventory_quantity' => $quantityAfter,
-                        ]);
-
-                        // Create inventory movement record
-                        InventoryMovement::create([
-                            'product_variant_id' => $record->id,
-                            'type' => $data['type'],
-                            'quantity' => $quantityChange,
-                            'quantity_before' => $quantityBefore,
-                            'quantity_after' => $quantityAfter,
-                            'reference' => $data['reference'] ?? null,
-                        ]);
-
-                        Notification::make()
-                            ->title(__('Stock adjusted successfully'))
-                            ->body(__('Stock changed from :before to :after', [
-                                'before' => $quantityBefore,
-                                'after' => $quantityAfter,
-                            ]))
-                            ->success()
-                            ->send();
-                    }),
+                AdjustStockAction::make(),
 
                 Action::make('view_history')
                     ->label(__('History'))
                     ->icon('heroicon-o-clock')
                     ->color('gray')
                     ->modalHeading(fn (Model $record): string => __('Inventory History: :sku', ['sku' => $record->sku]))
-                    ->modalContent(fn (Model $record): \Illuminate\View\View => view(
-                        'filament.resources.product.products.pages.inventory-history',
-                        ['record' => $record]
-                    ))
+                    ->modalWidth('4xl')
+                    ->infolist(function (Model $record): array {
+                        $movements = $record->inventoryMovements()
+                            ->orderBy('created_at', 'desc')
+                            ->limit(50)
+                            ->get();
+
+                        if ($movements->isEmpty()) {
+                            return [
+                                \Filament\Infolists\Components\TextEntry::make('no_history')
+                                    ->label('')
+                                    ->state(__('No inventory movements recorded yet'))
+                                    ->color('gray'),
+                            ];
+                        }
+
+                        return [
+                            \Filament\Infolists\Components\RepeatableEntry::make('movements')
+                                ->label(__('Movement History'))
+                                ->state($movements->toArray())
+                                ->schema([
+                                    \Filament\Infolists\Components\TextEntry::make('created_at')
+                                        ->label(__('Date'))
+                                        ->dateTime()
+                                        ->size('sm'),
+
+                                    \Filament\Infolists\Components\TextEntry::make('type')
+                                        ->label(__('Type'))
+                                        ->badge()
+                                        ->formatStateUsing(fn ($state) => __(ucfirst($state)))
+                                        ->color(fn ($state): string => match ($state) {
+                                            'received' => 'success',
+                                            'sold' => 'primary',
+                                            'returned' => 'warning',
+                                            'damaged' => 'danger',
+                                            default => 'gray',
+                                        }),
+
+                                    \Filament\Infolists\Components\TextEntry::make('quantity')
+                                        ->label(__('Change'))
+                                        ->formatStateUsing(fn ($state) => $state > 0 ? "+{$state}" : $state)
+                                        ->color(fn ($state): string => $state > 0 ? 'success' : 'danger')
+                                        ->weight('bold'),
+
+                                    \Filament\Infolists\Components\TextEntry::make('quantity_before')
+                                        ->label(__('Before'))
+                                        ->formatStateUsing(fn ($state) => (string) $state),
+
+                                    \Filament\Infolists\Components\TextEntry::make('quantity_after')
+                                        ->label(__('After'))
+                                        ->formatStateUsing(fn ($state) => (string) $state),
+
+                                    \Filament\Infolists\Components\TextEntry::make('reference')
+                                        ->label(__('Reference'))
+                                        ->default('-')
+                                        ->columnSpanFull(),
+                                ])
+                                ->columns(5),
+                        ];
+                    })
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel(__('Close')),
 
@@ -282,6 +263,6 @@ class ProductInventoryTable
                     })
                     ->deselectRecordsAfterCompletion(),
             ])
-            ->defaultSort('product_variants.inventory_quantity', 'asc');
+            ->defaultSort('id', 'desc');
     }
 }
