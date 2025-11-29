@@ -34,8 +34,8 @@ class ProductVariant extends Model implements HasMedia
     protected function casts(): array
     {
         return [
-            'price' => 'decimal:2',
-            'cost_price' => 'decimal:2',
+            'price' => \Cknow\Money\Casts\MoneyIntegerCast::class,
+            'cost_price' => \Cknow\Money\Casts\MoneyIntegerCast::class,
             'weight' => 'decimal:2',
             'requires_shipping' => 'boolean',
             'taxable' => 'boolean',
