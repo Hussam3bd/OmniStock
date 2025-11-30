@@ -1,0 +1,1963 @@
+[
+    {
+        "code": "AED",
+        "symbol": "د.إ",
+        "english_name": "United Arab Emirates Dirham",
+        "arabic_name": "درهم إماراتي",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 1,
+
+        "country_code": "AE",
+        "emoji": "🇦🇪"
+    },
+    {
+        "code": "AFN",
+        "symbol": "؋",
+        "english_name": "Afghani",
+        "arabic_name": "أفغاني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "AF",
+        "emoji": "🇦🇫"
+    },
+    {
+        "code": "ALL",
+        "symbol": "Lek",
+        "english_name": "Lek",
+        "arabic_name": "ليك",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "AL",
+        "emoji": "🇦🇱"
+    },
+    {
+        "code": "AMD",
+        "symbol": "դր.",
+        "english_name": "Armenian Dram",
+        "arabic_name": "درام",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "AM",
+        "emoji": "🇦🇲"
+    },
+    {
+        "code": "ANG",
+        "symbol": "ƒ",
+        "english_name": "Netherlands Antillean Guilder",
+        "arabic_name": "جنيه آنتيلي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "AN",
+        "emoji": "🇦🇽"
+    },
+    {
+        "code": "AOA",
+        "symbol": "Kz",
+        "english_name": "Kwanza",
+        "arabic_name": "كوانزا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "AO",
+        "emoji": "🇦🇴"
+    },
+    {
+        "code": "ARS",
+        "symbol": "$",
+        "english_name": "Argentine Peso",
+        "arabic_name": "الجنيه الأرجنتيني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "AR",
+        "emoji": "🇦🇷"
+    },
+    {
+        "code": "AUD",
+        "symbol": "$",
+        "english_name": "Australian Dollar",
+        "arabic_name": "دولار أسترالي",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "AU",
+        "emoji": "🇦🇺"
+    },
+    {
+        "code": "AWG",
+        "symbol": "",
+        "english_name": "Aruban Florin",
+        "arabic_name": "فلورين أروبي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "AW",
+        "emoji": "🇦🇼"
+    },
+    {
+        "code": "AZN",
+        "symbol": "",
+        "english_name": "Azerbaijanian Manat",
+        "arabic_name": "مانات أذربيجاني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "AZ",
+        "emoji": "🇦🇿"
+    },
+    {
+        "code": "BAM",
+        "symbol": "",
+        "english_name": "Convertible Mark",
+        "arabic_name": "ماركة تحويلية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BA",
+        "emoji": "🇧🇦"
+    },
+    {
+        "code": "BBD",
+        "symbol": "",
+        "english_name": "Barbadian Dollar",
+        "arabic_name": "دولار بربادي",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "BB",
+        "emoji": "🇧🇧"
+    },
+    {
+        "code": "BDT",
+        "symbol": "",
+        "english_name": "Taka",
+        "arabic_name": "تاكا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BD",
+        "emoji": "🇧🇩"
+    },
+    {
+        "code": "BGN",
+        "symbol": "",
+        "english_name": "Bulgarian Lev",
+        "arabic_name": "ليف بلغاري",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BG",
+        "emoji": "🇧🇬"
+    },
+    {
+        "code": "BHD",
+        "symbol": "",
+        "english_name": "Bahraini Dinar",
+        "arabic_name": "دينار بحريني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BH",
+        "emoji": "🇧🇭"
+    },
+    {
+        "code": "BIF",
+        "symbol": "",
+        "english_name": "Burundi Franc",
+        "arabic_name": "فرنك بوروندي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BI",
+        "emoji": "🇧🇮"
+    },
+    {
+        "code": "BMD",
+        "symbol": "",
+        "english_name": "Bermudian Dollar",
+        "arabic_name": "دولار برمودي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BM",
+        "emoji": "🇧🇲"
+    },
+    {
+        "code": "BND",
+        "symbol": "",
+        "english_name": "Brunei Dollar",
+        "arabic_name": "دولار بروني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BN",
+        "emoji": "🇧🇳"
+    },
+    {
+        "code": "BOB",
+        "symbol": "",
+        "english_name": "Boliviano",
+        "arabic_name": "بوليفيانو",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BO",
+        "emoji": "🇧🇴"
+    },
+    {
+        "code": "BOV",
+        "symbol": "Bs.",
+        "english_name": "Mvdol",
+        "arabic_name": "مونزول بوليفياني",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "BO",
+        "emoji": "🇧🇴"
+    },
+    {
+        "code": "BRL",
+        "symbol": "R$",
+        "english_name": "Brazilian Real",
+        "arabic_name": "ريال برازيلي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BR",
+        "emoji": "🇧🇷"
+    },
+    {
+        "code": "BSD",
+        "symbol": "",
+        "english_name": "Bahamian Dollar",
+        "arabic_name": "دولار باهامي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BS",
+        "emoji": "🇧🇸"
+    },
+    {
+        "code": "BTN",
+        "symbol": "",
+        "english_name": "Bhutanese ngultrum",
+        "arabic_name": "نقول بوتاني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BT",
+        "emoji": "🇧🇹"
+    },
+    {
+        "code": "BWP",
+        "symbol": "",
+        "english_name": "Pula",
+        "arabic_name": "بولا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BW",
+        "emoji": "🇧🇼"
+    },
+    {
+        "code": "BYN",
+        "symbol": "",
+        "english_name": "Belarussian Ruble",
+        "arabic_name": "روبل بيلاروسي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BY",
+        "emoji": "🇧🇾"
+    },
+    {
+        "code": "BZD",
+        "symbol": "",
+        "english_name": "Belize Dollar",
+        "arabic_name": "دولار بليزي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BZ",
+        "emoji": "🇧🇿"
+    },
+    {
+        "code": "CAD",
+        "symbol": "$",
+        "english_name": "Canadian Dollar",
+        "arabic_name": "دولار كندي",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "CA",
+        "emoji": "🇨🇦"
+    },
+    {
+        "code": "CDF",
+        "symbol": "",
+        "english_name": "Congolese franc",
+        "arabic_name": "فرنك جنوب إفريقي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "CD",
+        "emoji": "🇨🇩"
+    },
+    {
+        "code": "CHF",
+        "symbol": "Fr",
+        "english_name": "Swiss Franc",
+        "arabic_name": "فرانك سويسري",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "CH",
+        "emoji": "🇨🇭"
+    },
+    {
+        "code": "CLF",
+        "symbol": "UF",
+        "english_name": "Unidades de fomento",
+        "arabic_name": "وحدات فونمونتو شيلي",
+        "decimal_separator": ",",
+        "thousands_separator": ".",
+        "is_symbol_after": 0,
+
+        "country_code": "CL",
+        "emoji": "🇨🇱"
+    },
+    {
+        "code": "CLP",
+        "symbol": "",
+        "english_name": "Chilean Peso",
+        "arabic_name": "الجنيه الشيلي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "CL",
+        "emoji": "🇨🇱"
+    },
+    {
+        "code": "CNY",
+        "symbol": "&yen;",
+        "english_name": "Chinese Yuan",
+        "arabic_name": "يوان صيني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "CN",
+        "emoji": "🇨🇳"
+    },
+    {
+        "code": "COP",
+        "symbol": "",
+        "english_name": "Colombian Peso",
+        "arabic_name": "البيزو كولومبي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "CO",
+        "emoji": "🇨🇴"
+    },
+    {
+        "code": "CRC",
+        "symbol": "",
+        "english_name": "Costa Rican Colon",
+        "arabic_name": "كوستاريكان سلفي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "CR",
+        "emoji": "🇨🇷"
+    },
+    {
+        "code": "CUC",
+        "symbol": "$",
+        "english_name": "Peso Convertible",
+        "arabic_name": "البيزو القابل للتحويل",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 1,
+
+        "country_code": "CU",
+        "emoji": "🇨🇺"
+    },
+    {
+        "code": "CUP",
+        "symbol": "",
+        "english_name": "Cuban Peso",
+        "arabic_name": "البيزو الكوبي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "CU",
+        "emoji": "🇨🇺"
+    },
+    {
+        "code": "CVE",
+        "symbol": "",
+        "english_name": "Cabo Verde Escudo",
+        "arabic_name": "الصورية الرأسية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "CV",
+        "emoji": "🇨🇻"
+    },
+    {
+        "code": "CZK",
+        "symbol": "",
+        "english_name": "Czech Koruna",
+        "arabic_name": "قرشية تشيكية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "CZ",
+        "emoji": "🇨🇿"
+    },
+    {
+        "code": "DJF",
+        "symbol": "",
+        "english_name": "Djibouti Franc",
+        "arabic_name": "فرنك جيبوتي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "DJ",
+        "emoji": "🇩🇯"
+    },
+    {
+        "code": "DKK",
+        "symbol": "kr",
+        "english_name": "Danish Krone",
+        "arabic_name": "كرونة دانمركية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "DK",
+        "emoji": "🇩🇰"
+    },
+    {
+        "code": "DOP",
+        "symbol": "",
+        "english_name": "Dominican Peso",
+        "arabic_name": "البيزو الدومنيكي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "DO",
+        "emoji": "🇩🇴"
+    },
+    {
+        "code": "DZD",
+        "symbol": "",
+        "english_name": "Algerian Dinar",
+        "arabic_name": "دينار جزائري",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "DZ",
+        "emoji": "🇩🇿"
+    },
+    {
+        "code": "EGP",
+        "symbol": "",
+        "english_name": "Egyptian Pound",
+        "arabic_name": "جنيه مصري",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "EG",
+        "emoji": "🇪🇬"
+    },
+    {
+        "code": "ERN",
+        "symbol": "",
+        "english_name": "Nakfa",
+        "arabic_name": "ناكفا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "ER",
+        "emoji": "🇪🇷"
+    },
+    {
+        "code": "ETB",
+        "symbol": "",
+        "english_name": "Ethiopian Birr",
+        "arabic_name": "بير إثيوبي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "ET",
+        "emoji": "🇪🇹"
+    },
+    {
+        "code": "EUR",
+        "symbol": "&euro;",
+        "english_name": "Euro",
+        "arabic_name": "يورو",
+        "decimal_separator": ",",
+        "thousands_separator": ".",
+        "is_symbol_after": 0,
+
+        "country_code": "EU",
+        "emoji": "🇪🇺"
+    },
+    {
+        "code": "FJD",
+        "symbol": "",
+        "english_name": "Fiji Dollar",
+        "arabic_name": "دولار فيجي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "FJ",
+        "emoji": "🇫🇯"
+    },
+    {
+        "code": "FKP",
+        "symbol": "",
+        "english_name": "Falkland Islands Pound",
+        "arabic_name": "جنيه جزر فوكلاند",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "FK",
+        "emoji": "🇫🇰"
+    },
+    {
+        "code": "GBP",
+        "symbol": "&#163;",
+        "english_name": "British Pound",
+        "arabic_name": "جنيه بريطاني",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "GB",
+        "emoji": "🇬🇧"
+    },
+    {
+        "code": "GEL",
+        "symbol": "",
+        "english_name": "Lari",
+        "arabic_name": "لاري",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "GE",
+        "emoji": "🇬🇪"
+    },
+    {
+        "code": "GHS",
+        "symbol": "",
+        "english_name": "Ghana Cedi",
+        "arabic_name": "سيدي غانا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "GH",
+        "emoji": "🇬🇭"
+    },
+    {
+        "code": "GIP",
+        "symbol": "",
+        "english_name": "Gibraltar Pound",
+        "arabic_name": "جنيه جبل طارق",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "GI",
+        "emoji": "🇬🇮"
+    },
+    {
+        "code": "GMD",
+        "symbol": "",
+        "english_name": "Dalasi",
+        "arabic_name": "دالاسي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "GM",
+        "emoji": "🇬🇲"
+    },
+    {
+        "code": "GNF",
+        "symbol": "",
+        "english_name": "Guinea Franc",
+        "arabic_name": "فرنك غينيا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "GN",
+        "emoji": "🇬🇳"
+    },
+    {
+        "code": "GTQ",
+        "symbol": "",
+        "english_name": "Quetzal",
+        "arabic_name": "كيتزال",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "GT",
+        "emoji": "🇬🇹"
+    },
+    {
+        "code": "GYD",
+        "symbol": "",
+        "english_name": "Guyana Dollar",
+        "arabic_name": "دولار غيانا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "GY",
+        "emoji": "🇬🇾"
+    },
+    {
+        "code": "HKD",
+        "symbol": "$",
+        "english_name": "Hong Kong Dollar",
+        "arabic_name": "دولار هونغ كونغ",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "HK",
+        "emoji": "🇭🇰"
+    },
+    {
+        "code": "HNL",
+        "symbol": "",
+        "english_name": "Lempira",
+        "arabic_name": "ليمبيرا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "HN",
+        "emoji": "🇭🇳"
+    },
+    {
+        "code": "HRK",
+        "symbol": "",
+        "english_name": "Croatian Kuna",
+        "arabic_name": "كونا هرادي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "HR",
+        "emoji": "🇭🇷"
+    },
+    {
+        "code": "HTG",
+        "symbol": "",
+        "english_name": "Haitian gourde",
+        "arabic_name": "جردة هايتي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "HT",
+        "emoji": "🇭🇹"
+    },
+    {
+        "code": "HUF",
+        "symbol": "Ft",
+        "english_name": "Hungarian Forint",
+        "arabic_name": "فورينت هنغاري",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "HU",
+        "emoji": "🇭🇺"
+    },
+    {
+        "code": "IDR",
+        "symbol": "",
+        "english_name": "Rupiah",
+        "arabic_name": "روبية إندونيسية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "ID",
+        "emoji": "🇮🇩"
+    },
+    {
+        "code": "ILS",
+        "symbol": "&#8362;",
+        "english_name": "Israeli Sheqel",
+        "arabic_name": "شيكل إسرائيلي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "IL",
+        "emoji": "🇮🇱"
+    },
+    {
+        "code": "INR",
+        "symbol": "&#8377;",
+        "english_name": "Indian Rupee",
+        "arabic_name": "روبية إندونيسية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "IN",
+        "emoji": "🇮🇳"
+    },
+    {
+        "code": "IQD",
+        "symbol": "",
+        "english_name": "Iraqi Dinar",
+        "arabic_name": "دينار عراقي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "IQ",
+        "emoji": "🇮🇶"
+    },
+    {
+        "code": "IRR",
+        "symbol": "",
+        "english_name": "Iranian rial",
+        "arabic_name": "ريال إيراني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "IR",
+        "emoji": "🇮🇷"
+    },
+    {
+        "code": "ISK",
+        "symbol": "",
+        "english_name": "Icelandic Krona",
+        "arabic_name": "كرونة آيسلندية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "IS",
+        "emoji": "🇮🇸"
+    },
+    {
+        "code": "JMD",
+        "symbol": "",
+        "english_name": "Jamaican Dollar",
+        "arabic_name": "دولار جامايكي",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "JM",
+        "emoji": "🇯🇲"
+    },
+    {
+        "code": "JOD",
+        "symbol": "",
+        "english_name": "Jordanian Dinar",
+        "arabic_name": "دينار أردني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "JO",
+        "emoji": "🇯🇴"
+    },
+    {
+        "code": "JPY",
+        "symbol": "&yen;",
+        "english_name": "Japanese Yen",
+        "arabic_name": "ين ياباني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "JP",
+        "emoji": "🇯🇵"
+    },
+    {
+        "code": "KES",
+        "symbol": "",
+        "english_name": "Kenyan Shilling",
+        "arabic_name": "شيلين كيني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "KE",
+        "emoji": "🇰🇪"
+    },
+    {
+        "code": "KGS",
+        "symbol": "",
+        "english_name": "Som",
+        "arabic_name": "سوم",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "KG",
+        "emoji": "🇰🇬"
+    },
+    {
+        "code": "KHR",
+        "symbol": "",
+        "english_name": "Riel",
+        "arabic_name": "ريال كمبورجي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "KH",
+        "emoji": "🇰🇭"
+    },
+    {
+        "code": "KMF",
+        "symbol": "",
+        "english_name": "Comoro Franc",
+        "arabic_name": "فرنك جزر القمر",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "KM",
+        "emoji": "🇰🇲"
+    },
+    {
+        "code": "KPW",
+        "symbol": "",
+        "english_name": "North Korean won",
+        "arabic_name": "ون كوريا الشمالية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "KP",
+        "emoji": "🇰🇵"
+    },
+    {
+        "code": "KRW",
+        "symbol": "&#8361;",
+        "english_name": "South Korean Won",
+        "arabic_name": "دونا كوري",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "KR",
+        "emoji": "🇰🇷"
+    },
+    {
+        "code": "KWD",
+        "symbol": "د.ك",
+        "english_name": "Kuwaiti Dinar",
+        "arabic_name": "دينار كويتي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "KW",
+        "emoji": "🇰🇼"
+    },
+    {
+        "code": "KYD",
+        "symbol": "",
+        "english_name": "Cayman Islands Dollar",
+        "arabic_name": "دولار جزر كايمان",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "KY",
+        "emoji": "🇰🇾"
+    },
+    {
+        "code": "KZT",
+        "symbol": "",
+        "english_name": "Tenge",
+        "arabic_name": "تنكا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "KZ",
+        "emoji": "🇰🇿"
+    },
+    {
+        "code": "LAK",
+        "symbol": "",
+        "english_name": "Kip",
+        "arabic_name": "كيب",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "LA",
+        "emoji": "🇱🇦"
+    },
+    {
+        "code": "LBP",
+        "symbol": "",
+        "english_name": "Lebanese Pound",
+        "arabic_name": "ليرة بلبنانية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "LB",
+        "emoji": "🇱🇧"
+    },
+    {
+        "code": "LKR",
+        "symbol": "",
+        "english_name": "Sri Lankan Rupee",
+        "arabic_name": "روبية سريلانكية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "LK",
+        "emoji": "🇱🇰"
+    },
+    {
+        "code": "LRD",
+        "symbol": "",
+        "english_name": "Liberian Dollar",
+        "arabic_name": "دولار libérien",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "LR",
+        "emoji": "🇱🇷"
+    },
+    {
+        "code": "LSL",
+        "symbol": "",
+        "english_name": "Lesotho loti",
+        "arabic_name": "لتي سوتو",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "LS",
+        "emoji": "🇱🇸"
+    },
+    {
+        "code": "LTL",
+        "symbol": "Lt",
+        "english_name": "Lithuanian Litas",
+        "arabic_name": "ليتا ليتواني",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 1,
+
+        "country_code": "LT",
+        "emoji": "🇱🇹"
+    },
+    {
+        "code": "LVL",
+        "symbol": "Ls",
+        "english_name": "Latvian Lats",
+        "arabic_name": "لتس لاتفيا",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "LV",
+        "emoji": "🇱🇻"
+    },
+    {
+        "code": "LYD",
+        "symbol": "",
+        "english_name": "Libyan Dinar",
+        "arabic_name": "دينار ليبي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "LY",
+        "emoji": "🇱🇾"
+    },
+    {
+        "code": "MAD",
+        "symbol": "",
+        "english_name": "Moroccan Dirham",
+        "arabic_name": "درهم مغربي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MA",
+        "emoji": "🇲🇦"
+    },
+    {
+        "code": "MDL",
+        "symbol": "",
+        "english_name": "Moldovan leu",
+        "arabic_name": "ليو مولدوفا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MD",
+        "emoji": "🇲🇩"
+    },
+    {
+        "code": "MGA",
+        "symbol": "",
+        "english_name": "Malagasy Ariary",
+        "arabic_name": "أرياري مالاكيزي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MG",
+        "emoji": "🇲🇬"
+    },
+    {
+        "code": "MKD",
+        "symbol": "",
+        "english_name": "Macedonian denar",
+        "arabic_name":  "دينار مقدوني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MK",
+        "emoji": "🇲🇰"
+    },
+    {
+        "code": "MMK",
+        "symbol": "",
+        "english_name": "Kyat",
+        "arabic_name": "كيات ميانمار",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MM",
+        "emoji": "🇲🇲"
+    },
+    {
+        "code": "MNT",
+        "symbol": "",
+        "english_name": "Tugrik",
+        "arabic_name": "توغريك",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MN",
+        "emoji": "🇲🇳"
+    },
+    {
+        "code": "MOP",
+        "symbol": "",
+        "english_name": "Macanese pataca",
+        "arabic_name": "بتاكا ماكاوي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MO",
+        "emoji": "🇲🇴"
+    },
+    {
+        "code": "MRO",
+        "symbol": "",
+        "english_name": "Ouguiya",
+        "arabic_name": "أوغية موريتانية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MR",
+        "emoji": "🇲🇷"
+    },
+    {
+        "code": "MUR",
+        "symbol": "",
+        "english_name": "Mauritius Rupee",
+        "arabic_name": "روبية موريشيوسية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MU",
+        "emoji": "🇲🇺"
+    },
+    {
+        "code": "MVR",
+        "symbol": "",
+        "english_name": "Rufiyaa",
+        "arabic_name": "روفيا مالديفيا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MV",
+        "emoji": "🇲🇻"
+    },
+    {
+        "code": "MWK",
+        "symbol": "",
+        "english_name": "Kwacha",
+        "arabic_name": "كواكا مالاوي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MW",
+        "emoji": "🇲🇼"
+    },
+    {
+        "code": "MXN",
+        "symbol": "",
+        "english_name": "Mexican Peso",
+        "arabic_name": "بيزو مكسوفي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MX",
+        "emoji": "🇲🇽"
+    },
+    {
+        "code": "MYR",
+        "symbol": "",
+        "english_name": "Malaysian Ringgit",
+        "arabic_name": "رينغت ماليزي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MY",
+        "emoji": "🇲🇾"
+    },
+    {
+        "code": "MZN",
+        "symbol": "",
+        "english_name": "Mozambique Metical",
+        "arabic_name": "متكال موزمبيقي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "MZ",
+        "emoji": "🇲🇿"
+    },
+    {
+        "code": "NAD",
+        "symbol": "",
+        "english_name": "Namibian Dollar",
+        "arabic_name": "دولار ناميبي",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "NA",
+        "emoji": "🇳🇦"
+    },
+    {
+        "code": "NGN",
+        "symbol": "",
+        "english_name": "Naira",
+        "arabic_name": "نيرة نيجيري",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "NG",
+        "emoji": "🇳🇬"
+    },
+    {
+        "code": "NIO",
+        "symbol": "",
+        "english_name": "Cordoba Oro",
+        "arabic_name": "أورو كوردوبا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "NI",
+        "emoji": "🇳🇮"
+    },
+    {
+        "code": "NOK",
+        "symbol": "kr",
+        "english_name": "Norwegian Krone",
+        "arabic_name": "كرونة نرويجية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "NO",
+        "emoji": "🇳🇴"
+    },
+    {
+        "code": "NPR",
+        "symbol": "",
+        "english_name": "Nepalese Rupee",
+        "arabic_name": "روبية نيبالي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "NP",
+        "emoji": "🇳🇵"
+    },
+    {
+        "code": "NZD",
+        "symbol": "$",
+        "english_name": "New Zealand Dollar",
+        "arabic_name": "دولار زلندي",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "NZ",
+        "emoji": "🇳🇿"
+    },
+    {
+        "code": "OMR",
+        "symbol": "",
+        "english_name": "Omani Rial",
+        "arabic_name": "ريال عماني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "OM",
+        "emoji": "🇴🇲"
+    },
+    {
+        "code": "PAB",
+        "symbol": "",
+        "english_name": "Panamanian Balboa",
+        "arabic_name": "بالبوغامي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "PA",
+        "emoji": "🇵🇦"
+    },
+    {
+        "code": "PEN",
+        "symbol": "",
+        "english_name": "Nuevo Sol",
+        "arabic_name": "سول بيرو",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "PE",
+        "emoji": "🇵🇪"
+    },
+    {
+        "code": "PGK",
+        "symbol": "",
+        "english_name": "Kina",
+        "arabic_name": "كينا بابوا غينيا الجديدة",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "PG",
+        "emoji": "🇵🇬"
+    },
+    {
+        "code": "PHP",
+        "symbol": "&#8369;",
+        "english_name": "Philippine Peso",
+        "arabic_name": "بيزو فلبيني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "PH",
+        "emoji": "🇵🇭"
+    },
+    {
+        "code": "PKR",
+        "symbol": "",
+        "english_name": "Pakistani Rupee",
+        "arabic_name": "روبية باكستانية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "PK",
+        "emoji": "🇵🇰"
+    },
+    {
+        "code": "PLN",
+        "symbol": "",
+        "english_name": "Polish Zloty",
+        "arabic_name": "زلوتي هولندي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "PL",
+        "emoji": "🇵🇱"
+    },
+    {
+        "code": "PYG",
+        "symbol": "",
+        "english_name": "Guarani",
+        "arabic_name": "غواراني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "PY",
+        "emoji": "🇵🇾"
+    },
+    {
+        "code": "QAR",
+        "symbol": "",
+        "english_name": "Qatari Riyal",
+        "arabic_name": "ريال قطري",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "QA",
+        "emoji": "🇶🇦"
+    },
+    {
+        "code": "RON",
+        "symbol": "",
+        "english_name": "Romanian Leu",
+        "arabic_name": "ليو روماني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "RO",
+        "emoji": "🇷🇴"
+    },
+    {
+        "code": "RSD",
+        "symbol": "",
+        "english_name": "Serbian Dinar",
+        "arabic_name": "دينار صربي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "RS",
+        "emoji": "🇷🇸"
+    },
+    {
+        "code": "RUB",
+        "symbol": "&#8381;",
+        "english_name": "Russian Rouble",
+        "arabic_name": "روبل روسي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "RU",
+        "emoji": "🇷🇺"
+    },
+    {
+        "code": "RWF",
+        "symbol": "",
+        "english_name": "Rwanda Franc",
+        "arabic_name": "فرنك رواندي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "RW",
+        "emoji": "🇷🇼"
+    },
+    {
+        "code": "SAR",
+        "symbol": "ر.س",
+        "english_name": "Saudi Riyal",
+        "arabic_name": "ريال سعودي",
+        "decimal_separator": "",
+        "thousands_separator": ".",
+        "is_symbol_after": 1,
+
+        "country_code": "SA",
+        "emoji": "🇸🇦"
+    },
+    {
+        "code": "SBD",
+        "symbol": "",
+        "english_name": "Solomon Islands Dollar",
+        "arabic_name": "دولار جزر سليمان",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "SB",
+        "emoji": "🇸🇧"
+    },
+    {
+        "code": "SCR",
+        "symbol": "",
+        "english_name": "Seychelles Rupee",
+        "arabic_name": "روبية سيشيلية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "SC",
+        "emoji": "🇸🇨"
+    },
+    {
+        "code": "SDG",
+        "symbol": "",
+        "english_name": "Sudanese Pound",
+        "arabic_name": "جنيه سوداني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "SD",
+        "emoji": "🇸🇩"
+    },
+    {
+        "code": "SEK",
+        "symbol": "kr",
+        "english_name": "Swedish Krona",
+        "arabic_name": "كرونة سويدية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "SE",
+        "emoji": "🇸🇪"
+    },
+    {
+        "code": "SGD",
+        "symbol": "$",
+        "english_name": "Singapore Dollar",
+        "arabic_name": "دولار سنغافورة",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "SG",
+        "emoji": "🇸🇬"
+    },
+    {
+        "code": "SHP",
+        "symbol": "",
+        "english_name": "Saint Helena pound",
+        "arabic_name": "جنيه سانت هيلينا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "SH",
+        "emoji": "🇸🇭"
+    },
+    {
+        "code": "SLL",
+        "symbol": "",
+        "english_name": "Leone",
+        "arabic_name": "ليوني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "SL",
+        "emoji": "🇸🇱"
+    },
+    {
+        "code": "SOS",
+        "symbol": "",
+        "english_name": "Somali Shilling",
+        "arabic_name": "شلن سومالي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "SO",
+        "emoji": "🇸🇴"
+    },
+    {
+        "code": "SRD",
+        "symbol": "",
+        "english_name": "Surinam Dollar",
+        "arabic_name": "دولار سورينامي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "SR",
+        "emoji": "🇸🇷"
+    },
+    {
+        "code": "SSP",
+        "symbol": "",
+        "english_name": "South Sudanese Pound",
+        "arabic_name": "جنيه جنوب السودان",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "SS",
+        "emoji": "🇸🇸"
+    },
+    {
+        "code": "STD",
+        "symbol": "",
+        "english_name": "Dobra",
+        "arabic_name": "دوبرا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "ST",
+        "emoji": "🇸🇹"
+    },
+    {
+        "code": "SVC",
+        "symbol": "",
+        "english_name": "Salvadoran colón",
+        "arabic_name": "colón سلفادوري",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "SV",
+        "emoji": "🇸🇻"
+    },
+    {
+        "code": "SYP",
+        "symbol": "",
+        "english_name": "Syrian Pound",
+        "arabic_name": "ليرة سورية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "SY",
+        "emoji": "🇸🇾"
+    },
+    {
+        "code": "SZL",
+        "symbol": "",
+        "english_name": "Lilangeni",
+        "arabic_name": "ليلانغيني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "SZ",
+        "emoji": "🇸🇿"
+    },
+    {
+        "code": "THB",
+        "symbol": "&#3647;",
+        "english_name": "Thai Baht",
+        "arabic_name": "بات تايلند",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "TH",
+        "emoji": "🇹🇭"
+    },
+    {
+        "code": "TJS",
+        "symbol": "",
+        "english_name": "Somoni",
+        "arabic_name": "ساموني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "TJ",
+        "emoji": "🇹🇯"
+    },
+    {
+        "code": "TMT",
+        "symbol": "",
+        "english_name": "Turkmenistan New Manat",
+        "arabic_name": "مانات تركمانستانية",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "TM",
+        "emoji": "🇹🇲"
+    },
+    {
+        "code": "TND",
+        "symbol": "",
+        "english_name": "Tunisian Dinar",
+        "arabic_name": "دينار تونسي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "TN",
+        "emoji": "🇹🇳"
+    },
+    {
+        "code": "TOP",
+        "symbol": "",
+        "english_name": "Pa’anga",
+        "arabic_name": "باونا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "TO",
+        "emoji": "🇹🇴"
+    },
+    {
+        "code": "TRY",
+        "symbol": "&#8378;",
+        "english_name": "Turkish Lira",
+        "arabic_name": "ليرة تركية",
+        "decimal_separator": ",",
+        "thousands_separator": ".",
+        "is_symbol_after": 1,
+
+        "country_code": "TR",
+        "emoji": "🇹🇷"
+    },
+    {
+        "code": "TTD",
+        "symbol": "",
+        "english_name": "Trinidad and Tobago Dollar",
+        "arabic_name": "دولار ترينيداد وتوباغو",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "TT",
+        "emoji": "🇹🇹"
+    },
+    {
+        "code": "TWD",
+        "symbol": "",
+        "english_name": "New Taiwan dollar",
+        "arabic_name": "دولار تايواني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "TW",
+        "emoji": "🇹🇼"
+    },
+    {
+        "code": "TZS",
+        "symbol": "",
+        "english_name": "Tanzanian shilling",
+        "arabic_name": "شلن تنزانيا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "TZ",
+        "emoji": "🇹🇿"
+    },
+    {
+        "code": "UAH",
+        "symbol": "",
+        "english_name": "Hryvnia",
+        "arabic_name": "هريفنيا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "UA",
+        "emoji": "🇺🇦"
+    },
+    {
+        "code": "UGX",
+        "symbol": "",
+        "english_name": "Uganda Shilling",
+        "arabic_name": "شلن أوغندا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "UG",
+        "emoji": "🇺🇬"
+    },
+    {
+        "code": "USD",
+        "symbol": "$",
+        "english_name": "US Dollar",
+        "arabic_name": "دولار أمريكي",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "US",
+        "emoji": "🇺🇸"
+    },
+    {
+        "code": "UYU",
+        "symbol": "",
+        "english_name": "Peso Uruguayo",
+        "arabic_name": "بيزو اورغوي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "UY",
+        "emoji": "🇺🇾"
+    },
+    {
+        "code": "UZS",
+        "symbol": "",
+        "english_name": "Uzbekistan Sum",
+        "arabic_name": "سمبل أوزبكستاني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "UZ",
+        "emoji": "🇺🇿"
+    },
+    {
+        "code": "VEF",
+        "symbol": "Bs F",
+        "english_name": "Bolivar",
+        "arabic_name": "بوليفار",
+        "decimal_separator": ",",
+        "thousands_separator": ".",
+        "is_symbol_after": 0,
+
+        "country_code": "VE",
+        "emoji": "🇻🇪"
+    },
+    {
+        "code": "VND",
+        "symbol": "",
+        "english_name": "Dong",
+        "arabic_name": "دونغ",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "VN",
+        "emoji": "🇻🇳"
+    },
+    {
+        "code": "VUV",
+        "symbol": "",
+        "english_name": "Vatu",
+        "arabic_name": "فاتو",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "VU",
+        "emoji": "🇻🇺"
+    },
+    {
+        "code": "WST",
+        "symbol": "",
+        "english_name": "Tala",
+        "arabic_name": "تالا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "WS",
+        "emoji":"🇼🇸"
+    },
+    {
+        "code": "XAF",
+        "symbol": "",
+        "english_name": "Central African CFA franc",
+        "arabic_name": "فرنك وسط أفريقيي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "CF",
+        "emoji": "🇨🇫"
+    },
+    {
+        "code": "XAG",
+        "symbol": "oz t",
+        "english_name": "Silver",
+        "arabic_name": "فضة",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 1,
+        "status": 0
+    },
+    {
+        "code": "XAU",
+        "symbol": "oz t",
+        "english_name": "Gold",
+        "arabic_name": "ذهب",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 1,
+        "status": 0
+    },
+    {
+        "code": "XCD",
+        "symbol": "",
+        "english_name": "East Caribbean Dollar",
+        "arabic_name": "دولار شرق الكاريبي",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 0,
+
+        "country_code": "DM",
+        "emoji": "🇩🇲"
+    },
+    {
+        "code": "XDR",
+        "symbol": "SDR",
+        "english_name": "SDR (Special Drawing Right)",
+        "arabic_name": "SDR",
+        "decimal_separator": ".",
+        "thousands_separator": ",",
+        "is_symbol_after": 1
+    },
+    {
+        "code": "XOF",
+        "symbol": "",
+        "english_name": "West African CFA franc",
+        "arabic_name": "فرنك أفريقي غربي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "BJ",
+        "emoji": "🇧🇯"
+    },
+    {
+        "code": "XPF",
+        "symbol": "",
+        "english_name": "CFP franc (franc Pacifique)",
+        "arabic_name": "فرنك سياسي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "PF",
+        "emoji": "🇵🇫"
+    },
+    {
+        "code": "YER",
+        "symbol": "&#xFDFC;",
+        "english_name": "Yemeni Rial",
+        "arabic_name": "ريال يمني",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "YE",
+        "emoji": "🇾🇪"
+    },
+    {
+        "code": "ZAR",
+        "symbol": "",
+        "english_name": "South African Rand",
+        "arabic_name": "راند جنوب أفريقيا",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "ZA",
+        "emoji": "🇿🇦"
+    },
+    {
+        "code": "ZMW",
+        "symbol": "",
+        "english_name": "Zambian Kwacha",
+        "arabic_name": "كواكا زامبي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "ZM",
+        "emoji": "🇿🇲"
+    },
+    {
+        "code": "ZWL",
+        "symbol": "",
+        "english_name": "Zimbabwe Dollar",
+        "arabic_name": "دولار زيمبابوي",
+        "decimal_separator": null,
+        "thousands_separator": null,
+        "is_symbol_after": 0,
+
+        "country_code": "ZW",
+        "emoji": "🇿🇼"
+    }
+]

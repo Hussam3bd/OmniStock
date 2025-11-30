@@ -22,6 +22,10 @@ class PurchaseOrderItem extends Model
         'total',
     ];
 
+    protected $attributes = [
+        'quantity_received' => 0,
+    ];
+
     protected function casts(): array
     {
         return [

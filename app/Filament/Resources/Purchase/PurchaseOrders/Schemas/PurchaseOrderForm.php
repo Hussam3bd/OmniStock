@@ -52,6 +52,48 @@ class PurchaseOrderForm
                                     ->maxLength(255),
                             ]),
 
+                        Forms\Components\Select::make('location_id')
+                            ->label(__('Destination Location'))
+                            ->relationship('location', 'name')
+                            ->required()
+                            ->searchable()
+                            ->preload()
+                            ->default(fn () => \App\Models\Inventory\Location::where('is_default', true)->first()?->id)
+                            ->helperText(__('Where this order will be received')),
+
+                        Forms\Components\Select::make('currency_id')
+                            ->label(__('Currency'))
+                            ->relationship('currency', 'code')
+                            ->required()
+                            ->searchable()
+                            ->preload()
+                            ->default(fn () => \App\Models\Currency::where('is_default', true)->first()?->id)
+                            ->reactive()
+                            ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->code} ({$record->symbol})")
+                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                if ($state) {
+                                    $currency = \App\Models\Currency::find($state);
+                                    $defaultCurrency = \App\Models\Currency::where('is_default', true)->first();
+
+                                    if ($currency && $defaultCurrency) {
+                                        $rate = \App\Models\ExchangeRate::getRateWithFallback(
+                                            $currency->id,
+                                            $defaultCurrency->id
+                                        );
+                                        $set('exchange_rate', $rate ?? 1.0);
+                                    }
+                                }
+                            }),
+
+                        Forms\Components\TextInput::make('exchange_rate')
+                            ->label(__('Exchange Rate'))
+                            ->numeric()
+                            ->disabled()
+                            ->dehydrated()
+                            ->helperText(fn ($get) => $get('currency_id')
+                                ? __('Rate to default currency at order time')
+                                : null),
+
                         Forms\Components\Select::make('status')
                             ->label(__('Status'))
                             ->options(PurchaseOrderStatus::class)
@@ -92,7 +134,10 @@ class PurchaseOrderForm
                                     return $quantity * $unitCost;
                                 });
 
-                                return number_format($subtotal, 2).' '.__('TRY');
+                                $currency = \App\Models\Currency::find($get('currency_id'));
+                                $currencyCode = $currency?->code ?? 'TRY';
+
+                                return number_format($subtotal, 2).' '.$currencyCode;
                             }),
 
                         Infolists\Components\TextEntry::make('tax_display')
@@ -108,11 +153,16 @@ class PurchaseOrderForm
                                     return $subtotal * ($taxRate / 100);
                                 });
 
-                                return number_format($tax, 2).' '.__('TRY');
+                                $currency = \App\Models\Currency::find($get('currency_id'));
+                                $currencyCode = $currency?->code ?? 'TRY';
+
+                                return number_format($tax, 2).' '.$currencyCode;
                             }),
 
                         MoneyInput::make('shipping_cost')
                             ->label(__('Shipping Cost'))
+                            ->default(0)
+                            ->currencyField('currency_id')
                             ->reactive(),
 
                         Infolists\Components\TextEntry::make('total_display')
@@ -138,7 +188,20 @@ class PurchaseOrderForm
                                 $shipping = (float) ($get('shipping_cost') ?? 0);
                                 $total = $subtotal + $tax + $shipping;
 
-                                return number_format($total, 2).' '.__('TRY');
+                                $currency = \App\Models\Currency::find($get('currency_id'));
+                                $currencyCode = $currency?->code ?? 'TRY';
+                                $defaultCurrency = \App\Models\Currency::where('is_default', true)->first();
+
+                                $display = number_format($total, 2).' '.$currencyCode;
+
+                                // Show conversion if not default currency
+                                if ($currency && $defaultCurrency && $currency->id !== $defaultCurrency->id) {
+                                    $exchangeRate = (float) ($get('exchange_rate') ?? 1.0);
+                                    $convertedTotal = $total * $exchangeRate;
+                                    $display .= ' ≈ '.number_format($convertedTotal, 2).' '.$defaultCurrency->code;
+                                }
+
+                                return $display;
                             }),
                     ])
                     ->columnSpan(1),
@@ -153,13 +216,22 @@ class PurchaseOrderForm
                                     ->options(ProductVariant::query()
                                         ->with('product')
                                         ->get()
-                                        ->mapWithKeys(fn ($variant) => [
-                                            $variant->id => $variant->product->name.' - '.$variant->sku,
-                                        ]))
+                                        ->groupBy(fn ($variant) => $variant->product->title.($variant->product->model_code ? ' ('.$variant->product->model_code.')' : ''))
+                                        ->map(fn ($variants) => $variants->mapWithKeys(fn ($variant) => [
+                                            $variant->id => $variant->sku.($variant->title ? ' - '.$variant->title : ''),
+                                        ])))
                                     ->required()
                                     ->searchable()
                                     ->preload()
                                     ->reactive()
+                                    ->disableOptionWhen(function ($value, $state, $get) {
+                                        $selectedVariants = collect($get('../../items'))
+                                            ->pluck('product_variant_id')
+                                            ->filter()
+                                            ->values();
+
+                                        return $selectedVariants->contains($value) && $value !== $state;
+                                    })
                                     ->afterStateUpdated(function ($state, callable $set) {
                                         if ($state) {
                                             $variant = ProductVariant::find($state);
@@ -177,16 +249,10 @@ class PurchaseOrderForm
                                     ->minValue(1)
                                     ->reactive(),
 
-                                Forms\Components\TextInput::make('quantity_received')
-                                    ->label(__('Quantity Received'))
-                                    ->numeric()
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->visible(fn ($get) => $get('../../status') !== PurchaseOrderStatus::Draft->value),
-
                                 MoneyInput::make('unit_cost')
                                     ->label(__('Unit Cost'))
                                     ->required()
+                                    ->currencyField('../../currency_id')
                                     ->reactive(),
 
                                 Forms\Components\TextInput::make('tax_rate')
@@ -210,7 +276,10 @@ class PurchaseOrderForm
                                         $tax = $subtotal * ($taxRate / 100);
                                         $total = $subtotal + $tax;
 
-                                        return number_format($total, 2).' '.__('TRY');
+                                        $currency = \App\Models\Currency::find($get('../../currency_id'));
+                                        $currencyCode = $currency?->code ?? 'TRY';
+
+                                        return number_format($total, 2).' '.$currencyCode;
                                     }),
                             ])
                             ->columns(3)

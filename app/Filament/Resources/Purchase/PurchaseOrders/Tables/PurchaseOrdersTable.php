@@ -29,6 +29,13 @@ class PurchaseOrdersTable
                     ->searchable()
                     ->sortable(),
 
+                Tables\Columns\TextColumn::make('location.name')
+                    ->label(__('Location'))
+                    ->icon('heroicon-o-map-pin')
+                    ->sortable()
+                    ->toggleable()
+                    ->placeholder(__('Not set')),
+
                 Tables\Columns\TextColumn::make('status')
                     ->label(__('Status'))
                     ->badge()
@@ -104,6 +111,13 @@ class PurchaseOrdersTable
                 Tables\Filters\SelectFilter::make('supplier')
                     ->label(__('Supplier'))
                     ->relationship('supplier', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->multiple(),
+
+                Tables\Filters\SelectFilter::make('location')
+                    ->label(__('Location'))
+                    ->relationship('location', 'name')
                     ->searchable()
                     ->preload()
                     ->multiple(),
