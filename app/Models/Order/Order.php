@@ -2,6 +2,9 @@
 
 namespace App\Models\Order;
 
+use App\Enums\Order\FulfillmentStatus;
+use App\Enums\Order\OrderStatus;
+use App\Enums\Order\PaymentStatus;
 use App\Models\Accounting\Transaction;
 use App\Models\Customer\Customer;
 use App\Models\Inventory\InventoryMovement;
@@ -18,7 +21,9 @@ class Order extends Model
         'customer_id',
         'channel',
         'order_number',
-        'status',
+        'order_status',
+        'payment_status',
+        'fulfillment_status',
         'subtotal',
         'tax_amount',
         'shipping_amount',
@@ -35,6 +40,9 @@ class Order extends Model
     protected function casts(): array
     {
         return [
+            'order_status' => OrderStatus::class,
+            'payment_status' => PaymentStatus::class,
+            'fulfillment_status' => FulfillmentStatus::class,
             'subtotal' => MoneyIntegerCast::class,
             'tax_amount' => MoneyIntegerCast::class,
             'shipping_amount' => MoneyIntegerCast::class,
