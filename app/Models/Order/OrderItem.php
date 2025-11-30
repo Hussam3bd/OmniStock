@@ -3,6 +3,7 @@
 namespace App\Models\Order;
 
 use App\Models\Product\ProductVariant;
+use Cknow\Money\Casts\MoneyIntegerCast;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -19,8 +20,8 @@ class OrderItem extends Model
     protected function casts(): array
     {
         return [
-            'unit_price' => 'decimal:2',
-            'total_price' => 'decimal:2',
+            'unit_price' => MoneyIntegerCast::class,
+            'total_price' => MoneyIntegerCast::class,
         ];
     }
 

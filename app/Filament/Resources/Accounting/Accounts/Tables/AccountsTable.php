@@ -32,9 +32,7 @@ class AccountsTable
 
                 TextColumn::make('balance')
                     ->label(__('Balance'))
-                    ->numeric(decimalPlaces: 2)
-                    ->sortable()
-                    ->prefix(fn ($record) => $record->currency?->code ?? 'TRY'),
+                    ->sortable(),
 
                 TextColumn::make('created_at')
                     ->label(__('Created At'))

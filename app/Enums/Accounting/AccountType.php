@@ -2,7 +2,9 @@
 
 namespace App\Enums\Accounting;
 
-enum AccountType: string
+use Filament\Support\Contracts\HasLabel;
+
+enum AccountType: string implements HasLabel
 {
     case BANK = 'bank';
     case CASH = 'cash';

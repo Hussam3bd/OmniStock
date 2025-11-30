@@ -6,6 +6,7 @@ use App\Models\Accounting\Transaction;
 use App\Models\Customer\Customer;
 use App\Models\Inventory\InventoryMovement;
 use App\Models\Platform\PlatformMapping;
+use Cknow\Money\Casts\MoneyIntegerCast;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -34,11 +35,11 @@ class Order extends Model
     protected function casts(): array
     {
         return [
-            'subtotal' => 'decimal:2',
-            'tax_amount' => 'decimal:2',
-            'shipping_amount' => 'decimal:2',
-            'discount_amount' => 'decimal:2',
-            'total_amount' => 'decimal:2',
+            'subtotal' => MoneyIntegerCast::class,
+            'tax_amount' => MoneyIntegerCast::class,
+            'shipping_amount' => MoneyIntegerCast::class,
+            'discount_amount' => MoneyIntegerCast::class,
+            'total_amount' => MoneyIntegerCast::class,
             'invoice_date' => 'date',
             'order_date' => 'datetime',
         ];

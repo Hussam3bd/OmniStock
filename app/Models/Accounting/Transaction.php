@@ -3,6 +3,7 @@
 namespace App\Models\Accounting;
 
 use App\Models\Order\Order;
+use Cknow\Money\Casts\MoneyIntegerCast;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -22,7 +23,7 @@ class Transaction extends Model
     protected function casts(): array
     {
         return [
-            'amount' => 'decimal:2',
+            'amount' => MoneyIntegerCast::class,
             'transaction_date' => 'date',
         ];
     }

@@ -4,6 +4,7 @@ namespace App\Models\Accounting;
 
 use App\Enums\Accounting\AccountType;
 use App\Models\Currency;
+use Cknow\Money\Casts\MoneyIntegerCast;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -22,7 +23,7 @@ class Account extends Model
     {
         return [
             'type' => AccountType::class,
-            'balance' => 'decimal:2',
+            'balance' => MoneyIntegerCast::class,
         ];
     }
 
