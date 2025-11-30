@@ -22,7 +22,7 @@ class LocationResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return __('Inventory');
+        return __('Settings');
     }
 
     public static function form(Schema $schema): Schema
