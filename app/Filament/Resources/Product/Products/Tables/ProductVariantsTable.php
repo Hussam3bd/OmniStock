@@ -3,13 +3,18 @@
 namespace App\Filament\Resources\Product\Products\Tables;
 
 use App\Filament\Actions\AdjustStockAction;
+use App\Forms\Components\MoneyInput;
 use App\Models\Product\ProductVariant;
 use App\Models\Product\VariantOption;
+use App\Services\BarcodeService;
+use App\Tables\Columns\MoneyInputColumn;
 use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ManageRelatedRecords;
@@ -17,6 +22,7 @@ use Filament\Tables;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 class ProductVariantsTable
@@ -80,14 +86,14 @@ class ProductVariantsTable
                     ->label(__('Barcode'))
                     ->rules(['nullable', 'max:255']),
 
-                Tables\Columns\TextInputColumn::make('price')
+                MoneyInputColumn::make('price')
                     ->label(__('Price'))
                     ->rules(['required', 'numeric', 'min:0'])
                     ->sortable(),
 
-                Tables\Columns\TextInputColumn::make('cost_price')
+                MoneyInputColumn::make('cost_price')
                     ->label(__('Cost'))
-                    ->rules(['nullable', 'numeric', 'min:0'])
+                    ->sortable()
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('inventory_quantity')
@@ -185,12 +191,17 @@ class ProductVariantsTable
                             ->unique('product_variants', 'sku')
                             ->maxLength(255),
 
-                        Forms\Components\TextInput::make('price')
+                        Forms\Components\TextInput::make('barcode')
+                            ->label(__('Barcode'))
+                            ->maxLength(255),
+
+                        MoneyInput::make('price')
                             ->label(__('Price'))
                             ->required()
-                            ->numeric()
-                            ->prefix('TRY')
                             ->default(0),
+
+                        MoneyInput::make('cost_price')
+                            ->label(__('Cost Price')),
 
                         Forms\Components\TextInput::make('inventory_quantity')
                             ->label(__('Stock'))
@@ -200,11 +211,126 @@ class ProductVariantsTable
                     ]),
             ])
             ->recordActions([
+                EditAction::make()
+                    ->modalHeading(__('Edit Variant'))
+                    ->schema([
+                        Forms\Components\TextInput::make('sku')
+                            ->label(__('SKU'))
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('barcode')
+                            ->label(__('Barcode'))
+                            ->maxLength(255),
+
+                        Forms\Components\Placeholder::make('edit_price_inline')
+                            ->label(__('Price & Cost'))
+                            ->content(__('Edit price and cost directly in the table for faster updates')),
+                    ]),
+
                 AdjustStockAction::make(),
                 DeleteAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    BulkAction::make('generate_sku')
+                        ->label(__('Generate SKU'))
+                        ->icon('heroicon-o-tag')
+                        ->requiresConfirmation()
+                        ->modalHeading(__('Generate SKU for Selected Variants'))
+                        ->modalDescription(__('This will generate and update SKU for all selected variants based on their product model code and option values.'))
+                        ->action(function (Collection $records) {
+                            $barcodeService = app(BarcodeService::class);
+                            $updatedCount = 0;
+
+                            foreach ($records as $variant) {
+                                $sku = $barcodeService->generateSku($variant);
+                                $variant->update(['sku' => $sku]);
+                                $updatedCount++;
+                            }
+
+                            Notification::make()
+                                ->title(__('SKU Generated Successfully'))
+                                ->body(__(':count variants updated', ['count' => $updatedCount]))
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
+                    BulkAction::make('generate_barcode')
+                        ->label(__('Generate Barcode'))
+                        ->icon('heroicon-o-qr-code')
+                        ->requiresConfirmation()
+                        ->modalHeading(__('Generate Barcode for Selected Variants'))
+                        ->modalDescription(__('This will generate barcodes for all selected variants using the configured format and country code.'))
+                        ->action(function (Collection $records) {
+                            $barcodeService = app(BarcodeService::class);
+                            $updatedCount = 0;
+
+                            foreach ($records as $variant) {
+                                $barcode = $barcodeService->generateBarcode($variant);
+                                $variant->update(['barcode' => $barcode]);
+                                $updatedCount++;
+                            }
+
+                            Notification::make()
+                                ->title(__('Barcode Generated Successfully'))
+                                ->body(__(':count variants updated', ['count' => $updatedCount]))
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
+                    BulkAction::make('update_price')
+                        ->label(__('Update Price'))
+                        ->icon('heroicon-o-currency-dollar')
+                        ->form([
+                            MoneyInput::make('price')
+                                ->label(__('New Price'))
+                                ->required()
+                                ->helperText(__('This price will be applied to all selected variants')),
+                        ])
+                        ->action(function (Collection $records, array $data) {
+                            $updatedCount = 0;
+
+                            foreach ($records as $variant) {
+                                $variant->update(['price' => $data['price']]);
+                                $updatedCount++;
+                            }
+
+                            Notification::make()
+                                ->title(__('Price Updated Successfully'))
+                                ->body(__(':count variants updated', ['count' => $updatedCount]))
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
+                    BulkAction::make('update_cost')
+                        ->label(__('Update Cost'))
+                        ->icon('heroicon-o-banknotes')
+                        ->form([
+                            MoneyInput::make('cost_price')
+                                ->label(__('New Cost Price'))
+                                ->required()
+                                ->helperText(__('This cost will be applied to all selected variants')),
+                        ])
+                        ->action(function (Collection $records, array $data) {
+                            $updatedCount = 0;
+
+                            foreach ($records as $variant) {
+                                $variant->update(['cost_price' => $data['cost_price']]);
+                                $updatedCount++;
+                            }
+
+                            Notification::make()
+                                ->title(__('Cost Updated Successfully'))
+                                ->body(__(':count variants updated', ['count' => $updatedCount]))
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
                     DeleteBulkAction::make(),
                 ]),
             ])
