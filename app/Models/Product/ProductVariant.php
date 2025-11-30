@@ -5,6 +5,7 @@ namespace App\Models\Product;
 use App\Models\Inventory\InventoryMovement;
 use App\Models\Order\OrderItem;
 use App\Models\Platform\PlatformMapping;
+use Cknow\Money\Casts\MoneyIntegerCast;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -34,8 +35,8 @@ class ProductVariant extends Model implements HasMedia
     protected function casts(): array
     {
         return [
-            'price' => \Cknow\Money\Casts\MoneyIntegerCast::class,
-            'cost_price' => \Cknow\Money\Casts\MoneyIntegerCast::class,
+            'price' => MoneyIntegerCast::class,
+            'cost_price' => MoneyIntegerCast::class,
             'weight' => 'decimal:2',
             'requires_shipping' => 'boolean',
             'taxable' => 'boolean',
@@ -65,6 +66,13 @@ class ProductVariant extends Model implements HasMedia
     public function optionValues(): BelongsToMany
     {
         return $this->belongsToMany(VariantOptionValue::class, 'product_variant_option_values')
+            ->withTimestamps();
+    }
+
+    public function locations(): BelongsToMany
+    {
+        return $this->belongsToMany(\App\Models\Inventory\Location::class, 'location_inventory')
+            ->withPivot('quantity')
             ->withTimestamps();
     }
 

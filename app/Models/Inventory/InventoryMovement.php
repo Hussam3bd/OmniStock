@@ -11,6 +11,7 @@ class InventoryMovement extends Model
 {
     protected $fillable = [
         'product_variant_id',
+        'location_id',
         'order_id',
         'purchase_order_item_id',
         'type',
@@ -18,6 +19,7 @@ class InventoryMovement extends Model
         'quantity_before',
         'quantity_after',
         'reference',
+        'notes',
     ];
 
     public function productVariant(): BelongsTo
@@ -33,5 +35,10 @@ class InventoryMovement extends Model
     public function purchaseOrderItem(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Purchase\PurchaseOrderItem::class);
+    }
+
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 }
