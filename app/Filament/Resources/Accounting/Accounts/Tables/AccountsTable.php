@@ -15,19 +15,35 @@ class AccountsTable
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->searchable(),
-                TextColumn::make('type')
-                    ->searchable(),
-                TextColumn::make('currency')
-                    ->searchable(),
-                TextColumn::make('balance')
-                    ->numeric()
+                    ->label(__('Name'))
+                    ->searchable()
                     ->sortable(),
+
+                TextColumn::make('type')
+                    ->label(__('Type'))
+                    ->badge()
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('currency.code')
+                    ->label(__('Currency'))
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('balance')
+                    ->label(__('Balance'))
+                    ->numeric(decimalPlaces: 2)
+                    ->sortable()
+                    ->prefix(fn ($record) => $record->currency?->code ?? 'TRY'),
+
                 TextColumn::make('created_at')
+                    ->label(__('Created At'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+
                 TextColumn::make('updated_at')
+                    ->label(__('Updated At'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
