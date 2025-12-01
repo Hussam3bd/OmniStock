@@ -2,11 +2,12 @@
 
 namespace App\Filament\Resources\Integration\Integrations\Tables;
 
+use App\Jobs\SyncShopifyOrders;
 use App\Jobs\SyncShopifyProducts;
+use App\Jobs\SyncTrendyolOrders;
+use App\Jobs\SyncTrendyolProducts;
 use App\Models\Integration\Integration;
-use App\Services\Integrations\SalesChannels\Shopify\Mappers\OrderMapper as ShopifyOrderMapper;
 use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
-use App\Services\Integrations\SalesChannels\Trendyol\Mappers\OrderMapper as TrendyolOrderMapper;
 use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -17,6 +18,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Bus\Batch;
 use Illuminate\Support\Facades\Bus;
 
 class IntegrationsTable
@@ -144,24 +146,56 @@ class IntegrationsTable
                             $jobs = collect($products)->map(function ($product) use ($record) {
                                 return match ($record->provider) {
                                     'shopify' => new SyncShopifyProducts($record, $product),
-                                    'trendyol' => new SyncShopifyProducts($record, $product), // TODO: Create TrendyolProductSync job
+                                    'trendyol' => new SyncTrendyolProducts($record, $product),
                                 };
                             })->toArray();
+
+                            // Get current user for notifications
+                            $user = auth()->user();
 
                             // Dispatch batch
                             $batch = Bus::batch($jobs)
                                 ->name("Sync {$totalProducts} products from ".ucfirst($record->provider))
                                 ->allowFailures()
                                 ->onQueue('default')
-                                ->finally(function () use ($record, $totalProducts) {
+                                ->then(function (Batch $batch) use ($user, $totalProducts, $record) {
+                                    // All jobs completed successfully
                                     Notification::make()
                                         ->title(__('Product sync completed'))
-                                        ->body(__('Finished syncing :count products from :provider', [
+                                        ->body(__('Successfully synced all :count products from :provider', [
                                             'count' => $totalProducts,
                                             'provider' => ucfirst($record->provider),
                                         ]))
                                         ->success()
-                                        ->sendToDatabase(auth()->user());
+                                        ->sendToDatabase($user);
+                                })
+                                ->catch(function (Batch $batch, \Throwable $e) use ($user, $record) {
+                                    // First batch job failure
+                                    Notification::make()
+                                        ->title(__('Product sync error'))
+                                        ->body(__('An error occurred during product sync from :provider: :error', [
+                                            'provider' => ucfirst($record->provider),
+                                            'error' => $e->getMessage(),
+                                        ]))
+                                        ->danger()
+                                        ->sendToDatabase($user);
+                                })
+                                ->finally(function (Batch $batch) use ($user, $totalProducts, $record) {
+                                    // Always runs, even with failures
+                                    if ($batch->failedJobs > 0) {
+                                        $successCount = $batch->totalJobs - $batch->failedJobs;
+
+                                        Notification::make()
+                                            ->title(__('Product sync completed with errors'))
+                                            ->body(__('Synced :success of :total products from :provider. :failed failed.', [
+                                                'success' => $successCount,
+                                                'total' => $totalProducts,
+                                                'failed' => $batch->failedJobs,
+                                                'provider' => ucfirst($record->provider),
+                                            ]))
+                                            ->warning()
+                                            ->sendToDatabase($user);
+                                    }
                                 })
                                 ->dispatch();
 
@@ -189,8 +223,8 @@ class IntegrationsTable
                     ->visible(fn (Integration $record) => in_array($record->provider, ['trendyol', 'shopify']) && $record->is_active)
                     ->requiresConfirmation()
                     ->modalHeading(__('Sync Orders'))
-                    ->modalDescription(__('This will fetch and sync recent orders from :provider.', ['provider' => fn (Integration $record) => ucfirst($record->provider)]))
-                    ->modalSubmitActionLabel(__('Sync Now'))
+                    ->modalDescription(__('This will fetch and sync recent orders from :provider. The process will run in the background.', ['provider' => fn (Integration $record) => ucfirst($record->provider)]))
+                    ->modalSubmitActionLabel(__('Start Sync'))
                     ->action(function (Integration $record) {
                         try {
                             $adapter = match ($record->provider) {
@@ -203,26 +237,88 @@ class IntegrationsTable
                                 throw new \Exception('Unsupported provider');
                             }
 
+                            // Fetch all orders (just metadata, not full sync yet)
                             $orders = $adapter->fetchAllOrders(now()->subDays(30));
-                            $mapper = match ($record->provider) {
-                                'trendyol' => app(TrendyolOrderMapper::class),
-                                'shopify' => app(ShopifyOrderMapper::class),
-                            };
+                            $totalOrders = count($orders);
 
-                            $synced = 0;
-                            foreach ($orders as $order) {
-                                $mapper->mapOrder($order);
-                                $synced++;
+                            if ($totalOrders === 0) {
+                                Notification::make()
+                                    ->title(__('No orders found'))
+                                    ->body(__('No orders to sync from :provider', ['provider' => ucfirst($record->provider)]))
+                                    ->warning()
+                                    ->send();
+
+                                return;
                             }
 
+                            // Create jobs for each order
+                            $jobs = collect($orders)->map(function ($order) use ($record) {
+                                return match ($record->provider) {
+                                    'shopify' => new SyncShopifyOrders($record, $order),
+                                    'trendyol' => new SyncTrendyolOrders($record, $order),
+                                };
+                            })->toArray();
+
+                            // Get current user for notifications
+                            $user = auth()->user();
+
+                            // Dispatch batch
+                            $batch = Bus::batch($jobs)
+                                ->name("Sync {$totalOrders} orders from ".ucfirst($record->provider))
+                                ->allowFailures()
+                                ->onQueue('default')
+                                ->then(function (Batch $batch) use ($user, $totalOrders, $record) {
+                                    // All jobs completed successfully
+                                    Notification::make()
+                                        ->title(__('Order sync completed'))
+                                        ->body(__('Successfully synced all :count orders from :provider', [
+                                            'count' => $totalOrders,
+                                            'provider' => ucfirst($record->provider),
+                                        ]))
+                                        ->success()
+                                        ->sendToDatabase($user);
+                                })
+                                ->catch(function (Batch $batch, \Throwable $e) use ($user, $record) {
+                                    // First batch job failure
+                                    Notification::make()
+                                        ->title(__('Order sync error'))
+                                        ->body(__('An error occurred during order sync from :provider: :error', [
+                                            'provider' => ucfirst($record->provider),
+                                            'error' => $e->getMessage(),
+                                        ]))
+                                        ->danger()
+                                        ->sendToDatabase($user);
+                                })
+                                ->finally(function (Batch $batch) use ($user, $totalOrders, $record) {
+                                    // Always runs, even with failures
+                                    if ($batch->failedJobs > 0) {
+                                        $successCount = $batch->totalJobs - $batch->failedJobs;
+
+                                        Notification::make()
+                                            ->title(__('Order sync completed with errors'))
+                                            ->body(__('Synced :success of :total orders from :provider. :failed failed.', [
+                                                'success' => $successCount,
+                                                'total' => $totalOrders,
+                                                'failed' => $batch->failedJobs,
+                                                'provider' => ucfirst($record->provider),
+                                            ]))
+                                            ->warning()
+                                            ->sendToDatabase($user);
+                                    }
+                                })
+                                ->dispatch();
+
                             Notification::make()
-                                ->title(__('Orders synced successfully'))
-                                ->body(__(':count orders synced from :provider', ['count' => $synced, 'provider' => ucfirst($record->provider)]))
+                                ->title(__('Order sync started'))
+                                ->body(__('Syncing :count orders from :provider in the background. You will be notified when complete.', [
+                                    'count' => $totalOrders,
+                                    'provider' => ucfirst($record->provider),
+                                ]))
                                 ->success()
                                 ->send();
                         } catch (\Exception $e) {
                             Notification::make()
-                                ->title(__('Error syncing orders'))
+                                ->title(__('Error starting order sync'))
                                 ->body($e->getMessage())
                                 ->danger()
                                 ->send();
