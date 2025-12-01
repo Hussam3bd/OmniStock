@@ -73,7 +73,7 @@ class OrderMapper extends BaseOrderMapper
             'city' => $shippingAddress['city'] ?? null,
             'state' => $shippingAddress['province'] ?? null,
             'postal_code' => $shippingAddress['zip'] ?? null,
-            'country' => $shippingAddress['country_code'] ?? $shippingAddress['country'] ?? null,
+            'country' => $shippingAddress['country_code'] ?? $shippingAddress['country'] ?? 'Unknown',
             'notes' => $shopifyOrder['note'] ?? null,
         ];
 
