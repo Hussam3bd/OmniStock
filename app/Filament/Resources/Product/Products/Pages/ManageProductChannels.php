@@ -25,13 +25,6 @@ class ManageProductChannels extends Page implements HasTable
 
     protected string $view = 'filament.pages.manage-product-channels';
 
-    public ?array $data = [];
-
-    public function mount(): void
-    {
-        $this->form->fill();
-    }
-
     public static function getNavigationLabel(): string
     {
         return __('Channels');
