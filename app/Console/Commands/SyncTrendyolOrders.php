@@ -13,6 +13,7 @@ class SyncTrendyolOrders extends Command
     protected $signature = 'trendyol:sync-orders
                             {--integration= : Specific integration ID to sync}
                             {--since= : Sync orders since this date (Y-m-d format)}
+                            {--all : Sync all orders without date filter}
                             {--force : Force sync even if integration is inactive}';
 
     protected $description = 'Sync orders from Trendyol marketplace';
@@ -21,6 +22,7 @@ class SyncTrendyolOrders extends Command
     {
         $integrationId = $this->option('integration');
         $since = $this->option('since');
+        $all = $this->option('all');
         $force = $this->option('force');
 
         $integrations = $this->getIntegrations($integrationId, $force);
@@ -31,9 +33,13 @@ class SyncTrendyolOrders extends Command
             return self::FAILURE;
         }
 
-        $sinceDate = $since ? Carbon::parse($since) : Carbon::now()->subDays(7);
-
-        $this->info("Syncing orders since {$sinceDate->format('Y-m-d H:i:s')}");
+        if ($all) {
+            $sinceDate = null;
+            $this->info('Syncing ALL orders (no date filter)');
+        } else {
+            $sinceDate = $since ? Carbon::parse($since) : Carbon::now()->subDays(7);
+            $this->info("Syncing orders since {$sinceDate->format('Y-m-d H:i:s')}");
+        }
 
         $totalSynced = 0;
         $totalErrors = 0;
@@ -82,7 +88,7 @@ class SyncTrendyolOrders extends Command
         return $query->get();
     }
 
-    protected function syncIntegration(Integration $integration, Carbon $since): array
+    protected function syncIntegration(Integration $integration, ?Carbon $since): array
     {
         $adapter = new TrendyolAdapter($integration);
         $mapper = app(TrendyolOrderMapper::class);
@@ -91,7 +97,10 @@ class SyncTrendyolOrders extends Command
             throw new \Exception('Authentication failed');
         }
 
-        $orders = $adapter->fetchOrders($since);
+        $this->info('Fetching orders from Trendyol...');
+        $orders = $adapter->fetchAllOrders($since);
+        $this->info("Found {$orders->count()} orders to sync");
+
         $synced = 0;
         $errors = 0;
 

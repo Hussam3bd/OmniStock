@@ -37,11 +37,11 @@ class TrendyolAdapter implements SalesChannelAdapter
         }
     }
 
-    public function fetchOrders(?Carbon $since = null): Collection
+    public function fetchOrders(?Carbon $since = null, int $page = 0, int $size = 200, ?array $statuses = null): Collection
     {
         $params = [
-            'page' => 0,
-            'size' => 200,
+            'page' => $page,
+            'size' => $size,
         ];
 
         if ($since) {
@@ -49,18 +49,152 @@ class TrendyolAdapter implements SalesChannelAdapter
             $params['endDate'] = now()->timestamp * 1000;
         }
 
+        // Add status filter if provided
+        if ($statuses && ! empty($statuses)) {
+            $params['status'] = implode(',', $statuses);
+        }
+
+        $url = "{$this->baseUrl}/{$this->integration->settings['supplier_id']}/orders";
+
         $response = Http::withBasicAuth(
             $this->integration->settings['api_key'],
             $this->integration->settings['api_secret']
-        )->get("{$this->baseUrl}/{$this->integration->settings['supplier_id']}/orders", $params);
+        )->get($url, $params);
 
         if (! $response->successful()) {
             return collect();
         }
 
-        $orders = $response->json('content', []);
+        $data = $response->json();
 
-        return collect($orders);
+        return collect([
+            'content' => $data['content'] ?? [],
+            'totalPages' => $data['totalPages'] ?? 0,
+            'totalElements' => $data['totalElements'] ?? 0,
+            'page' => $data['page'] ?? 0,
+            'size' => $data['size'] ?? 0,
+        ]);
+    }
+
+    public function fetchAllOrders(?Carbon $since = null, ?array $statuses = null): Collection
+    {
+        // Default to all statuses if none provided
+        if ($statuses === null) {
+            $statuses = [
+                'Created',
+                'Invoiced',
+                'Picking',
+                'Shipped',
+                'Delivered',
+                'Returned',
+                'UnDelivered',
+                'AtCollectionPoint',
+                'Awaiting',
+                'Verified',
+                'Reset',
+            ];
+        }
+
+        // If no since date, fetch last 12 months in monthly chunks
+        if ($since === null) {
+            return $this->fetchOrdersInMonthlyChunks(Carbon::now()->subMonths(12), now(), $statuses);
+        }
+
+        // Always use monthly chunks to respect Trendyol's one-month limitation
+        return $this->fetchOrdersInMonthlyChunks($since, now(), $statuses);
+    }
+
+    protected function fetchOrdersInMonthlyChunks(Carbon $startDate, Carbon $endDate, array $statuses): Collection
+    {
+        $allOrders = collect();
+
+        // Start from the beginning of the month containing startDate
+        $currentStart = $startDate->copy()->startOfMonth();
+
+        while ($currentStart->lt($endDate)) {
+            // End at the last day of the current month
+            $currentEnd = $currentStart->copy()->endOfMonth();
+
+            // Don't go beyond the requested end date
+            if ($currentEnd->gt($endDate)) {
+                $currentEnd = $endDate->copy();
+            }
+
+            // Don't start before the requested start date
+            $chunkStart = $currentStart->lt($startDate) ? $startDate->copy() : $currentStart->copy();
+
+            $orders = $this->fetchOrdersForDateRange($chunkStart, $statuses, $currentEnd);
+            $allOrders = $allOrders->merge($orders);
+
+            // Move to the first day of next month
+            $currentStart = $currentStart->copy()->addMonth()->startOfMonth();
+        }
+
+        return $allOrders;
+    }
+
+    protected function fetchOrdersForDateRange(?Carbon $since, array $statuses, ?Carbon $until = null): Collection
+    {
+        $allOrders = collect();
+        $page = 0;
+        $size = 200;
+
+        do {
+            // Use until date if provided, otherwise now()
+            $endDate = $until ?? now();
+
+            $params = [
+                'page' => $page,
+                'size' => $size,
+                'status' => implode(',', $statuses),
+            ];
+
+            if ($since) {
+                $params['startDate'] = $since->timestamp * 1000;
+                $params['endDate'] = $endDate->timestamp * 1000;
+            }
+
+            $url = "{$this->baseUrl}/{$this->integration->settings['supplier_id']}/orders";
+
+            $response = Http::withBasicAuth(
+                $this->integration->settings['api_key'],
+                $this->integration->settings['api_secret']
+            )->get($url, $params);
+
+            if (! $response->successful()) {
+                break;
+            }
+
+            $data = $response->json();
+            $orders = collect($data['content'] ?? []);
+
+            if ($orders->isEmpty()) {
+                break;
+            }
+
+            $allOrders = $allOrders->merge($orders);
+
+            $page++;
+
+            $totalPages = $data['totalPages'] ?? 0;
+
+            // If we got fewer orders than the page size, we're on the last page
+            if ($orders->count() < $size) {
+                break;
+            }
+
+            // Break if we've reached the last page
+            if ($totalPages > 0 && $page >= $totalPages) {
+                break;
+            }
+
+            // Safety limit
+            if ($page > 1000) {
+                break;
+            }
+        } while (true);
+
+        return $allOrders;
     }
 
     public function fetchProducts(int $page = 0, int $size = 200, ?string $approved = null): Collection
