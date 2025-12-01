@@ -111,6 +111,28 @@ class IntegrationForm
                     ->placeholder($fieldConfig['placeholder'] ?? null)
                     ->helperText($fieldConfig['helper'] ?? null),
 
+                'select' => Select::make("settings.{$fieldKey}")
+                    ->label($fieldConfig['label'])
+                    ->options($fieldConfig['options'] ?? [])
+                    ->required($fieldConfig['required'] ?? false)
+                    ->placeholder($fieldConfig['placeholder'] ?? null)
+                    ->default($fieldConfig['default'] ?? null)
+                    ->helperText($fieldConfig['helper'] ?? null)
+                    ->searchable($fieldConfig['searchable'] ?? false),
+
+                'relationship' => Select::make("settings.{$fieldKey}")
+                    ->label($fieldConfig['label'])
+                    ->relationship(
+                        name: $fieldConfig['relationship_name'],
+                        titleAttribute: $fieldConfig['relationship_title_attribute'] ?? 'name',
+                        modifyQueryUsing: fn ($query) => $query->where('is_active', true)
+                    )
+                    ->required($fieldConfig['required'] ?? false)
+                    ->placeholder($fieldConfig['placeholder'] ?? null)
+                    ->helperText($fieldConfig['helper'] ?? null)
+                    ->searchable()
+                    ->preload(),
+
                 default => TextInput::make("settings.{$fieldKey}")
                     ->label($fieldConfig['label'])
                     ->required($fieldConfig['required'] ?? false)
