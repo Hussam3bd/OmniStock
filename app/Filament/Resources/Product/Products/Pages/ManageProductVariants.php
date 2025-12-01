@@ -22,6 +22,6 @@ class ManageProductVariants extends ManageRelatedRecords
     public function table(Table $table): Table
     {
         return ProductVariantsTable::configure($table, $this)
-            ->modifyQueryUsing(fn (Builder $query) => $query->with('optionValues.variantOption'));
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['optionValues.variantOption', 'channelAvailability']));
     }
 }
