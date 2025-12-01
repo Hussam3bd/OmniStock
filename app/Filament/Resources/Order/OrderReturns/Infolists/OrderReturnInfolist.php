@@ -223,7 +223,7 @@ class OrderReturnInfolist
 
                 Schemas\Components\Section::make(__('Customer Photos'))
                     ->schema([
-                        Infolists\Components\ImageEntry::make('customer_photos')
+                        \Filament\Infolists\Components\SpatieMediaLibraryImageEntry::make('customer_photos')
                             ->label('')
                             ->collection('customer_photos')
                             ->columnSpanFull(),
@@ -233,7 +233,7 @@ class OrderReturnInfolist
 
                 Schemas\Components\Section::make(__('Inspection Photos'))
                     ->schema([
-                        Infolists\Components\ImageEntry::make('inspection_photos')
+                        \Filament\Infolists\Components\SpatieMediaLibraryImageEntry::make('inspection_photos')
                             ->label('')
                             ->collection('inspection_photos')
                             ->columnSpanFull(),
