@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Product\Products\Tables;
 
+use App\Enums\Order\OrderChannel;
 use App\Filament\Actions\AdjustStockAction;
 use App\Forms\Components\MoneyInput;
 use App\Models\Inventory\InventoryMovement;
@@ -139,28 +140,6 @@ class ProductVariantsTable
                 Tables\Columns\TextColumn::make('channelAvailability.channel')
                     ->label(__('Channels'))
                     ->badge()
-                    ->separator(',')
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'shopify' => 'Shopify',
-                        'trendyol' => 'Trendyol',
-                        default => ucfirst($state),
-                    })
-                    ->color(fn (string $state): string => match ($state) {
-                        'shopify' => 'success',
-                        'trendyol' => 'warning',
-                        default => 'gray',
-                    })
-                    ->icon(fn (string $state): string => match ($state) {
-                        'shopify' => 'heroicon-o-shopping-bag',
-                        'trendyol' => 'heroicon-o-building-storefront',
-                        default => 'heroicon-o-globe-alt',
-                    })
-                    ->getStateUsing(function ($record) {
-                        return $record->channelAvailability
-                            ->where('is_enabled', true)
-                            ->pluck('channel')
-                            ->toArray();
-                    })
                     ->placeholder(__('No channels'))
                     ->toggleable(),
             ])
@@ -183,10 +162,7 @@ class ProductVariantsTable
 
                 Tables\Filters\SelectFilter::make('channel')
                     ->label(__('Sales Channel'))
-                    ->options([
-                        'shopify' => 'Shopify',
-                        'trendyol' => 'Trendyol',
-                    ])
+                    ->options(OrderChannel::class)
                     ->query(function ($query, $state) {
                         $channel = $state['value'] ?? null;
                         if ($channel) {

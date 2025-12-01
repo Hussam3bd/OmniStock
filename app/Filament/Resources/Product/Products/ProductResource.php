@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Product\Products;
 use App\Filament\Resources\Product\Products\Pages\CreateProduct;
 use App\Filament\Resources\Product\Products\Pages\EditProduct;
 use App\Filament\Resources\Product\Products\Pages\ListProducts;
+use App\Filament\Resources\Product\Products\Pages\ManageProductChannels;
 use App\Filament\Resources\Product\Products\Pages\ManageProductMedia;
 use App\Filament\Resources\Product\Products\Pages\ManageProductVariants;
 use App\Filament\Resources\Product\Products\Schemas\ProductForm;
@@ -58,6 +59,7 @@ class ProductResource extends Resource
         return $page->generateNavigationItems([
             EditProduct::class,
             ManageProductVariants::class,
+            ManageProductChannels::class,
             ManageProductMedia::class,
         ]);
     }
@@ -76,6 +78,7 @@ class ProductResource extends Resource
             'create' => CreateProduct::route('/create'),
             'edit' => EditProduct::route('/{record}/edit'),
             'variants' => ManageProductVariants::route('/{record}/variants'),
+            'channels' => ManageProductChannels::route('/{record}/channels'),
             'media' => ManageProductMedia::route('/{record}/media'),
         ];
     }
