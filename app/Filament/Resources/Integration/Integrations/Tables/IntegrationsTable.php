@@ -3,6 +3,11 @@
 namespace App\Filament\Resources\Integration\Integrations\Tables;
 
 use App\Models\Integration\Integration;
+use App\Services\Integrations\SalesChannels\Shopify\Mappers\OrderMapper as ShopifyOrderMapper;
+use App\Services\Integrations\SalesChannels\Shopify\Mappers\ProductMapper as ShopifyProductMapper;
+use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
+use App\Services\Integrations\SalesChannels\Trendyol\Mappers\OrderMapper as TrendyolOrderMapper;
+use App\Services\Integrations\SalesChannels\Trendyol\Mappers\ProductMapper as TrendyolProductMapper;
 use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -60,19 +65,25 @@ class IntegrationsTable
                     ->label(__('Webhook'))
                     ->boolean()
                     ->getStateUsing(function ($record) {
-                        if ($record->provider !== 'trendyol') {
+                        if (! in_array($record->provider, ['trendyol', 'shopify'])) {
                             return null;
                         }
 
-                        return isset($record->config['webhook']['id']);
+                        return isset($record->config['webhook']);
                     })
                     ->tooltip(function ($record) {
-                        if ($record->provider !== 'trendyol') {
+                        if (! in_array($record->provider, ['trendyol', 'shopify'])) {
                             return null;
                         }
 
                         if (isset($record->config['webhook']['id'])) {
                             return __('Webhook ID: :id', ['id' => $record->config['webhook']['id']]);
+                        }
+
+                        if (isset($record->config['webhook']['webhooks'])) {
+                            $count = count($record->config['webhook']['webhooks']);
+
+                            return __(':count webhooks configured', ['count' => $count]);
                         }
 
                         return __('No webhook configured');
@@ -94,45 +105,148 @@ class IntegrationsTable
                 //
             ])
             ->recordActions([
+                Action::make('sync_products')
+                    ->label(__('Sync Products'))
+                    ->icon(Heroicon::OutlinedArrowPath)
+                    ->color('info')
+                    ->visible(fn (Integration $record) => in_array($record->provider, ['trendyol', 'shopify']) && $record->is_active)
+                    ->requiresConfirmation()
+                    ->modalHeading(__('Sync Products'))
+                    ->modalDescription(__('This will fetch and sync all products from :provider to your store.', ['provider' => fn (Integration $record) => ucfirst($record->provider)]))
+                    ->modalSubmitActionLabel(__('Sync Now'))
+                    ->action(function (Integration $record) {
+                        try {
+                            $adapter = match ($record->provider) {
+                                'trendyol' => new TrendyolAdapter($record),
+                                'shopify' => new ShopifyAdapter($record),
+                                default => null,
+                            };
+
+                            if (! $adapter) {
+                                throw new \Exception('Unsupported provider');
+                            }
+
+                            $products = $adapter->fetchAllProducts();
+                            $mapper = match ($record->provider) {
+                                'trendyol' => app(TrendyolProductMapper::class),
+                                'shopify' => app(ShopifyProductMapper::class),
+                            };
+
+                            $synced = 0;
+                            foreach ($products as $product) {
+                                $mapper->mapProduct($product);
+                                $synced++;
+                            }
+
+                            Notification::make()
+                                ->title(__('Products synced successfully'))
+                                ->body(__(':count products synced from :provider', ['count' => $synced, 'provider' => ucfirst($record->provider)]))
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title(__('Error syncing products'))
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+
+                Action::make('sync_orders')
+                    ->label(__('Sync Orders'))
+                    ->icon(Heroicon::OutlinedArrowPath)
+                    ->color('warning')
+                    ->visible(fn (Integration $record) => in_array($record->provider, ['trendyol', 'shopify']) && $record->is_active)
+                    ->requiresConfirmation()
+                    ->modalHeading(__('Sync Orders'))
+                    ->modalDescription(__('This will fetch and sync recent orders from :provider.', ['provider' => fn (Integration $record) => ucfirst($record->provider)]))
+                    ->modalSubmitActionLabel(__('Sync Now'))
+                    ->action(function (Integration $record) {
+                        try {
+                            $adapter = match ($record->provider) {
+                                'trendyol' => new TrendyolAdapter($record),
+                                'shopify' => new ShopifyAdapter($record),
+                                default => null,
+                            };
+
+                            if (! $adapter) {
+                                throw new \Exception('Unsupported provider');
+                            }
+
+                            $orders = $adapter->fetchAllOrders(now()->subDays(30));
+                            $mapper = match ($record->provider) {
+                                'trendyol' => app(TrendyolOrderMapper::class),
+                                'shopify' => app(ShopifyOrderMapper::class),
+                            };
+
+                            $synced = 0;
+                            foreach ($orders as $order) {
+                                $mapper->mapOrder($order);
+                                $synced++;
+                            }
+
+                            Notification::make()
+                                ->title(__('Orders synced successfully'))
+                                ->body(__(':count orders synced from :provider', ['count' => $synced, 'provider' => ucfirst($record->provider)]))
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title(__('Error syncing orders'))
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+
                 Action::make('register_webhook')
-                    ->label(fn (Integration $record) => isset($record->config['webhook']['id'])
+                    ->label(fn (Integration $record) => isset($record->config['webhook'])
                         ? __('Update Webhook')
                         : __('Register Webhook'))
                     ->icon(Heroicon::OutlinedSignal)
-                    ->color(fn (Integration $record) => isset($record->config['webhook']['id'])
+                    ->color(fn (Integration $record) => isset($record->config['webhook'])
                         ? 'info'
-                        : 'warning')
-                    ->visible(fn (Integration $record) => $record->provider === 'trendyol' && $record->is_active)
+                        : 'success')
+                    ->visible(fn (Integration $record) => in_array($record->provider, ['trendyol', 'shopify']) && $record->is_active)
                     ->requiresConfirmation()
-                    ->modalHeading(fn (Integration $record) => isset($record->config['webhook']['id'])
-                        ? __('Update Trendyol Webhook')
-                        : __('Register Trendyol Webhook'))
-                    ->modalDescription(__('This will create/update a webhook at Trendyol to receive real-time order updates.'))
+                    ->modalHeading(fn (Integration $record) => isset($record->config['webhook'])
+                        ? __('Update :provider Webhook', ['provider' => ucfirst($record->provider)])
+                        : __('Register :provider Webhook', ['provider' => ucfirst($record->provider)]))
+                    ->modalDescription(__('This will create/update webhooks to receive real-time updates from :provider.', ['provider' => fn (Integration $record) => ucfirst($record->provider)]))
                     ->modalSubmitActionLabel(__('Proceed'))
                     ->action(function (Integration $record) {
                         try {
-                            $adapter = new TrendyolAdapter($record);
+                            $adapter = match ($record->provider) {
+                                'trendyol' => new TrendyolAdapter($record),
+                                'shopify' => new ShopifyAdapter($record),
+                                default => null,
+                            };
+
+                            if (! $adapter) {
+                                throw new \Exception('Unsupported provider');
+                            }
 
                             if ($adapter->registerWebhooks()) {
                                 Notification::make()
-                                    ->title(__('Webhook registered successfully'))
+                                    ->title(__('Webhooks registered successfully'))
                                     ->success()
                                     ->send();
                             } else {
                                 Notification::make()
-                                    ->title(__('Failed to register webhook'))
+                                    ->title(__('Failed to register webhooks'))
                                     ->body(__('Please check your integration settings and try again.'))
                                     ->danger()
                                     ->send();
                             }
                         } catch (\Exception $e) {
                             Notification::make()
-                                ->title(__('Error registering webhook'))
+                                ->title(__('Error registering webhooks'))
                                 ->body($e->getMessage())
                                 ->danger()
                                 ->send();
                         }
                     }),
+
                 EditAction::make(),
             ])
             ->toolbarActions([
