@@ -148,28 +148,28 @@ class ProductMapper extends BaseProductMapper
     }
 
     /**
-     * Find matching product by SKU or title.
+     * Find matching product by barcode, SKU, or title.
      */
     protected function findMatchingProduct(array $shopifyProduct): ?Product
     {
-        // Try to match by first variant SKU
+        // Try to match by variant barcode first, then SKU
         $variants = $shopifyProduct['variants'] ?? [];
 
         foreach ($variants as $variant) {
-            $sku = $variant['sku'] ?? null;
+            $barcode = $variant['barcode'] ?? null;
 
-            if ($sku) {
-                $existingVariant = ProductVariant::where('sku', $sku)->first();
+            if ($barcode) {
+                $existingVariant = ProductVariant::where('barcode', $barcode)->first();
 
                 if ($existingVariant) {
                     return $existingVariant->product;
                 }
             }
 
-            $barcode = $variant['barcode'] ?? null;
+            $sku = $variant['sku'] ?? null;
 
-            if ($barcode) {
-                $existingVariant = ProductVariant::where('barcode', $barcode)->first();
+            if ($sku) {
+                $existingVariant = ProductVariant::where('sku', $sku)->first();
 
                 if ($existingVariant) {
                     return $existingVariant->product;
@@ -210,13 +210,13 @@ class ProductMapper extends BaseProductMapper
             }
         }
 
-        // If not found by mapping, try to match by SKU or barcode
-        if (! $variant && $sku) {
-            $variant = ProductVariant::where('sku', $sku)->first();
-        }
-
+        // If not found by mapping, try to match by barcode first, then SKU
         if (! $variant && $barcode) {
             $variant = ProductVariant::where('barcode', $barcode)->first();
+        }
+
+        if (! $variant && $sku) {
+            $variant = ProductVariant::where('sku', $sku)->first();
         }
 
         $price = $this->convertToMinorUnits((float) ($shopifyVariant['price'] ?? 0));
@@ -226,7 +226,7 @@ class ProductMapper extends BaseProductMapper
 
         $variantData = [
             'product_id' => $product->id,
-            'sku' => $sku ?? 'SKU-'.time(),
+            'sku' => $sku ?? ($barcode ?? 'SKU-'.uniqid()),
             'barcode' => $barcode,
             'title' => $shopifyVariant['title'] ?? $product->title,
             'price' => $price,

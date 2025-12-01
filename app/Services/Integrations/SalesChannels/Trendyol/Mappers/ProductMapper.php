@@ -123,7 +123,7 @@ class ProductMapper extends BaseProductMapper
 
         $variantData = [
             'product_id' => $product->id,
-            'sku' => $sku ?? 'SKU-'.time(),
+            'sku' => $sku ?? ($barcode ?? 'SKU-'.uniqid()),
             'barcode' => $barcode,
             'title' => $item['title'] ?? $product->title,
             'price' => $this->convertToMinorUnits($item['salePrice'] ?? 0),
