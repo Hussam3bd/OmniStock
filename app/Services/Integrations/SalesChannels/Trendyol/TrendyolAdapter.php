@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Services\Integrations\SalesChannels;
+namespace App\Services\Integrations\SalesChannels\Trendyol;
 
+use App\Enums\Order\OrderChannel;
 use App\Models\Customer\Customer;
 use App\Models\Integration\Integration;
 use App\Models\Order\Order;
@@ -258,7 +259,7 @@ class TrendyolAdapter implements SalesChannelAdapter
     public function updateInventory(ProductVariant $variant): bool
     {
         $mapping = $variant->platformMappings()
-            ->where('platform', 'trendyol')
+            ->where('platform', OrderChannel::TRENDYOL->value)
             ->first();
 
         if (! $mapping || ! isset($mapping->platform_data['barcode'])) {
@@ -296,7 +297,7 @@ class TrendyolAdapter implements SalesChannelAdapter
     public function fulfillOrder(Order $order, array $trackingInfo): bool
     {
         $mapping = $order->platformMappings()
-            ->where('platform', 'trendyol')
+            ->where('platform', OrderChannel::TRENDYOL->value)
             ->first();
 
         if (! $mapping) {

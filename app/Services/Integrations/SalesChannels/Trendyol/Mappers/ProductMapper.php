@@ -1,25 +1,32 @@
 <?php
 
-namespace App\Services\Integrations\SalesChannels;
+namespace App\Services\Integrations\SalesChannels\Trendyol\Mappers;
 
+use App\Enums\Order\OrderChannel;
 use App\Models\Platform\PlatformMapping;
 use App\Models\Product\Product;
 use App\Models\Product\ProductVariant;
+use App\Services\Integrations\Concerns\BaseProductMapper;
 use App\Services\Product\AttributeMappingService;
 use Illuminate\Support\Facades\DB;
 
-class TrendyolProductMapper
+class ProductMapper extends BaseProductMapper
 {
     public function __construct(
         protected AttributeMappingService $attributeMappingService
     ) {}
 
+    protected function getChannel(): OrderChannel
+    {
+        return OrderChannel::TRENDYOL;
+    }
+
     /**
      * Map a Trendyol product to our system.
      */
-    public function mapProduct(array $trendyolProduct, string $platform = 'trendyol'): Product
+    public function mapProduct(array $trendyolProduct): Product
     {
-        return DB::transaction(function () use ($trendyolProduct, $platform) {
+        return DB::transaction(function () use ($trendyolProduct) {
             // Extract product-level data
             $productMainId = $trendyolProduct['productMainId'] ?? null;
             $productTitle = $trendyolProduct['title'] ?? 'Unknown Product';
@@ -27,7 +34,7 @@ class TrendyolProductMapper
             $categoryName = $trendyolProduct['categoryName'] ?? null;
 
             // Find or create product using productMainId
-            $product = $this->findOrCreateProduct($productMainId, $productTitle, $brand, $platform);
+            $product = $this->findOrCreateProductByMainId($productMainId, $productTitle, $brand);
 
             // Sync images (only once per product, not per variant)
             if (isset($trendyolProduct['images']) && $product->getMedia('images')->isEmpty()) {
@@ -35,7 +42,7 @@ class TrendyolProductMapper
             }
 
             // Sync this variant (in Products API, each response item is one variant)
-            $this->syncVariant($product, $trendyolProduct, $platform);
+            $this->syncVariant($product, $trendyolProduct);
 
             return $product->fresh('variants');
         });
@@ -44,11 +51,10 @@ class TrendyolProductMapper
     /**
      * Find or create a product by productMainId.
      */
-    protected function findOrCreateProduct(
+    protected function findOrCreateProductByMainId(
         ?string $productMainId,
         string $title,
-        ?string $brand,
-        string $platform
+        ?string $brand
     ): Product {
         // Try to find by model_code (productMainId)
         if ($productMainId) {
@@ -61,7 +67,7 @@ class TrendyolProductMapper
 
         // Try to find by platform mapping
         if ($productMainId) {
-            $mapping = PlatformMapping::where('platform', $platform)
+            $mapping = PlatformMapping::where('platform', $this->getChannel()->value)
                 ->where('entity_type', Product::class)
                 ->where('platform_id', (string) $productMainId)
                 ->first();
@@ -75,8 +81,8 @@ class TrendyolProductMapper
         $product = Product::create([
             'model_code' => $productMainId,
             'title' => $title,
-            'description' => sprintf('Imported from %s', ucfirst($platform)),
-            'vendor' => $brand ?? ucfirst($platform),
+            'description' => sprintf('Imported from %s', ucfirst($this->getChannel()->value)),
+            'vendor' => $brand ?? ucfirst($this->getChannel()->value),
             'product_type' => 'Imported',
             'status' => 'active',
         ]);
@@ -84,7 +90,7 @@ class TrendyolProductMapper
         // Create platform mapping for new product (only once per productMainId)
         if ($productMainId) {
             PlatformMapping::create([
-                'platform' => $platform,
+                'platform' => $this->getChannel()->value,
                 'entity_type' => Product::class,
                 'entity_id' => $product->id,
                 'platform_id' => (string) $productMainId,
@@ -99,7 +105,7 @@ class TrendyolProductMapper
     /**
      * Sync a single variant.
      */
-    protected function syncVariant(Product $product, array $item, string $platform): void
+    protected function syncVariant(Product $product, array $item): void
     {
         $barcode = $item['barcode'] ?? null;
         $sku = $item['stockCode'] ?? $item['merchantSku'] ?? $barcode;
@@ -135,14 +141,14 @@ class TrendyolProductMapper
 
         // Only create/update platform mapping if it doesn't exist or needs updating
         if ($barcode) {
-            $mapping = PlatformMapping::where('platform', $platform)
+            $mapping = PlatformMapping::where('platform', $this->getChannel()->value)
                 ->where('entity_type', ProductVariant::class)
                 ->where('platform_id', (string) $barcode)
                 ->first();
 
             if (! $mapping) {
                 PlatformMapping::create([
-                    'platform' => $platform,
+                    'platform' => $this->getChannel()->value,
                     'entity_type' => ProductVariant::class,
                     'entity_id' => $variant->id,
                     'platform_id' => (string) $barcode,
@@ -160,13 +166,13 @@ class TrendyolProductMapper
         }
 
         // Map variant attributes
-        $this->mapVariantAttributes($variant, $item, $platform);
+        $this->mapVariantAttributes($variant, $item);
     }
 
     /**
      * Map variant attributes (color, size, etc.).
      */
-    protected function mapVariantAttributes(ProductVariant $variant, array $item, string $platform): void
+    protected function mapVariantAttributes(ProductVariant $variant, array $item): void
     {
         $attributes = [];
 
@@ -195,7 +201,7 @@ class TrendyolProductMapper
             $this->attributeMappingService->mapAttributesToVariant(
                 $variant,
                 $attributes,
-                $platform
+                $this->getChannel()->value
             );
         }
     }
@@ -226,13 +232,5 @@ class TrendyolProductMapper
                     ->log('product_image_sync_failed');
             }
         }
-    }
-
-    /**
-     * Convert price to minor units (cents).
-     */
-    protected function convertToMinorUnits(float $amount): int
-    {
-        return (int) round($amount * 100);
     }
 }

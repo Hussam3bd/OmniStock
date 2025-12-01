@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Integration\Integration;
-use App\Services\Integrations\SalesChannels\TrendyolAdapter;
-use App\Services\Integrations\SalesChannels\TrendyolOrderMapper;
+use App\Services\Integrations\SalesChannels\Trendyol\Mappers\OrderMapper;
+use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -91,7 +91,7 @@ class SyncTrendyolOrders extends Command
     protected function syncIntegration(Integration $integration, ?Carbon $since): array
     {
         $adapter = new TrendyolAdapter($integration);
-        $mapper = app(TrendyolOrderMapper::class);
+        $mapper = app(OrderMapper::class);
 
         if (! $adapter->authenticate()) {
             throw new \Exception('Authentication failed');
@@ -106,7 +106,7 @@ class SyncTrendyolOrders extends Command
 
         $this->withProgressBar($orders, function ($trendyolOrder) use ($mapper, $integration, &$synced, &$errors) {
             try {
-                $order = $mapper->mapOrder($trendyolOrder, 'trendyol');
+                $order = $mapper->mapOrder($trendyolOrder);
 
                 activity()
                     ->causedBy(null)

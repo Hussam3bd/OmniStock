@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Integrations\SalesChannels;
+namespace App\Services\Integrations\SalesChannels\Trendyol\Mappers;
 
 use App\Enums\Order\FulfillmentStatus;
 use App\Enums\Order\OrderChannel;
@@ -10,22 +10,28 @@ use App\Models\Customer\Customer;
 use App\Models\Order\Order;
 use App\Models\Platform\PlatformMapping;
 use App\Models\Product\ProductVariant;
+use App\Services\Integrations\Concerns\BaseOrderMapper;
 use App\Services\Product\AttributeMappingService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
-class TrendyolOrderMapper
+class OrderMapper extends BaseOrderMapper
 {
     public function __construct(
         protected AttributeMappingService $attributeMappingService
     ) {}
 
-    public function mapOrder(array $trendyolPackage, string $integrationProvider = 'trendyol'): Order
+    protected function getChannel(): OrderChannel
     {
-        return DB::transaction(function () use ($trendyolPackage, $integrationProvider) {
-            $customer = $this->findOrCreateCustomer($trendyolPackage, $integrationProvider);
+        return OrderChannel::TRENDYOL;
+    }
 
-            $existingMapping = PlatformMapping::where('platform', $integrationProvider)
+    public function mapOrder(array $trendyolPackage): Order
+    {
+        return DB::transaction(function () use ($trendyolPackage) {
+            $customer = $this->findOrCreateCustomerFromTrendyol($trendyolPackage);
+
+            $existingMapping = PlatformMapping::where('platform', $this->getChannel()->value)
                 ->where('platform_id', (string) $trendyolPackage['id'])
                 ->where('entity_type', Order::class)
                 ->first();
@@ -39,10 +45,10 @@ class TrendyolOrderMapper
                     $existingMapping->delete();
                 }
 
-                $order = $this->createOrder($customer, $trendyolPackage, $integrationProvider);
+                $order = $this->createOrder($customer, $trendyolPackage);
             }
 
-            $this->syncOrderItems($order, $trendyolPackage['lines'] ?? [], $integrationProvider);
+            $this->syncOrderItems($order, $trendyolPackage['lines'] ?? []);
 
             // Calculate and update total commission
             $totalCommission = $order->items->sum(function ($item) {
@@ -55,22 +61,12 @@ class TrendyolOrderMapper
         });
     }
 
-    protected function findOrCreateCustomer(array $trendyolPackage, string $platform): Customer
+    protected function findOrCreateCustomerFromTrendyol(array $trendyolPackage): Customer
     {
         $shipmentAddress = $trendyolPackage['shipmentAddress'] ?? [];
         $invoiceAddress = $trendyolPackage['invoiceAddress'] ?? [];
 
-        $existingMapping = PlatformMapping::where('platform', $platform)
-            ->where('platform_id', (string) ($trendyolPackage['customerId'] ?? ''))
-            ->where('entity_type', Customer::class)
-            ->first();
-
-        if ($existingMapping) {
-            return $existingMapping->entity;
-        }
-
-        $customer = Customer::create([
-            'channel' => OrderChannel::TRENDYOL,
+        $customerData = [
             'first_name' => $trendyolPackage['customerFirstName'] ?? $shipmentAddress['firstName'] ?? '',
             'last_name' => $trendyolPackage['customerLastName'] ?? $shipmentAddress['lastName'] ?? '',
             'email' => $trendyolPackage['customerEmail'] ?? null,
@@ -82,26 +78,31 @@ class TrendyolOrderMapper
             'postal_code' => $shipmentAddress['postalCode'] ?? null,
             'country' => $shipmentAddress['countryCode'] ?? 'TR',
             'notes' => null,
-        ]);
+        ];
 
-        if (! empty($trendyolPackage['customerId'])) {
-            PlatformMapping::create([
-                'platform' => $platform,
-                'entity_type' => Customer::class,
-                'entity_id' => $customer->id,
-                'platform_id' => (string) $trendyolPackage['customerId'],
-                'platform_data' => [
-                    'invoice_address' => $invoiceAddress,
-                    'shipment_address' => $shipmentAddress,
-                ],
-                'last_synced_at' => now(),
-            ]);
+        $externalCustomerId = ! empty($trendyolPackage['customerId'])
+            ? (string) $trendyolPackage['customerId']
+            : null;
+
+        $customer = $this->findOrCreateCustomer($customerData, $externalCustomerId);
+
+        // Update platform data if customer was found/created with external ID
+        if ($externalCustomerId) {
+            $customer->platformMappings()
+                ->where('platform', $this->getChannel()->value)
+                ->where('platform_id', $externalCustomerId)
+                ->update([
+                    'platform_data' => [
+                        'invoice_address' => $invoiceAddress,
+                        'shipment_address' => $shipmentAddress,
+                    ],
+                ]);
         }
 
         return $customer;
     }
 
-    protected function createOrder(Customer $customer, array $trendyolPackage, string $platform): Order
+    protected function createOrder(Customer $customer, array $trendyolPackage): Order
     {
         $grossAmount = $this->convertToMinorUnits($trendyolPackage['grossAmount'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
         $totalDiscount = $this->convertToMinorUnits($trendyolPackage['totalDiscount'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
@@ -132,7 +133,7 @@ class TrendyolOrderMapper
 
         $order = Order::create([
             'customer_id' => $customer->id,
-            'channel' => $platform,
+            'channel' => $this->getChannel(),
             'order_number' => $trendyolPackage['orderNumber'] ?? null,
             'order_status' => $orderStatus,
             'payment_status' => $paymentStatus,
@@ -163,7 +164,7 @@ class TrendyolOrderMapper
 
         PlatformMapping::updateOrCreate(
             [
-                'platform' => $platform,
+                'platform' => $this->getChannel()->value,
                 'entity_type' => Order::class,
                 'entity_id' => $order->id,
             ],
@@ -225,19 +226,19 @@ class TrendyolOrderMapper
         ]);
 
         $order->platformMappings()
-            ->where('platform', 'trendyol')
+            ->where('platform', $this->getChannel()->value)
             ->update([
                 'platform_data' => $trendyolPackage,
                 'last_synced_at' => now(),
             ]);
     }
 
-    protected function syncOrderItems(Order $order, array $lines, string $platform): void
+    protected function syncOrderItems(Order $order, array $lines): void
     {
         $existingItemIds = [];
 
         foreach ($lines as $line) {
-            $variant = $this->findProductVariant($line, $platform);
+            $variant = $this->findProductVariant($line);
 
             if (! $variant) {
                 continue;
@@ -271,7 +272,7 @@ class TrendyolOrderMapper
                 'commission_rate' => round($commissionRate, 2),
             ];
 
-            $existingMapping = PlatformMapping::where('platform', $platform)
+            $existingMapping = PlatformMapping::where('platform', $this->getChannel()->value)
                 ->where('platform_id', (string) $line['id'])
                 ->where('entity_type', 'App\Models\Order\OrderItem')
                 ->first();
@@ -293,7 +294,7 @@ class TrendyolOrderMapper
 
                 PlatformMapping::updateOrCreate(
                     [
-                        'platform' => $platform,
+                        'platform' => $this->getChannel()->value,
                         'entity_type' => 'App\Models\Order\OrderItem',
                         'entity_id' => $item->id,
                     ],
@@ -311,7 +312,7 @@ class TrendyolOrderMapper
         $order->items()->whereNotIn('id', $existingItemIds)->delete();
     }
 
-    protected function findProductVariant(array $line, string $platform): ?ProductVariant
+    protected function findProductVariant(array $line): ?ProductVariant
     {
         $barcode = $line['barcode'] ?? null;
 
@@ -338,7 +339,7 @@ class TrendyolOrderMapper
             }
         }
 
-        $mapping = PlatformMapping::where('platform', $platform)
+        $mapping = PlatformMapping::where('platform', $this->getChannel()->value)
             ->where('platform_id', (string) ($line['productCode'] ?? ''))
             ->where('entity_type', ProductVariant::class)
             ->first();
@@ -347,10 +348,10 @@ class TrendyolOrderMapper
             return $mapping->entity;
         }
 
-        return $this->createProductFromLine($line, $platform);
+        return $this->createProductFromLine($line);
     }
 
-    protected function createProductFromLine(array $line, string $platform): ProductVariant
+    protected function createProductFromLine(array $line): ProductVariant
     {
         $productName = $line['productName'] ?? 'Unknown Product';
         $productCode = $line['productCode'] ?? null;
@@ -363,12 +364,12 @@ class TrendyolOrderMapper
         $cleanProductName = $this->cleanProductName($productName, $line);
 
         // Find or create product by model code
-        $product = $this->findOrCreateProduct($modelCode, $cleanProductName, $platform);
+        $product = $this->findOrCreateProduct($modelCode, $cleanProductName);
 
         if ($productCode) {
             PlatformMapping::updateOrCreate(
                 [
-                    'platform' => $platform,
+                    'platform' => $this->getChannel()->value,
                     'entity_type' => \App\Models\Product\Product::class,
                     'entity_id' => $product->id,
                 ],
@@ -394,7 +395,7 @@ class TrendyolOrderMapper
         if ($productCode) {
             PlatformMapping::updateOrCreate(
                 [
-                    'platform' => $platform,
+                    'platform' => $this->getChannel()->value,
                     'entity_type' => ProductVariant::class,
                     'entity_id' => $variant->id,
                 ],
@@ -407,12 +408,12 @@ class TrendyolOrderMapper
         }
 
         // Map variant attributes (color, size, etc.)
-        $this->mapVariantAttributes($variant, $line, $platform);
+        $this->mapVariantAttributes($variant, $line);
 
         activity()
             ->performedOn($variant)
             ->withProperties([
-                'platform' => $platform,
+                'platform' => $this->getChannel()->value,
                 'product_code' => $productCode,
                 'line_data' => $line,
             ])
@@ -424,7 +425,7 @@ class TrendyolOrderMapper
     /**
      * Map Trendyol line item attributes to variant options.
      */
-    protected function mapVariantAttributes(ProductVariant $variant, array $line, string $platform): void
+    protected function mapVariantAttributes(ProductVariant $variant, array $line): void
     {
         $attributes = [];
 
@@ -442,14 +443,9 @@ class TrendyolOrderMapper
             $this->attributeMappingService->mapAttributesToVariant(
                 $variant,
                 $attributes,
-                $platform
+                $this->getChannel()->value
             );
         }
-    }
-
-    protected function convertToMinorUnits(float $amount, string $currency): int
-    {
-        return (int) round($amount * 100);
     }
 
     protected function mapOrderStatus(string $trendyolStatus): OrderStatus
@@ -568,8 +564,7 @@ class TrendyolOrderMapper
      */
     protected function findOrCreateProduct(
         ?string $modelCode,
-        string $productName,
-        string $platform
+        string $productName
     ): \App\Models\Product\Product {
         // Try to find by model code
         if ($modelCode) {
@@ -584,8 +579,8 @@ class TrendyolOrderMapper
         return \App\Models\Product\Product::create([
             'model_code' => $modelCode,
             'title' => $productName,
-            'description' => sprintf('Imported from %s', ucfirst($platform)),
-            'vendor' => ucfirst($platform),
+            'description' => sprintf('Imported from %s', ucfirst($this->getChannel()->value)),
+            'vendor' => ucfirst($this->getChannel()->value),
             'product_type' => 'Imported',
             'status' => 'active',
         ]);

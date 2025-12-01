@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Integration\Integration;
-use App\Services\Integrations\SalesChannels\TrendyolClaimsMapper;
+use App\Services\Integrations\SalesChannels\Trendyol\Mappers\ClaimsMapper;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 
@@ -15,7 +15,7 @@ class SyncTrendyolClaims extends Command
 
     protected $description = 'Sync Trendyol return claims to the returns system';
 
-    public function handle(TrendyolClaimsMapper $mapper): int
+    public function handle(ClaimsMapper $mapper): int
     {
         $integration = Integration::where('provider', 'trendyol')->first();
 
@@ -40,7 +40,7 @@ class SyncTrendyolClaims extends Command
 
         foreach ($allClaims as $claim) {
             try {
-                $return = $mapper->mapClaim($claim);
+                $return = $mapper->mapReturn($claim);
 
                 if ($return) {
                     $this->line("✓ Synced claim {$claim['id']} → Return {$return->return_number}");

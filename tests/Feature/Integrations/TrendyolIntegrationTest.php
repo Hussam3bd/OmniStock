@@ -1,7 +1,7 @@
 <?php
 
 use App\Models\Integration\Integration;
-use App\Services\Integrations\SalesChannels\TrendyolAdapter;
+use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
 use Illuminate\Support\Facades\Http;
 
 uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
@@ -70,8 +70,9 @@ test('can fetch orders from trendyol', function () {
     ]);
 
     $adapter = new TrendyolAdapter($integration);
-    $orders = $adapter->fetchOrders();
+    $result = $adapter->fetchOrders();
 
-    expect($orders)->toHaveCount(1)
-        ->and($orders->first()['orderNumber'])->toBe('TY-123456');
+    expect($result)->toBeInstanceOf(\Illuminate\Support\Collection::class)
+        ->and($result->get('content'))->toHaveCount(1)
+        ->and($result->get('content')[0]['orderNumber'])->toBe('TY-123456');
 });

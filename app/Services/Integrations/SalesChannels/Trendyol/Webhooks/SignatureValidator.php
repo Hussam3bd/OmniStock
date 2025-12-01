@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Services\Integrations\Webhooks;
+namespace App\Services\Integrations\SalesChannels\Trendyol\Webhooks;
 
 use App\Models\Integration\Integration;
 use Illuminate\Http\Request;
 use Spatie\WebhookClient\SignatureValidator\SignatureValidator;
 use Spatie\WebhookClient\WebhookConfig;
 
-class TrendyolSignatureValidator implements SignatureValidator
+class SignatureValidator implements SignatureValidator
 {
     public function isValid(Request $request, WebhookConfig $config): bool
     {

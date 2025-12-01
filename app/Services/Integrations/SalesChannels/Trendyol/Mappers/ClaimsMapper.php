@@ -1,21 +1,27 @@
 <?php
 
-namespace App\Services\Integrations\SalesChannels;
+namespace App\Services\Integrations\SalesChannels\Trendyol\Mappers;
 
 use App\Enums\Order\OrderChannel;
 use App\Enums\Order\ReturnStatus;
 use App\Models\Order\Order;
 use App\Models\Order\OrderReturn;
 use App\Models\Order\ReturnItem;
+use App\Services\Integrations\Concerns\BaseReturnsMapper;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
-class TrendyolClaimsMapper
+class ClaimsMapper extends BaseReturnsMapper
 {
+    protected function getChannel(): OrderChannel
+    {
+        return OrderChannel::TRENDYOL;
+    }
+
     /**
      * Map Trendyol claim to OrderReturn
      */
-    public function mapClaim(array $claim): ?OrderReturn
+    public function mapReturn(array $claim): ?OrderReturn
     {
         // Find order by order number
         $order = Order::where('order_number', $claim['orderNumber'])->first();
@@ -66,7 +72,7 @@ class TrendyolClaimsMapper
                     'external_return_id' => $claim['id'],
                 ],
                 [
-                    'channel' => OrderChannel::TRENDYOL,
+                    'channel' => $this->getChannel(),
                     'status' => $status,
                     'requested_at' => $claimDate,
                     'approved_at' => $approvedAt,

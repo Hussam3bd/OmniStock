@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Integration\Integration;
-use App\Services\Integrations\SalesChannels\TrendyolOrderMapper;
+use App\Services\Integrations\SalesChannels\Trendyol\Mappers\OrderMapper;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -47,8 +47,8 @@ class ProcessTrendyolWebhook extends ProcessWebhookJob implements ShouldQueue
         }
 
         try {
-            $mapper = new TrendyolOrderMapper;
-            $order = $mapper->mapOrder($payload, 'trendyol');
+            $mapper = app(OrderMapper::class);
+            $order = $mapper->mapOrder($payload);
 
             activity()
                 ->performedOn($order)

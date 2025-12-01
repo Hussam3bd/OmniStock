@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Integration\Integration;
-use App\Services\Integrations\SalesChannels\TrendyolAdapter;
-use App\Services\Integrations\SalesChannels\TrendyolProductMapper;
+use App\Services\Integrations\SalesChannels\Trendyol\Mappers\ProductMapper;
+use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
 use Illuminate\Console\Command;
 
 class SyncTrendyolProducts extends Command
@@ -82,7 +82,7 @@ class SyncTrendyolProducts extends Command
     protected function syncIntegration(Integration $integration, ?string $approved): array
     {
         $adapter = new TrendyolAdapter($integration);
-        $mapper = app(TrendyolProductMapper::class);
+        $mapper = app(ProductMapper::class);
 
         if (! $adapter->authenticate()) {
             throw new \Exception('Authentication failed');
@@ -98,7 +98,7 @@ class SyncTrendyolProducts extends Command
 
         $this->withProgressBar($products, function ($trendyolProduct) use ($mapper, $integration, &$synced, &$errors) {
             try {
-                $product = $mapper->mapProduct($trendyolProduct, 'trendyol');
+                $product = $mapper->mapProduct($trendyolProduct);
 
                 activity()
                     ->causedBy(null)
