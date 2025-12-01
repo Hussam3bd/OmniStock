@@ -66,6 +66,8 @@ class ProductVariant extends Model implements HasMedia
     public function optionValues(): BelongsToMany
     {
         return $this->belongsToMany(VariantOptionValue::class, 'product_variant_option_values')
+            ->withPivot('id')
+            ->orderByPivot('id')
             ->withTimestamps();
     }
 
@@ -104,7 +106,7 @@ class ProductVariant extends Model implements HasMedia
     {
         $value = $this->getOptionValueForOption($variantOptionId);
 
-        return $value ? __($value->value) : __('No value');
+        return $value ? $value->getTranslation('value', app()->getLocale()) : __('No value');
     }
 
     public function registerMediaCollections(): void

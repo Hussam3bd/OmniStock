@@ -15,8 +15,19 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Seed currencies
+        $this->call(CurrencySeeder::class);
 
+        // Seed variant options (size, color, etc.)
+        $this->call(VariantOptionSeeder::class);
+
+        // Seed accounts
+        $this->call(AccountSeeder::class);
+
+        // Seed Trendyol attribute mappings
+        $this->call(TrendyolAttributeMappingSeeder::class);
+
+        // Create test user
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',

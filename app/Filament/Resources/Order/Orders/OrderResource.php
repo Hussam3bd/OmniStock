@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Order\Orders;
 use App\Filament\Resources\Order\Orders\Pages\CreateOrder;
 use App\Filament\Resources\Order\Orders\Pages\EditOrder;
 use App\Filament\Resources\Order\Orders\Pages\ListOrders;
+use App\Filament\Resources\Order\Orders\Pages\ViewOrder;
 use App\Filament\Resources\Order\Orders\Schemas\OrderForm;
 use App\Filament\Resources\Order\Orders\Tables\OrdersTable;
 use App\Models\Order\Order;
@@ -49,6 +50,7 @@ class OrderResource extends Resource
         return [
             'index' => ListOrders::route('/'),
             'create' => CreateOrder::route('/create'),
+            'view' => ViewOrder::route('/{record}'),
             'edit' => EditOrder::route('/{record}/edit'),
         ];
     }

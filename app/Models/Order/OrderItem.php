@@ -15,6 +15,10 @@ class OrderItem extends Model
         'quantity',
         'unit_price',
         'total_price',
+        'discount_amount',
+        'tax_rate',
+        'tax_amount',
+        'commission_amount',
     ];
 
     protected function casts(): array
@@ -22,6 +26,10 @@ class OrderItem extends Model
         return [
             'unit_price' => MoneyIntegerCast::class,
             'total_price' => MoneyIntegerCast::class,
+            'discount_amount' => MoneyIntegerCast::class,
+            'tax_amount' => MoneyIntegerCast::class,
+            'commission_amount' => MoneyIntegerCast::class,
+            'tax_rate' => 'decimal:2',
         ];
     }
 

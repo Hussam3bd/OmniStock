@@ -14,6 +14,7 @@ class ProductForm
     public static function configure(Schema $schema): Schema
     {
         return $schema
+            ->columns(1)
             ->components([
                 Section::make(__('Product Information'))
                     ->description(__('Core product details'))

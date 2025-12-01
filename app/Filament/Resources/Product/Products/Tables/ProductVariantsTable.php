@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Product\Products\Tables;
 
 use App\Filament\Actions\AdjustStockAction;
 use App\Forms\Components\MoneyInput;
+use App\Models\Inventory\InventoryMovement;
 use App\Models\Product\ProductVariant;
 use App\Models\Product\VariantOption;
 use App\Services\BarcodeService;
@@ -46,34 +47,46 @@ class ProductVariantsTable
                             }
 
                             $query->whereHas('optionValues', function ($q) use ($key) {
-                                $q->where('variant_option_values.id', $key);
+                                $q->where('variant_option_value_id', $key);
                             });
                         })
                         ->orderQueryUsing(function (Builder $query, string $direction) use ($option) {
-                            // Order by the option value - include position in SELECT for DISTINCT compatibility
-                            $query->select('product_variants.*', 'vov_'.$option->id.'.position as _group_order')
-                                ->leftJoin(
-                                    'product_variant_option_values as pvov_'.$option->id,
-                                    fn ($join) => $join->on('product_variants.id', '=', 'pvov_'.$option->id.'.product_variant_id')
-                                )
+                            // Order by the option value position using subquery to avoid GROUP BY issues
+                            $query->leftJoin(
+                                'product_variant_option_values as pvov_'.$option->id,
+                                'product_variants.id', '=', 'pvov_'.$option->id.'.product_variant_id'
+                            )
                                 ->leftJoin(
                                     'variant_option_values as vov_'.$option->id,
-                                    fn ($join) => $join->on('pvov_'.$option->id.'.variant_option_value_id', '=', 'vov_'.$option->id.'.id')
-                                        ->where('vov_'.$option->id.'.variant_option_id', '=', $option->id)
+                                    function ($join) use ($option) {
+                                        $join->on('pvov_'.$option->id.'.variant_option_value_id', '=', 'vov_'.$option->id.'.id')
+                                            ->where('vov_'.$option->id.'.variant_option_id', '=', $option->id);
+                                    }
                                 )
-                                ->orderBy('_group_order', $direction)
-                                ->distinct();
+                                ->selectRaw('product_variants.*, MAX(vov_'.$option->id.'.position) as _group_position')
+                                ->groupBy('product_variants.id')
+                                ->orderBy('_group_position', $direction);
                         });
                 })->toArray()
             )
-//            ->defaultGroup("option_{$variantOptions->first()?->id}")
+            ->defaultGroup("option_{$variantOptions->first()?->id}")
             ->groupingSettingsInDropdownOnDesktop()
             ->columns([
                 Tables\Columns\TextColumn::make('optionValues.value')
                     ->label(__('Variant'))
                     ->badge()
                     ->separator(' / ')
-                    ->formatStateUsing(fn ($state) => __($state))
+                    ->formatStateUsing(function ($state, $record) {
+                        // If the state is an array (JSON), get the translation for current locale
+                        if (is_array($state)) {
+                            $locale = app()->getLocale();
+
+                            return $state[$locale] ?? $state['en'] ?? $state['tr'] ?? '';
+                        }
+
+                        // Fallback for string values (shouldn't happen after migration)
+                        return $state;
+                    })
                     ->searchable(),
 
                 Tables\Columns\TextInputColumn::make('sku')
@@ -104,6 +117,40 @@ class ProductVariantsTable
                         $state <= 0 => 'danger',
                         $state <= 10 => 'warning',
                         default => 'success',
+                    })
+                    ->formatStateUsing(fn (int $state): string => match (true) {
+                        $state <= 0 => __('Out of Stock'),
+                        $state <= 10 => __(':count (Low Stock)', ['count' => $state]),
+                        default => (string) $state,
+                    }),
+
+                Tables\Columns\TextColumn::make('weight')
+                    ->label(__('Weight'))
+                    ->suffix('kg')
+                    ->toggleable()
+                    ->toggledHiddenByDefault(),
+
+                Tables\Columns\IconColumn::make('requires_shipping')
+                    ->label(__('Shipping'))
+                    ->boolean()
+                    ->toggleable()
+                    ->toggledHiddenByDefault(),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('stock_status')
+                    ->label(__('Stock Status'))
+                    ->options([
+                        'in_stock' => __('In Stock'),
+                        'low_stock' => __('Low Stock (≤10)'),
+                        'out_of_stock' => __('Out of Stock'),
+                    ])
+                    ->query(function ($query, $state) {
+                        return match ($state['value'] ?? null) {
+                            'out_of_stock' => $query->where('inventory_quantity', '<=', 0),
+                            'low_stock' => $query->whereBetween('inventory_quantity', [1, 10]),
+                            'in_stock' => $query->where('inventory_quantity', '>', 10),
+                            default => $query,
+                        };
                     }),
             ])
             ->headerActions([
@@ -223,16 +270,153 @@ class ProductVariantsTable
                             ->label(__('Barcode'))
                             ->maxLength(255),
 
+                        Forms\Components\TextInput::make('weight')
+                            ->label(__('Weight (kg)'))
+                            ->numeric()
+                            ->suffix('kg'),
+
+                        Forms\Components\Toggle::make('requires_shipping')
+                            ->label(__('Requires Shipping'))
+                            ->default(true),
+
+                        Forms\Components\Toggle::make('taxable')
+                            ->label(__('Taxable'))
+                            ->default(true),
+
                         Forms\Components\Placeholder::make('edit_price_inline')
                             ->label(__('Price & Cost'))
-                            ->content(__('Edit price and cost directly in the table for faster updates')),
+                            ->content(__('Edit price and cost directly in the table for faster updates'))
+                            ->columnSpanFull(),
                     ]),
 
                 AdjustStockAction::make(),
+
+                Action::make('view_history')
+                    ->label(__('History'))
+                    ->icon('heroicon-o-clock')
+                    ->color('gray')
+                    ->modalHeading(fn (Model $record): string => __('Inventory History: :sku', ['sku' => $record->sku]))
+                    ->modalWidth('4xl')
+                    ->infolist(function (Model $record): array {
+                        $movements = $record->inventoryMovements()
+                            ->orderBy('created_at', 'desc')
+                            ->limit(50)
+                            ->get();
+
+                        if ($movements->isEmpty()) {
+                            return [
+                                \Filament\Infolists\Components\TextEntry::make('no_history')
+                                    ->label('')
+                                    ->state(__('No inventory movements recorded yet'))
+                                    ->color('gray'),
+                            ];
+                        }
+
+                        return [
+                            \Filament\Infolists\Components\RepeatableEntry::make('movements')
+                                ->label(__('Movement History'))
+                                ->state($movements->toArray())
+                                ->schema([
+                                    \Filament\Infolists\Components\TextEntry::make('created_at')
+                                        ->label(__('Date'))
+                                        ->dateTime()
+                                        ->size('sm'),
+
+                                    \Filament\Infolists\Components\TextEntry::make('type')
+                                        ->label(__('Type'))
+                                        ->badge()
+                                        ->formatStateUsing(fn ($state) => __(ucfirst($state)))
+                                        ->color(fn ($state): string => match ($state) {
+                                            'received' => 'success',
+                                            'sold' => 'primary',
+                                            'returned' => 'warning',
+                                            'damaged' => 'danger',
+                                            default => 'gray',
+                                        }),
+
+                                    \Filament\Infolists\Components\TextEntry::make('quantity')
+                                        ->label(__('Change'))
+                                        ->formatStateUsing(fn ($state) => $state > 0 ? "+{$state}" : $state)
+                                        ->color(fn ($state): string => $state > 0 ? 'success' : 'danger')
+                                        ->weight('bold'),
+
+                                    \Filament\Infolists\Components\TextEntry::make('quantity_before')
+                                        ->label(__('Before'))
+                                        ->formatStateUsing(fn ($state) => (string) $state),
+
+                                    \Filament\Infolists\Components\TextEntry::make('quantity_after')
+                                        ->label(__('After'))
+                                        ->formatStateUsing(fn ($state) => (string) $state),
+
+                                    \Filament\Infolists\Components\TextEntry::make('reference')
+                                        ->label(__('Reference'))
+                                        ->default('-')
+                                        ->columnSpanFull(),
+                                ])
+                                ->columns(5),
+                        ];
+                    })
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel(__('Close')),
+
                 DeleteAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    BulkAction::make('bulk_adjust')
+                        ->label(__('Bulk Adjust Stock'))
+                        ->icon('heroicon-o-calculator')
+                        ->color('primary')
+                        ->schema([
+                            Forms\Components\Select::make('type')
+                                ->label(__('Movement Type'))
+                                ->options([
+                                    'received' => __('Received (Purchase)'),
+                                    'adjustment' => __('Adjustment'),
+                                    'correction' => __('Correction'),
+                                ])
+                                ->required()
+                                ->native(false),
+
+                            Forms\Components\TextInput::make('quantity')
+                                ->label(__('Quantity to Add'))
+                                ->required()
+                                ->numeric()
+                                ->helperText(__('This amount will be added to all selected variants')),
+
+                            Forms\Components\Textarea::make('reference')
+                                ->label(__('Notes/Reference'))
+                                ->rows(3),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            $quantityChange = (int) $data['quantity'];
+
+                            foreach ($records as $record) {
+                                $quantityBefore = $record->inventory_quantity;
+                                $quantityAfter = $quantityBefore + $quantityChange;
+
+                                $record->update([
+                                    'inventory_quantity' => $quantityAfter,
+                                ]);
+
+                                InventoryMovement::create([
+                                    'product_variant_id' => $record->id,
+                                    'type' => $data['type'],
+                                    'quantity' => $quantityChange,
+                                    'quantity_before' => $quantityBefore,
+                                    'quantity_after' => $quantityAfter,
+                                    'reference' => $data['reference'] ?? null,
+                                ]);
+                            }
+
+                            Notification::make()
+                                ->title(__('Bulk stock adjustment completed'))
+                                ->body(__(':count variants updated', ['count' => $records->count()]))
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
                     BulkAction::make('generate_sku')
                         ->label(__('Generate SKU'))
                         ->icon('heroicon-o-tag')
@@ -337,7 +521,7 @@ class ProductVariantsTable
             ->emptyStateHeading(__('No variants yet'))
             ->emptyStateDescription(__('Create your first variant or generate multiple variants automatically'))
             ->emptyStateIcon('heroicon-o-cube')
-            ->defaultSort('product_variants.id', 'desc');
+            ->defaultSort('sku', 'asc');
     }
 
     protected static function generateCombinations(array $options): array

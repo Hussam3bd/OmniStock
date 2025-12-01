@@ -3,6 +3,7 @@
 namespace App\Models\Order;
 
 use App\Enums\Order\FulfillmentStatus;
+use App\Enums\Order\OrderChannel;
 use App\Enums\Order\OrderStatus;
 use App\Enums\Order\PaymentStatus;
 use App\Models\Accounting\Transaction;
@@ -14,9 +15,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Order extends Model
 {
+    use LogsActivity;
+
     protected $fillable = [
         'customer_id',
         'channel',
@@ -40,6 +45,7 @@ class Order extends Model
     protected function casts(): array
     {
         return [
+            'channel' => OrderChannel::class,
             'order_status' => OrderStatus::class,
             'payment_status' => PaymentStatus::class,
             'fulfillment_status' => FulfillmentStatus::class,
@@ -51,6 +57,32 @@ class Order extends Model
             'invoice_date' => 'date',
             'order_date' => 'datetime',
         ];
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'order_status',
+                'payment_status',
+                'fulfillment_status',
+                'subtotal',
+                'tax_amount',
+                'shipping_amount',
+                'discount_amount',
+                'total_amount',
+                'invoice_number',
+                'invoice_date',
+                'invoice_url',
+                'notes',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
+
+    public function isExternal(): bool
+    {
+        return $this->channel?->isExternal() ?? false;
     }
 
     public function customer(): BelongsTo

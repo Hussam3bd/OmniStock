@@ -2,6 +2,10 @@
 
 namespace App\Filament\Resources\Order\Orders\Schemas;
 
+use App\Enums\Order\FulfillmentStatus;
+use App\Enums\Order\OrderChannel;
+use App\Enums\Order\OrderStatus;
+use App\Enums\Order\PaymentStatus;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -17,45 +21,72 @@ class OrderForm
             ->components([
                 Select::make('customer_id')
                     ->relationship('customer', 'id')
-                    ->required(),
-                TextInput::make('channel')
                     ->required()
-                    ->default('manual'),
+                    ->disabled(fn ($record) => $record?->isExternal()),
+                Select::make('channel')
+                    ->options(OrderChannel::class)
+                    ->required()
+                    ->default(OrderChannel::PORTAL->value)
+                    ->disabled(fn ($record) => $record?->isExternal()),
                 TextInput::make('order_number')
-                    ->required(),
-                TextInput::make('status')
                     ->required()
-                    ->default('pending'),
+                    ->disabled(fn ($record) => $record?->isExternal()),
+                Select::make('order_status')
+                    ->options(OrderStatus::class)
+                    ->required()
+                    ->default(OrderStatus::PENDING->value)
+                    ->disabled(fn ($record) => $record?->isExternal()),
+                Select::make('payment_status')
+                    ->options(PaymentStatus::class)
+                    ->required()
+                    ->default(PaymentStatus::PENDING->value)
+                    ->disabled(fn ($record) => $record?->isExternal()),
+                Select::make('fulfillment_status')
+                    ->options(FulfillmentStatus::class)
+                    ->required()
+                    ->default(FulfillmentStatus::UNFULFILLED->value)
+                    ->disabled(fn ($record) => $record?->isExternal()),
                 TextInput::make('subtotal')
                     ->required()
                     ->numeric()
-                    ->default(0.0),
+                    ->default(0.0)
+                    ->disabled(fn ($record) => $record?->isExternal()),
                 TextInput::make('tax_amount')
                     ->required()
                     ->numeric()
-                    ->default(0.0),
+                    ->default(0.0)
+                    ->disabled(fn ($record) => $record?->isExternal()),
                 TextInput::make('shipping_amount')
                     ->required()
                     ->numeric()
-                    ->default(0.0),
+                    ->default(0.0)
+                    ->disabled(fn ($record) => $record?->isExternal()),
                 TextInput::make('discount_amount')
                     ->required()
                     ->numeric()
-                    ->default(0.0),
+                    ->default(0.0)
+                    ->disabled(fn ($record) => $record?->isExternal()),
                 TextInput::make('total_amount')
                     ->required()
-                    ->numeric(),
+                    ->numeric()
+                    ->disabled(fn ($record) => $record?->isExternal()),
                 TextInput::make('currency')
                     ->required()
-                    ->default('TRY'),
-                TextInput::make('invoice_number'),
-                DatePicker::make('invoice_date'),
+                    ->default('TRY')
+                    ->disabled(fn ($record) => $record?->isExternal()),
+                TextInput::make('invoice_number')
+                    ->disabled(fn ($record) => $record?->isExternal()),
+                DatePicker::make('invoice_date')
+                    ->disabled(fn ($record) => $record?->isExternal()),
                 TextInput::make('invoice_url')
-                    ->url(),
+                    ->url()
+                    ->disabled(fn ($record) => $record?->isExternal()),
                 Textarea::make('notes')
-                    ->columnSpanFull(),
+                    ->columnSpanFull()
+                    ->disabled(fn ($record) => $record?->isExternal()),
                 DateTimePicker::make('order_date')
-                    ->required(),
+                    ->required()
+                    ->disabled(fn ($record) => $record?->isExternal()),
             ]);
     }
 }

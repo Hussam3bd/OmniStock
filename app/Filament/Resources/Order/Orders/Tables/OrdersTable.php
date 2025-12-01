@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Order\Orders\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -13,39 +14,31 @@ class OrdersTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->defaultSort('order_date', 'desc')
             ->columns([
-                TextColumn::make('customer.id')
-                    ->searchable(),
-                TextColumn::make('channel')
-                    ->searchable(),
                 TextColumn::make('order_number')
+                    ->label('Order #')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('customer.full_name')
+                    ->label('Customer')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('channel')
+                    ->badge()
                     ->searchable(),
-                TextColumn::make('status')
-                    ->searchable(),
-                TextColumn::make('subtotal')
-                    ->numeric()
+                TextColumn::make('order_status')
+                    ->badge()
                     ->sortable(),
-                TextColumn::make('tax_amount')
-                    ->numeric()
+                TextColumn::make('payment_status')
+                    ->badge()
                     ->sortable(),
-                TextColumn::make('shipping_amount')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('discount_amount')
-                    ->numeric()
+                TextColumn::make('fulfillment_status')
+                    ->badge()
                     ->sortable(),
                 TextColumn::make('total_amount')
-                    ->numeric()
+                    ->money(fn ($record) => $record->currency)
                     ->sortable(),
-                TextColumn::make('currency')
-                    ->searchable(),
-                TextColumn::make('invoice_number')
-                    ->searchable(),
-                TextColumn::make('invoice_date')
-                    ->date()
-                    ->sortable(),
-                TextColumn::make('invoice_url')
-                    ->searchable(),
                 TextColumn::make('order_date')
                     ->dateTime()
                     ->sortable(),
@@ -62,7 +55,10 @@ class OrdersTable
                 //
             ])
             ->recordActions([
-                EditAction::make(),
+                ViewAction::make()
+                    ->visible(fn ($record) => $record->isExternal()),
+                EditAction::make()
+                    ->visible(fn ($record) => ! $record->isExternal()),
             ])
             ->bulkActions([
                 BulkActionGroup::make([

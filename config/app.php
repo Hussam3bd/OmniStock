@@ -86,6 +86,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Available Locales
+    |--------------------------------------------------------------------------
+    |
+    | List all locales that your application supports. This is used by
+    | translation features to know which languages are available.
+    |
+    */
+
+    'available_locales' => ['en', 'tr'],
+
+    /*
+    |--------------------------------------------------------------------------
     | Encryption Key
     |--------------------------------------------------------------------------
     |

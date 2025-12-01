@@ -4,11 +4,14 @@ namespace App\Models\Integration;
 
 use App\Models\Accounting\Account;
 use App\Models\Inventory\Location;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Integration extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'name',
         'type',

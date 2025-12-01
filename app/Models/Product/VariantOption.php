@@ -10,6 +10,7 @@ class VariantOption extends Model
 {
     protected $fillable = [
         'name',
+        'type',
         'position',
     ];
 
@@ -29,5 +30,29 @@ class VariantOption extends Model
     public function getTranslatedNameAttribute(): string
     {
         return __($this->name);
+    }
+
+    /**
+     * Check if this is a system variant option (color or size).
+     */
+    public function isSystemType(): bool
+    {
+        return in_array($this->type, ['color', 'size']);
+    }
+
+    /**
+     * Scope to get color variant option.
+     */
+    public function scopeColor($query)
+    {
+        return $query->where('type', 'color');
+    }
+
+    /**
+     * Scope to get size variant option.
+     */
+    public function scopeSize($query)
+    {
+        return $query->where('type', 'size');
     }
 }
