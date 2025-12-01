@@ -63,7 +63,7 @@ return [
         [
             'name' => 'trendyol',
             'signing_secret' => '',
-            'signature_header_name' => 'X-Trendyol-Api-Key',
+            'signature_header_name' => 'X-Api-Key',
             'signature_validator' => \App\Services\Integrations\SalesChannels\Trendyol\Webhooks\SignatureValidator::class,
             'webhook_profile' => \App\Services\Integrations\SalesChannels\Trendyol\Webhooks\WebhookProfile::class,
             'webhook_response' => \Spatie\WebhookClient\WebhookResponse\DefaultRespondsTo::class,
