@@ -2,6 +2,7 @@
 
 namespace App\Models\Customer;
 
+use App\Enums\Order\OrderChannel;
 use App\Models\Order\Order;
 use App\Models\Platform\PlatformMapping;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 class Customer extends Model
 {
     protected $fillable = [
-        'source',
+        'channel',
         'first_name',
         'last_name',
         'email',
@@ -24,6 +25,13 @@ class Customer extends Model
         'country',
         'notes',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'channel' => OrderChannel::class,
+        ];
+    }
 
     public function orders(): HasMany
     {

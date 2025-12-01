@@ -23,8 +23,8 @@ class OrderReturnInfolist
                             ->url(fn ($record) => route('filament.admin.resources.order.orders.view', ['record' => $record->order]))
                             ->copyable(),
 
-                        Infolists\Components\TextEntry::make('platform')
-                            ->label(__('Platform'))
+                        Infolists\Components\TextEntry::make('channel')
+                            ->label(__('Channel'))
                             ->badge(),
 
                         Infolists\Components\TextEntry::make('status')

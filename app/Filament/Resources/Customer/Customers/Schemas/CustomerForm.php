@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Customer\Customers\Schemas;
 
+use App\Enums\Order\OrderChannel;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
@@ -12,9 +14,10 @@ class CustomerForm
     {
         return $schema
             ->components([
-                TextInput::make('source')
+                Select::make('channel')
+                    ->options(OrderChannel::class)
                     ->required()
-                    ->default('manual'),
+                    ->default(OrderChannel::PORTAL),
                 TextInput::make('first_name')
                     ->required(),
                 TextInput::make('last_name'),

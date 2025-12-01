@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Order\OrderReturns\Tables;
 
+use App\Enums\Order\OrderChannel;
 use App\Enums\Order\ReturnStatus;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -30,12 +31,18 @@ class OrderReturnsTable
 
                 TextColumn::make('order.customer.full_name')
                     ->label('Customer')
-                    ->searchable()
+                    ->searchable(query: function ($query, $search) {
+                        return $query->whereHas('order', function ($query) use ($search) {
+                            $query->whereHas('customer', function ($query) use ($search) {
+                                $query->where('first_name', 'like', "%{$search}%")
+                                    ->orWhere('last_name', 'like', "%{$search}%");
+                            });
+                        });
+                    })
                     ->sortable(),
 
-                TextColumn::make('platform')
+                TextColumn::make('channel')
                     ->badge()
-                    ->color('gray')
                     ->searchable(),
 
                 TextColumn::make('status')
@@ -81,12 +88,8 @@ class OrderReturnsTable
                     ->options(ReturnStatus::class)
                     ->multiple(),
 
-                SelectFilter::make('platform')
-                    ->options([
-                        'trendyol' => 'Trendyol',
-                        'shopify' => 'Shopify',
-                        'internal' => 'Internal',
-                    ])
+                SelectFilter::make('channel')
+                    ->options(OrderChannel::class)
                     ->multiple(),
             ])
             ->recordActions([

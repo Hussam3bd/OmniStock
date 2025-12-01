@@ -2,6 +2,7 @@
 
 namespace App\Services\Integrations\SalesChannels;
 
+use App\Enums\Order\OrderChannel;
 use App\Enums\Order\ReturnStatus;
 use App\Models\Order\Order;
 use App\Models\Order\OrderReturn;
@@ -65,7 +66,7 @@ class TrendyolClaimsMapper
                     'external_return_id' => $claim['id'],
                 ],
                 [
-                    'platform' => 'trendyol',
+                    'channel' => OrderChannel::TRENDYOL,
                     'status' => $status,
                     'requested_at' => $claimDate,
                     'approved_at' => $approvedAt,
@@ -102,13 +103,21 @@ class TrendyolClaimsMapper
 
             if ($totalItemsReturned === 0) {
                 $returnStatus = 'none';
+                $orderStatus = null;
             } elseif ($totalItemsReturned >= $totalItemsInOrder) {
                 $returnStatus = 'full';
+                $orderStatus = \App\Enums\Order\OrderStatus::REFUNDED;
             } else {
                 $returnStatus = 'partial';
+                $orderStatus = \App\Enums\Order\OrderStatus::PARTIALLY_REFUNDED;
             }
 
-            $order->update(['return_status' => $returnStatus]);
+            $updateData = ['return_status' => $returnStatus];
+            if ($orderStatus !== null) {
+                $updateData['order_status'] = $orderStatus;
+            }
+
+            $order->update($updateData);
 
             return $return->fresh('items');
         });

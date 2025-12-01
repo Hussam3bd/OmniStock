@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Order\OrderReturns\Schemas;
 
+use App\Enums\Order\OrderChannel;
 use App\Enums\Order\ReturnStatus;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -20,7 +21,8 @@ class OrderReturnForm
                     ->required(),
                 TextInput::make('return_number')
                     ->required(),
-                TextInput::make('platform')
+                Select::make('channel')
+                    ->options(OrderChannel::class)
                     ->required(),
                 TextInput::make('external_return_id'),
                 Select::make('status')

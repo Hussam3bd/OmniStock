@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Order\Orders\Pages;
 
 use App\Filament\Resources\Order\Orders\Infolists\OrderInfolist;
 use App\Filament\Resources\Order\Orders\OrderResource;
+use App\Filament\Resources\Order\Orders\RelationManagers\ReturnsRelationManager;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Schema;
 
@@ -20,6 +21,14 @@ class ViewOrder extends ViewRecord
     {
         return [
             //
+        ];
+    }
+
+    public function getRelationManagers(): array
+    {
+        return [
+            \App\Filament\Resources\Order\Orders\RelationManagers\ItemsRelationManager::class,
+            ReturnsRelationManager::class,
         ];
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Order\OrderReturns\Pages;
 
 use App\Filament\Resources\Order\OrderReturns\OrderReturnResource;
-use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListOrderReturns extends ListRecords
@@ -13,7 +12,7 @@ class ListOrderReturns extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            // Returns can only be created through integrations (Trendyol, Shopify, etc.)
         ];
     }
 }

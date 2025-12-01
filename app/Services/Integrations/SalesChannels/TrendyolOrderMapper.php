@@ -3,6 +3,7 @@
 namespace App\Services\Integrations\SalesChannels;
 
 use App\Enums\Order\FulfillmentStatus;
+use App\Enums\Order\OrderChannel;
 use App\Enums\Order\OrderStatus;
 use App\Enums\Order\PaymentStatus;
 use App\Models\Customer\Customer;
@@ -69,7 +70,7 @@ class TrendyolOrderMapper
         }
 
         $customer = Customer::create([
-            'source' => $platform,
+            'channel' => OrderChannel::TRENDYOL,
             'first_name' => $trendyolPackage['customerFirstName'] ?? $shipmentAddress['firstName'] ?? '',
             'last_name' => $trendyolPackage['customerLastName'] ?? $shipmentAddress['lastName'] ?? '',
             'email' => $trendyolPackage['customerEmail'] ?? null,

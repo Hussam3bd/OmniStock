@@ -15,6 +15,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
     case COMPLETED = 'completed';
     case CANCELLED = 'cancelled';
     case REFUNDED = 'refunded';
+    case PARTIALLY_REFUNDED = 'partially_refunded';
     case FAILED = 'failed';
 
     public function getLabel(): string
@@ -27,6 +28,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
             self::COMPLETED => __('Completed'),
             self::CANCELLED => __('Cancelled'),
             self::REFUNDED => __('Refunded'),
+            self::PARTIALLY_REFUNDED => __('Partially Refunded'),
             self::FAILED => __('Failed'),
         };
     }
@@ -41,6 +43,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
             self::COMPLETED => 'success',
             self::CANCELLED => 'danger',
             self::REFUNDED => 'warning',
+            self::PARTIALLY_REFUNDED => 'warning',
             self::FAILED => 'danger',
         };
     }
@@ -55,6 +58,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
             self::COMPLETED => 'heroicon-o-check-badge',
             self::CANCELLED => 'heroicon-o-x-circle',
             self::REFUNDED => 'heroicon-o-arrow-uturn-left',
+            self::PARTIALLY_REFUNDED => 'heroicon-o-arrow-uturn-left',
             self::FAILED => 'heroicon-o-exclamation-triangle',
         };
     }
@@ -69,6 +73,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
             self::COMPLETED => __('Order successfully completed and delivered'),
             self::CANCELLED => __('Order cancelled'),
             self::REFUNDED => __('Order refunded to customer'),
+            self::PARTIALLY_REFUNDED => __('Order partially refunded to customer'),
             self::FAILED => __('Order failed to process'),
         };
     }

@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Order\OrderReturns;
 
-use App\Filament\Resources\Order\OrderReturns\Pages\CreateOrderReturn;
 use App\Filament\Resources\Order\OrderReturns\Pages\ListOrderReturns;
 use App\Filament\Resources\Order\OrderReturns\Pages\ViewOrderReturn;
 use App\Filament\Resources\Order\OrderReturns\Schemas\OrderReturnForm;
@@ -33,6 +32,12 @@ class OrderReturnResource extends Resource
         return __('Sales');
     }
 
+    public static function canCreate(): bool
+    {
+        // Returns can only be created through integrations (Trendyol, Shopify, etc.)
+        return false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return OrderReturnForm::configure($schema);
@@ -54,7 +59,6 @@ class OrderReturnResource extends Resource
     {
         return [
             'index' => ListOrderReturns::route('/'),
-            'create' => CreateOrderReturn::route('/create'),
             'view' => ViewOrderReturn::route('/{record}'),
         ];
     }

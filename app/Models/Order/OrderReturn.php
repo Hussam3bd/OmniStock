@@ -2,6 +2,7 @@
 
 namespace App\Models\Order;
 
+use App\Enums\Order\OrderChannel;
 use App\Enums\Order\ReturnStatus;
 use Cknow\Money\Casts\MoneyIntegerCast;
 use Cknow\Money\Money;
@@ -20,7 +21,7 @@ class OrderReturn extends Model implements HasMedia
     protected $fillable = [
         'order_id',
         'return_number',
-        'platform',
+        'channel',
         'external_return_id',
         'status',
         'requested_at',
@@ -53,6 +54,7 @@ class OrderReturn extends Model implements HasMedia
     protected function casts(): array
     {
         return [
+            'channel' => OrderChannel::class,
             'status' => ReturnStatus::class,
             'requested_at' => 'datetime',
             'approved_at' => 'datetime',
@@ -213,13 +215,21 @@ class OrderReturn extends Model implements HasMedia
 
         if ($totalItemsReturned === 0) {
             $returnStatus = 'none';
+            $orderStatus = null; // Don't change order status
         } elseif ($totalItemsReturned >= $totalItemsInOrder) {
             $returnStatus = 'full';
+            $orderStatus = \App\Enums\Order\OrderStatus::REFUNDED;
         } else {
             $returnStatus = 'partial';
+            $orderStatus = \App\Enums\Order\OrderStatus::PARTIALLY_REFUNDED;
         }
 
-        $order->update(['return_status' => $returnStatus]);
+        $updateData = ['return_status' => $returnStatus];
+        if ($orderStatus !== null) {
+            $updateData['order_status'] = $orderStatus;
+        }
+
+        $order->update($updateData);
     }
 
     // Auto-generate return number
