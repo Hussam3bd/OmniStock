@@ -6,4 +6,4 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::webhooks('webhooks/trendyol', 'trendyol')->name('webhooks.trendyol');
+Route::webhooks('webhooks/trendyol', 'trendyol');

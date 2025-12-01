@@ -83,16 +83,18 @@ class TrendyolAdapter implements SalesChannelAdapter
         if ($statuses === null) {
             $statuses = [
                 'Created',
-                'Invoiced',
                 'Picking',
+                'Invoiced',
                 'Shipped',
+                'Cancelled',
                 'Delivered',
-                'Returned',
                 'UnDelivered',
-                'AtCollectionPoint',
+                'Returned',
+                'Unsupplied',
                 'Awaiting',
+                'Unpacked',
+                'AtCollectionPoint',
                 'Verified',
-                'Reset',
             ];
         }
 
@@ -337,7 +339,7 @@ class TrendyolAdapter implements SalesChannelAdapter
 
     public function registerWebhooks(): bool
     {
-        $webhookUrl = route('webhooks.trendyol');
+        $webhookUrl = route('webhook-client-trendyol');
 
         $webhookConfig = $this->integration->config['webhook'] ?? null;
 
@@ -368,24 +370,56 @@ class TrendyolAdapter implements SalesChannelAdapter
         $response = Http::withBasicAuth(
             $this->integration->settings['api_key'],
             $this->integration->settings['api_secret']
-        )->post("https://stageapigw.trendyol.com/integration/webhook/sellers/{$this->integration->settings['supplier_id']}/webhooks", [
+        )->post("https://apigw.trendyol.com/integration/webhook/sellers/{$this->integration->settings['supplier_id']}/webhooks", [
             'url' => $url,
             'username' => '',
             'password' => '',
             'authenticationType' => 'API_KEY',
             'apiKey' => $this->integration->settings['api_key'],
-            'subscribedStatuses' => ['CREATED', 'PICKING', 'INVOICED', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
+            'subscribedStatuses' => [
+                'CREATED',
+                'PICKING',
+                'INVOICED',
+                'SHIPPED',
+                'CANCELLED',
+                'DELIVERED',
+                'UNDELIVERED',
+                'RETURNED',
+                'UNSUPPLIED',
+                'AWAITING',
+                'UNPACKED',
+                'AT_COLLECTION_POINT',
+                'VERIFIED',
+            ],
         ]);
 
         if (! $response->successful()) {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'error' => $response->body(),
+                    'status' => $response->status(),
+                ])
+                ->log('trendyol_webhook_creation_failed');
+
             return false;
         }
 
         $webhookData = $response->json();
+        $webhookData['created_at'] = now()->toIso8601String();
+        $webhookData['webhook_url'] = $url;
 
         $config = $this->integration->config ?? [];
         $config['webhook'] = $webhookData;
         $this->integration->update(['config' => $config]);
+
+        activity()
+            ->performedOn($this->integration)
+            ->withProperties([
+                'webhook_id' => $webhookData['id'] ?? null,
+                'webhook_url' => $url,
+            ])
+            ->log('trendyol_webhook_created');
 
         return true;
     }
@@ -395,15 +429,63 @@ class TrendyolAdapter implements SalesChannelAdapter
         $response = Http::withBasicAuth(
             $this->integration->settings['api_key'],
             $this->integration->settings['api_secret']
-        )->put("https://stageapigw.trendyol.com/integration/webhook/sellers/{$this->integration->settings['supplier_id']}/webhooks/{$webhookId}", [
+        )->put("https://apigw.trendyol.com/integration/webhook/sellers/{$this->integration->settings['supplier_id']}/webhooks/{$webhookId}", [
             'url' => $url,
             'username' => '',
             'password' => '',
             'authenticationType' => 'API_KEY',
             'apiKey' => $this->integration->settings['api_key'],
-            'subscribedStatuses' => ['CREATED', 'PICKING', 'INVOICED', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
+            'subscribedStatuses' => [
+                'CREATED',
+                'PICKING',
+                'INVOICED',
+                'SHIPPED',
+                'CANCELLED',
+                'DELIVERED',
+                'UNDELIVERED',
+                'RETURNED',
+                'UNSUPPLIED',
+                'AWAITING',
+                'UNPACKED',
+                'AT_COLLECTION_POINT',
+                'VERIFIED',
+            ],
         ]);
 
+        if ($response->successful()) {
+            $config = $this->integration->config ?? [];
+            $config['webhook']['webhook_url'] = $url;
+            $config['webhook']['updated_at'] = now()->toIso8601String();
+            $this->integration->update(['config' => $config]);
+
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'webhook_id' => $webhookId,
+                    'webhook_url' => $url,
+                ])
+                ->log('trendyol_webhook_updated');
+        } else {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'error' => $response->body(),
+                    'status' => $response->status(),
+                    'webhook_id' => $webhookId,
+                ])
+                ->log('trendyol_webhook_update_failed');
+        }
+
         return $response->successful();
+    }
+
+    public function hasWebhook(): bool
+    {
+        return isset($this->integration->config['webhook']['id']);
+    }
+
+    public function getWebhookInfo(): ?array
+    {
+        return $this->integration->config['webhook'] ?? null;
     }
 }

@@ -184,9 +184,30 @@ class OrderMapper extends BaseOrderMapper
         $totalDiscount = $this->convertToMinorUnits($trendyolPackage['totalDiscount'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
         $totalPrice = $this->convertToMinorUnits($trendyolPackage['totalPrice'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
 
-        $orderStatus = $this->mapOrderStatus($trendyolPackage['status'] ?? '');
-        $paymentStatus = $this->mapPaymentStatus($trendyolPackage);
-        $fulfillmentStatus = $this->mapFulfillmentStatus($trendyolPackage['status'] ?? '');
+        $newOrderStatus = $this->mapOrderStatus($trendyolPackage['status'] ?? '');
+        $newPaymentStatus = $this->mapPaymentStatus($trendyolPackage);
+        $newFulfillmentStatus = $this->mapFulfillmentStatus($trendyolPackage['status'] ?? '');
+
+        // Track status changes
+        $statusChanges = [];
+        if ($order->order_status !== $newOrderStatus) {
+            $statusChanges['order_status'] = [
+                'from' => $order->order_status->value,
+                'to' => $newOrderStatus->value,
+            ];
+        }
+        if ($order->payment_status !== $newPaymentStatus) {
+            $statusChanges['payment_status'] = [
+                'from' => $order->payment_status->value,
+                'to' => $newPaymentStatus->value,
+            ];
+        }
+        if ($order->fulfillment_status !== $newFulfillmentStatus) {
+            $statusChanges['fulfillment_status'] = [
+                'from' => $order->fulfillment_status->value,
+                'to' => $newFulfillmentStatus->value,
+            ];
+        }
 
         // Extract shipping information
         $shippedAt = isset($trendyolPackage['originShipmentDate'])
@@ -208,9 +229,9 @@ class OrderMapper extends BaseOrderMapper
         }
 
         $order->update([
-            'order_status' => $orderStatus,
-            'payment_status' => $paymentStatus,
-            'fulfillment_status' => $fulfillmentStatus,
+            'order_status' => $newOrderStatus,
+            'payment_status' => $newPaymentStatus,
+            'fulfillment_status' => $newFulfillmentStatus,
             'subtotal' => $grossAmount,
             'discount_amount' => $totalDiscount,
             'total_amount' => $totalPrice,
@@ -231,6 +252,18 @@ class OrderMapper extends BaseOrderMapper
                 'platform_data' => $trendyolPackage,
                 'last_synced_at' => now(),
             ]);
+
+        // Log status changes
+        if (! empty($statusChanges)) {
+            activity()
+                ->performedOn($order)
+                ->withProperties([
+                    'trendyol_status' => $trendyolPackage['status'] ?? null,
+                    'status_changes' => $statusChanges,
+                    'order_number' => $order->order_number,
+                ])
+                ->log('trendyol_order_status_updated');
+        }
     }
 
     protected function syncOrderItems(Order $order, array $lines): void
@@ -451,12 +484,12 @@ class OrderMapper extends BaseOrderMapper
     protected function mapOrderStatus(string $trendyolStatus): OrderStatus
     {
         return match (strtoupper($trendyolStatus)) {
-            'CREATED', 'AWAITING' => OrderStatus::PENDING,
+            'CREATED', 'AWAITING', 'VERIFIED' => OrderStatus::PENDING,
             'PICKING', 'PICKED' => OrderStatus::PROCESSING,
-            'INVOICED', 'SHIPPED' => OrderStatus::COMPLETED,
+            'INVOICED', 'SHIPPED', 'AT_COLLECTION_POINT' => OrderStatus::COMPLETED,
             'DELIVERED' => OrderStatus::COMPLETED,
-            'CANCELLED', 'CANCEL_PENDING' => OrderStatus::CANCELLED,
-            'RETURNED', 'UNPACKED' => OrderStatus::CANCELLED,
+            'CANCELLED', 'CANCEL_PENDING', 'UNSUPPLIED' => OrderStatus::CANCELLED,
+            'RETURNED', 'UNPACKED', 'UNDELIVERED' => OrderStatus::CANCELLED,
             default => OrderStatus::PENDING,
         };
     }
@@ -470,8 +503,9 @@ class OrderMapper extends BaseOrderMapper
         $status = strtoupper($trendyolPackage['status'] ?? '');
 
         return match ($status) {
-            'SHIPPED', 'DELIVERED' => PaymentStatus::PAID,
-            'CANCELLED', 'RETURNED' => PaymentStatus::REFUNDED,
+            'INVOICED', 'SHIPPED', 'DELIVERED', 'AT_COLLECTION_POINT' => PaymentStatus::PAID,
+            'CANCELLED', 'RETURNED', 'UNSUPPLIED' => PaymentStatus::REFUNDED,
+            'UNDELIVERED' => PaymentStatus::REFUNDED,
             default => PaymentStatus::PENDING,
         };
     }
@@ -479,12 +513,12 @@ class OrderMapper extends BaseOrderMapper
     protected function mapFulfillmentStatus(string $trendyolStatus): FulfillmentStatus
     {
         return match (strtoupper($trendyolStatus)) {
-            'CREATED', 'AWAITING' => FulfillmentStatus::UNFULFILLED,
+            'CREATED', 'AWAITING', 'VERIFIED' => FulfillmentStatus::UNFULFILLED,
             'PICKING', 'PICKED' => FulfillmentStatus::AWAITING_SHIPMENT,
             'INVOICED' => FulfillmentStatus::AWAITING_SHIPMENT,
-            'SHIPPED' => FulfillmentStatus::IN_TRANSIT,
+            'SHIPPED', 'AT_COLLECTION_POINT' => FulfillmentStatus::IN_TRANSIT,
             'DELIVERED' => FulfillmentStatus::DELIVERED,
-            'CANCELLED', 'CANCEL_PENDING', 'RETURNED', 'UNPACKED' => FulfillmentStatus::CANCELLED,
+            'CANCELLED', 'CANCEL_PENDING', 'RETURNED', 'UNPACKED', 'UNDELIVERED', 'UNSUPPLIED' => FulfillmentStatus::CANCELLED,
             default => FulfillmentStatus::UNFULFILLED,
         };
     }
