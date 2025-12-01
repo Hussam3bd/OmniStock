@@ -43,6 +43,13 @@ class TrendyolOrderMapper
 
             $this->syncOrderItems($order, $trendyolPackage['lines'] ?? [], $integrationProvider);
 
+            // Calculate and update total commission
+            $totalCommission = $order->items->sum(function ($item) {
+                return $item->commission_amount->getAmount();
+            });
+
+            $order->update(['total_commission' => $totalCommission]);
+
             return $order->fresh('items', 'customer');
         });
     }
@@ -103,6 +110,25 @@ class TrendyolOrderMapper
         $paymentStatus = $this->mapPaymentStatus($trendyolPackage);
         $fulfillmentStatus = $this->mapFulfillmentStatus($trendyolPackage['status'] ?? '');
 
+        // Extract shipping information
+        $shippedAt = isset($trendyolPackage['originShipmentDate'])
+            ? Carbon::createFromTimestampMs($trendyolPackage['originShipmentDate'])
+            : null;
+
+        $estimatedDeliveryStart = isset($trendyolPackage['estimatedDeliveryStartDate'])
+            ? Carbon::createFromTimestampMs($trendyolPackage['estimatedDeliveryStartDate'])
+            : null;
+
+        $estimatedDeliveryEnd = isset($trendyolPackage['estimatedDeliveryEndDate'])
+            ? Carbon::createFromTimestampMs($trendyolPackage['estimatedDeliveryEndDate'])
+            : null;
+
+        // Check if delivered
+        $deliveredAt = null;
+        if (isset($trendyolPackage['status']) && strtoupper($trendyolPackage['status']) === 'DELIVERED') {
+            $deliveredAt = $shippedAt; // Approximate, exact delivery date not in API
+        }
+
         $order = Order::create([
             'customer_id' => $customer->id,
             'channel' => $platform,
@@ -115,14 +141,23 @@ class TrendyolOrderMapper
             'shipping_amount' => 0,
             'discount_amount' => $totalDiscount,
             'total_amount' => $totalPrice,
+            'total_commission' => 0, // Will be calculated from items
             'currency' => $trendyolPackage['currencyCode'] ?? 'TRY',
             'invoice_number' => null,
             'invoice_date' => null,
             'invoice_url' => $trendyolPackage['invoiceLink'] ?? null,
-            'notes' => sprintf('Cargo: %s, Tracking: %s', $trendyolPackage['cargoProviderName'] ?? 'N/A', $trendyolPackage['cargoTrackingNumber'] ?? 'N/A'),
+            'notes' => null,
             'order_date' => isset($trendyolPackage['orderDate'])
                 ? Carbon::createFromTimestampMs($trendyolPackage['orderDate'])
                 : now(),
+            'shipping_carrier' => $trendyolPackage['cargoProviderName'] ?? null,
+            'shipping_desi' => $trendyolPackage['cargoDeci'] ?? null,
+            'shipping_tracking_number' => $trendyolPackage['cargoTrackingNumber'] ?? null,
+            'shipping_tracking_url' => $trendyolPackage['cargoTrackingLink'] ?? null,
+            'shipped_at' => $shippedAt,
+            'delivered_at' => $deliveredAt,
+            'estimated_delivery_start' => $estimatedDeliveryStart,
+            'estimated_delivery_end' => $estimatedDeliveryEnd,
         ]);
 
         PlatformMapping::updateOrCreate(
@@ -151,6 +186,25 @@ class TrendyolOrderMapper
         $paymentStatus = $this->mapPaymentStatus($trendyolPackage);
         $fulfillmentStatus = $this->mapFulfillmentStatus($trendyolPackage['status'] ?? '');
 
+        // Extract shipping information
+        $shippedAt = isset($trendyolPackage['originShipmentDate'])
+            ? Carbon::createFromTimestampMs($trendyolPackage['originShipmentDate'])
+            : null;
+
+        $estimatedDeliveryStart = isset($trendyolPackage['estimatedDeliveryStartDate'])
+            ? Carbon::createFromTimestampMs($trendyolPackage['estimatedDeliveryStartDate'])
+            : null;
+
+        $estimatedDeliveryEnd = isset($trendyolPackage['estimatedDeliveryEndDate'])
+            ? Carbon::createFromTimestampMs($trendyolPackage['estimatedDeliveryEndDate'])
+            : null;
+
+        // Check if delivered
+        $deliveredAt = null;
+        if (isset($trendyolPackage['status']) && strtoupper($trendyolPackage['status']) === 'DELIVERED') {
+            $deliveredAt = $shippedAt; // Approximate, exact delivery date not in API
+        }
+
         $order->update([
             'order_status' => $orderStatus,
             'payment_status' => $paymentStatus,
@@ -159,7 +213,14 @@ class TrendyolOrderMapper
             'discount_amount' => $totalDiscount,
             'total_amount' => $totalPrice,
             'invoice_url' => $trendyolPackage['invoiceLink'] ?? $order->invoice_url,
-            'notes' => sprintf('Cargo: %s, Tracking: %s', $trendyolPackage['cargoProviderName'] ?? 'N/A', $trendyolPackage['cargoTrackingNumber'] ?? 'N/A'),
+            'shipping_carrier' => $trendyolPackage['cargoProviderName'] ?? null,
+            'shipping_desi' => $trendyolPackage['cargoDeci'] ?? null,
+            'shipping_tracking_number' => $trendyolPackage['cargoTrackingNumber'] ?? null,
+            'shipping_tracking_url' => $trendyolPackage['cargoTrackingLink'] ?? null,
+            'shipped_at' => $shippedAt,
+            'delivered_at' => $deliveredAt,
+            'estimated_delivery_start' => $estimatedDeliveryStart,
+            'estimated_delivery_end' => $estimatedDeliveryEnd,
         ]);
 
         $order->platformMappings()
@@ -186,13 +247,17 @@ class TrendyolOrderMapper
             $quantity = $line['quantity'] ?? 1;
             $discount = $this->convertToMinorUnits($line['discount'] ?? 0, $currency);
             $taxRate = $line['vatBaseAmount'] ?? 0;
-            $commission = $this->convertToMinorUnits($line['commission'] ?? 0, $currency);
+            $commissionRate = $line['commission'] ?? 0; // Commission is a percentage rate
 
             // Calculate tax amount based on tax rate
             $taxAmount = (int) round(($unitPrice * $quantity - $discount) * ($taxRate / 100));
 
             // Total price is unit price * quantity
             $totalPrice = $unitPrice * $quantity;
+
+            // Calculate commission amount from rate
+            // Commission is calculated on the unit price
+            $commissionAmount = (int) round($unitPrice * $quantity * ($commissionRate / 100));
 
             $itemData = [
                 'quantity' => $quantity,
@@ -201,7 +266,8 @@ class TrendyolOrderMapper
                 'discount_amount' => $discount,
                 'tax_rate' => $taxRate,
                 'tax_amount' => $taxAmount,
-                'commission_amount' => $commission,
+                'commission_amount' => $commissionAmount,
+                'commission_rate' => round($commissionRate, 2),
             ];
 
             $existingMapping = PlatformMapping::where('platform', $platform)

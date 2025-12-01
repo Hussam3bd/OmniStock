@@ -19,6 +19,7 @@ class OrderItem extends Model
         'tax_rate',
         'tax_amount',
         'commission_amount',
+        'commission_rate',
     ];
 
     protected function casts(): array
@@ -30,6 +31,7 @@ class OrderItem extends Model
             'tax_amount' => MoneyIntegerCast::class,
             'commission_amount' => MoneyIntegerCast::class,
             'tax_rate' => 'decimal:2',
+            'commission_rate' => 'decimal:2',
         ];
     }
 

@@ -68,6 +68,12 @@ class OrderInfolist
                             ->money(fn ($record) => $record->currency)
                             ->color('danger'),
 
+                        Infolists\Components\TextEntry::make('total_commission')
+                            ->label(__('Total Commission'))
+                            ->money(fn ($record) => $record->currency)
+                            ->color('warning')
+                            ->visible(fn ($record) => $record->total_commission->getAmount() > 0),
+
                         Infolists\Components\TextEntry::make('total_amount')
                             ->label(__('Total'))
                             ->money(fn ($record) => $record->currency)
@@ -86,7 +92,8 @@ class OrderInfolist
                                     ->label(__('SKU')),
 
                                 Infolists\Components\TextEntry::make('productVariant.product.name')
-                                    ->label(__('Product')),
+                                    ->label(__('Product'))
+                                    ->columnSpan(2),
 
                                 Infolists\Components\TextEntry::make('productVariant.option_values')
                                     ->label(__('Variant'))
@@ -103,14 +110,94 @@ class OrderInfolist
                                     ->label(__('Unit Price'))
                                     ->money(fn ($record) => $record->order->currency),
 
+                                Infolists\Components\TextEntry::make('discount_amount')
+                                    ->label(__('Discount'))
+                                    ->money(fn ($record) => $record->order->currency)
+                                    ->color('danger')
+                                    ->visible(fn ($record) => $record->discount_amount->getAmount() > 0),
+
+                                Infolists\Components\TextEntry::make('tax_rate')
+                                    ->label(__('VAT Rate'))
+                                    ->suffix('%')
+                                    ->visible(fn ($record) => $record->tax_rate > 0),
+
+                                Infolists\Components\TextEntry::make('tax_amount')
+                                    ->label(__('VAT Amount'))
+                                    ->money(fn ($record) => $record->order->currency)
+                                    ->visible(fn ($record) => $record->tax_amount->getAmount() > 0),
+
+                                Infolists\Components\TextEntry::make('commission_rate')
+                                    ->label(__('Commission Rate'))
+                                    ->suffix('%')
+                                    ->color('warning')
+                                    ->visible(fn ($record) => $record->commission_rate > 0),
+
+                                Infolists\Components\TextEntry::make('commission_amount')
+                                    ->label(__('Commission'))
+                                    ->money(fn ($record) => $record->order->currency)
+                                    ->color('warning')
+                                    ->visible(fn ($record) => $record->commission_amount->getAmount() > 0),
+
                                 Infolists\Components\TextEntry::make('total_price')
                                     ->label(__('Total'))
                                     ->money(fn ($record) => $record->order->currency)
                                     ->weight('medium'),
                             ])
-                            ->columns(3)
+                            ->columns(4)
                             ->contained(false),
                     ]),
+
+                Schemas\Components\Section::make(__('Shipping Information'))
+                    ->schema([
+                        Infolists\Components\TextEntry::make('shipping_carrier')
+                            ->label(__('Carrier'))
+                            ->icon('heroicon-o-truck')
+                            ->placeholder(__('Not available')),
+
+                        Infolists\Components\TextEntry::make('shipping_desi')
+                            ->label(__('Desi (Volumetric Weight)'))
+                            ->suffix(' desi')
+                            ->placeholder(__('Not available'))
+                            ->visible(fn ($record) => $record->shipping_desi > 0),
+
+                        Infolists\Components\TextEntry::make('shipping_tracking_number')
+                            ->label(__('Tracking Number'))
+                            ->copyable()
+                            ->placeholder(__('Not available')),
+
+                        Infolists\Components\TextEntry::make('shipping_tracking_url')
+                            ->label(__('Tracking Link'))
+                            ->url(fn ($state) => $state)
+                            ->openUrlInNewTab()
+                            ->placeholder(__('Not available'))
+                            ->columnSpanFull(),
+
+                        Infolists\Components\TextEntry::make('shipped_at')
+                            ->label(__('Shipped Date'))
+                            ->dateTime()
+                            ->placeholder(__('Not shipped yet')),
+
+                        Infolists\Components\TextEntry::make('delivered_at')
+                            ->label(__('Delivered Date'))
+                            ->dateTime()
+                            ->placeholder(__('Not delivered yet'))
+                            ->visible(fn ($record) => $record->delivered_at),
+
+                        Infolists\Components\TextEntry::make('estimated_delivery_start')
+                            ->label(__('Estimated Delivery (Start)'))
+                            ->dateTime()
+                            ->placeholder(__('Not available'))
+                            ->visible(fn ($record) => $record->estimated_delivery_start),
+
+                        Infolists\Components\TextEntry::make('estimated_delivery_end')
+                            ->label(__('Estimated Delivery (End)'))
+                            ->dateTime()
+                            ->placeholder(__('Not available'))
+                            ->visible(fn ($record) => $record->estimated_delivery_end),
+                    ])
+                    ->columns(2)
+                    ->collapsible()
+                    ->visible(fn ($record) => $record->shipping_carrier || $record->shipping_tracking_number),
 
                 Schemas\Components\Section::make(__('Invoice Information'))
                     ->schema([

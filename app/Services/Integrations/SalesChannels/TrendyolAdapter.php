@@ -95,39 +95,35 @@ class TrendyolAdapter implements SalesChannelAdapter
             ];
         }
 
-        // If no since date, fetch last 12 months in monthly chunks
+        // If no since date, fetch last 12 months in 2-week chunks
         if ($since === null) {
-            return $this->fetchOrdersInMonthlyChunks(Carbon::now()->subMonths(12), now(), $statuses);
+            return $this->fetchOrdersInTwoWeekChunks(Carbon::now()->subMonths(12), now(), $statuses);
         }
 
-        // Always use monthly chunks to respect Trendyol's one-month limitation
-        return $this->fetchOrdersInMonthlyChunks($since, now(), $statuses);
+        // Always use 2-week chunks to respect Trendyol's 14-day limitation
+        return $this->fetchOrdersInTwoWeekChunks($since, now(), $statuses);
     }
 
-    protected function fetchOrdersInMonthlyChunks(Carbon $startDate, Carbon $endDate, array $statuses): Collection
+    protected function fetchOrdersInTwoWeekChunks(Carbon $startDate, Carbon $endDate, array $statuses): Collection
     {
         $allOrders = collect();
 
-        // Start from the beginning of the month containing startDate
-        $currentStart = $startDate->copy()->startOfMonth();
+        $currentStart = $startDate->copy();
 
         while ($currentStart->lt($endDate)) {
-            // End at the last day of the current month
-            $currentEnd = $currentStart->copy()->endOfMonth();
+            // End at 14 days (2 weeks) from current start
+            $currentEnd = $currentStart->copy()->addDays(14);
 
             // Don't go beyond the requested end date
             if ($currentEnd->gt($endDate)) {
                 $currentEnd = $endDate->copy();
             }
 
-            // Don't start before the requested start date
-            $chunkStart = $currentStart->lt($startDate) ? $startDate->copy() : $currentStart->copy();
-
-            $orders = $this->fetchOrdersForDateRange($chunkStart, $statuses, $currentEnd);
+            $orders = $this->fetchOrdersForDateRange($currentStart, $statuses, $currentEnd);
             $allOrders = $allOrders->merge($orders);
 
-            // Move to the first day of next month
-            $currentStart = $currentStart->copy()->addMonth()->startOfMonth();
+            // Move to the next 2-week period
+            $currentStart = $currentStart->copy()->addDays(14);
         }
 
         return $allOrders;

@@ -34,12 +34,21 @@ class Order extends Model
         'shipping_amount',
         'discount_amount',
         'total_amount',
+        'total_commission',
         'currency',
         'invoice_number',
         'invoice_date',
         'invoice_url',
         'notes',
         'order_date',
+        'shipping_carrier',
+        'shipping_desi',
+        'shipping_tracking_number',
+        'shipping_tracking_url',
+        'shipped_at',
+        'delivered_at',
+        'estimated_delivery_start',
+        'estimated_delivery_end',
     ];
 
     protected function casts(): array
@@ -54,8 +63,14 @@ class Order extends Model
             'shipping_amount' => MoneyIntegerCast::class,
             'discount_amount' => MoneyIntegerCast::class,
             'total_amount' => MoneyIntegerCast::class,
+            'total_commission' => MoneyIntegerCast::class,
             'invoice_date' => 'date',
             'order_date' => 'datetime',
+            'shipping_desi' => 'decimal:2',
+            'shipped_at' => 'datetime',
+            'delivered_at' => 'datetime',
+            'estimated_delivery_start' => 'datetime',
+            'estimated_delivery_end' => 'datetime',
         ];
     }
 

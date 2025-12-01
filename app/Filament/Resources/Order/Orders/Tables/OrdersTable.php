@@ -22,7 +22,12 @@ class OrdersTable
                     ->sortable(),
                 TextColumn::make('customer.full_name')
                     ->label('Customer')
-                    ->searchable()
+                    ->searchable(query: function ($query, $search) {
+                        return $query->whereHas('customer', function ($query) use ($search) {
+                            $query->where('first_name', 'like', "%{$search}%")
+                                ->orWhere('last_name', 'like', "%{$search}%");
+                        });
+                    })
                     ->sortable(),
                 TextColumn::make('channel')
                     ->badge()
