@@ -220,6 +220,61 @@ class OrderInfolist
                     ->collapsible()
                     ->collapsed(),
 
+                Schemas\Components\Section::make(__('Returns'))
+                    ->schema([
+                        Infolists\Components\TextEntry::make('return_status')
+                            ->label(__('Return Status'))
+                            ->badge()
+                            ->color(fn ($state) => match ($state) {
+                                'full' => 'danger',
+                                'partial' => 'warning',
+                                'none', null => 'success',
+                                default => 'gray',
+                            })
+                            ->formatStateUsing(fn ($state) => match ($state) {
+                                'full' => __('Fully Returned'),
+                                'partial' => __('Partially Returned'),
+                                'none', null => __('No Returns'),
+                                default => ucfirst($state),
+                            }),
+
+                        Infolists\Components\RepeatableEntry::make('returns')
+                            ->label(__('Return Requests'))
+                            ->schema([
+                                Infolists\Components\TextEntry::make('return_number')
+                                    ->label(__('Return #'))
+                                    ->url(fn ($record) => route('filament.admin.resources.order.order-returns.view', ['record' => $record]))
+                                    ->copyable(),
+
+                                Infolists\Components\TextEntry::make('status')
+                                    ->label(__('Status'))
+                                    ->badge(),
+
+                                Infolists\Components\TextEntry::make('reason_name')
+                                    ->label(__('Reason'))
+                                    ->limit(40),
+
+                                Infolists\Components\TextEntry::make('requested_at')
+                                    ->label(__('Requested'))
+                                    ->dateTime()
+                                    ->since(),
+
+                                Infolists\Components\TextEntry::make('total_refund_amount')
+                                    ->label(__('Refund'))
+                                    ->money(fn ($record) => $record->currency),
+
+                                Infolists\Components\TextEntry::make('items_count')
+                                    ->label(__('Items'))
+                                    ->state(fn ($record) => $record->items->count())
+                                    ->badge(),
+                            ])
+                            ->columns(3)
+                            ->contained(false),
+                    ])
+                    ->collapsible()
+                    ->collapsed(fn ($record) => ! $record->hasReturns())
+                    ->visible(fn ($record) => $record->returns()->exists()),
+
                 Schemas\Components\Section::make(__('Activity Log'))
                     ->schema([
                         Infolists\Components\RepeatableEntry::make('activities')
