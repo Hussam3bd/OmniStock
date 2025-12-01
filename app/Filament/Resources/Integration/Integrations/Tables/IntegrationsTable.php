@@ -2,12 +2,11 @@
 
 namespace App\Filament\Resources\Integration\Integrations\Tables;
 
+use App\Jobs\SyncShopifyProducts;
 use App\Models\Integration\Integration;
 use App\Services\Integrations\SalesChannels\Shopify\Mappers\OrderMapper as ShopifyOrderMapper;
-use App\Services\Integrations\SalesChannels\Shopify\Mappers\ProductMapper as ShopifyProductMapper;
 use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
 use App\Services\Integrations\SalesChannels\Trendyol\Mappers\OrderMapper as TrendyolOrderMapper;
-use App\Services\Integrations\SalesChannels\Trendyol\Mappers\ProductMapper as TrendyolProductMapper;
 use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -18,6 +17,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Bus;
 
 class IntegrationsTable
 {
@@ -112,8 +112,8 @@ class IntegrationsTable
                     ->visible(fn (Integration $record) => in_array($record->provider, ['trendyol', 'shopify']) && $record->is_active)
                     ->requiresConfirmation()
                     ->modalHeading(__('Sync Products'))
-                    ->modalDescription(__('This will fetch and sync all products from :provider to your store.', ['provider' => fn (Integration $record) => ucfirst($record->provider)]))
-                    ->modalSubmitActionLabel(__('Sync Now'))
+                    ->modalDescription(__('This will fetch and sync all products from :provider to your store. The process will run in the background.', ['provider' => fn (Integration $record) => ucfirst($record->provider)]))
+                    ->modalSubmitActionLabel(__('Start Sync'))
                     ->action(function (Integration $record) {
                         try {
                             $adapter = match ($record->provider) {
@@ -126,26 +126,56 @@ class IntegrationsTable
                                 throw new \Exception('Unsupported provider');
                             }
 
+                            // Fetch all products (just metadata, not full sync yet)
                             $products = $adapter->fetchAllProducts();
-                            $mapper = match ($record->provider) {
-                                'trendyol' => app(TrendyolProductMapper::class),
-                                'shopify' => app(ShopifyProductMapper::class),
-                            };
+                            $totalProducts = count($products);
 
-                            $synced = 0;
-                            foreach ($products as $product) {
-                                $mapper->mapProduct($product);
-                                $synced++;
+                            if ($totalProducts === 0) {
+                                Notification::make()
+                                    ->title(__('No products found'))
+                                    ->body(__('No products to sync from :provider', ['provider' => ucfirst($record->provider)]))
+                                    ->warning()
+                                    ->send();
+
+                                return;
                             }
 
+                            // Create jobs for each product
+                            $jobs = collect($products)->map(function ($product) use ($record) {
+                                return match ($record->provider) {
+                                    'shopify' => new SyncShopifyProducts($record, $product),
+                                    'trendyol' => new SyncShopifyProducts($record, $product), // TODO: Create TrendyolProductSync job
+                                };
+                            })->toArray();
+
+                            // Dispatch batch
+                            $batch = Bus::batch($jobs)
+                                ->name("Sync {$totalProducts} products from ".ucfirst($record->provider))
+                                ->allowFailures()
+                                ->onQueue('default')
+                                ->finally(function () use ($record, $totalProducts) {
+                                    Notification::make()
+                                        ->title(__('Product sync completed'))
+                                        ->body(__('Finished syncing :count products from :provider', [
+                                            'count' => $totalProducts,
+                                            'provider' => ucfirst($record->provider),
+                                        ]))
+                                        ->success()
+                                        ->sendToDatabase(auth()->user());
+                                })
+                                ->dispatch();
+
                             Notification::make()
-                                ->title(__('Products synced successfully'))
-                                ->body(__(':count products synced from :provider', ['count' => $synced, 'provider' => ucfirst($record->provider)]))
+                                ->title(__('Product sync started'))
+                                ->body(__('Syncing :count products from :provider in the background. You will be notified when complete.', [
+                                    'count' => $totalProducts,
+                                    'provider' => ucfirst($record->provider),
+                                ]))
                                 ->success()
                                 ->send();
                         } catch (\Exception $e) {
                             Notification::make()
-                                ->title(__('Error syncing products'))
+                                ->title(__('Error starting product sync'))
                                 ->body($e->getMessage())
                                 ->danger()
                                 ->send();
