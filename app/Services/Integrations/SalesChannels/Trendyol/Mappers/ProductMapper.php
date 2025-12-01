@@ -165,6 +165,11 @@ class ProductMapper extends BaseProductMapper
             }
         }
 
+        // Enable on this channel
+        $variant->enableOnChannel($this->getChannel(), [
+            'barcode' => $barcode,
+        ]);
+
         // Map variant attributes
         $this->mapVariantAttributes($variant, $item);
     }

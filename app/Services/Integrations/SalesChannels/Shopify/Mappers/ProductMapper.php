@@ -263,6 +263,11 @@ class ProductMapper extends BaseProductMapper
             );
         }
 
+        // Enable on this channel
+        $variant->enableOnChannel($this->getChannel(), [
+            'inventory_item_id' => $shopifyVariant['inventory_item_id'] ?? null,
+        ]);
+
         // Map variant attributes (options)
         $this->mapVariantAttributes($variant, $shopifyVariant, $shopifyProduct);
     }

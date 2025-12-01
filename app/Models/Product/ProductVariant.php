@@ -78,6 +78,68 @@ class ProductVariant extends Model implements HasMedia
             ->withTimestamps();
     }
 
+    public function channelAvailability(): HasMany
+    {
+        return $this->hasMany(ProductChannelAvailability::class);
+    }
+
+    /**
+     * Check if variant is available on a specific channel.
+     */
+    public function isAvailableOnChannel(string|\App\Enums\Order\OrderChannel $channel): bool
+    {
+        if ($channel instanceof \App\Enums\Order\OrderChannel) {
+            $channel = $channel->value;
+        }
+
+        return $this->channelAvailability()
+            ->where('channel', $channel)
+            ->where('is_enabled', true)
+            ->exists();
+    }
+
+    /**
+     * Enable variant on a channel.
+     */
+    public function enableOnChannel(string|\App\Enums\Order\OrderChannel $channel, ?array $settings = null): void
+    {
+        if ($channel instanceof \App\Enums\Order\OrderChannel) {
+            $channel = $channel->value;
+        }
+
+        $this->channelAvailability()->updateOrCreate(
+            ['channel' => $channel],
+            [
+                'is_enabled' => true,
+                'channel_settings' => $settings,
+            ]
+        );
+    }
+
+    /**
+     * Disable variant on a channel.
+     */
+    public function disableOnChannel(string|\App\Enums\Order\OrderChannel $channel): void
+    {
+        if ($channel instanceof \App\Enums\Order\OrderChannel) {
+            $channel = $channel->value;
+        }
+
+        $this->channelAvailability()
+            ->where('channel', $channel)
+            ->update(['is_enabled' => false]);
+    }
+
+    /**
+     * Get enabled channels for this variant.
+     */
+    public function getEnabledChannels(): \Illuminate\Database\Eloquent\Collection
+    {
+        return $this->channelAvailability()
+            ->where('is_enabled', true)
+            ->get();
+    }
+
     /**
      * Get the option value for a specific variant option.
      * This is used for table grouping.
