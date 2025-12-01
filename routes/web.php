@@ -7,3 +7,4 @@ Route::get('/', function () {
 });
 
 Route::webhooks('webhooks/trendyol', 'trendyol');
+Route::webhooks('webhooks/shopify', 'shopify');

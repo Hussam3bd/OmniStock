@@ -71,6 +71,17 @@ return [
             'store_headers' => ['*'],
             'process_webhook_job' => \App\Jobs\ProcessTrendyolWebhook::class,
         ],
+        [
+            'name' => 'shopify',
+            'signing_secret' => '',
+            'signature_header_name' => 'X-Shopify-Hmac-SHA256',
+            'signature_validator' => \App\Services\Integrations\SalesChannels\Shopify\Webhooks\SignatureValidator::class,
+            'webhook_profile' => \App\Services\Integrations\SalesChannels\Shopify\Webhooks\WebhookProfile::class,
+            'webhook_response' => \Spatie\WebhookClient\WebhookResponse\DefaultRespondsTo::class,
+            'webhook_model' => \Spatie\WebhookClient\Models\WebhookCall::class,
+            'store_headers' => ['*'],
+            'process_webhook_job' => \App\Jobs\ProcessShopifyWebhook::class,
+        ],
     ],
 
     /*
