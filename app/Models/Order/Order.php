@@ -29,6 +29,7 @@ class Order extends Model
         'order_status',
         'payment_status',
         'fulfillment_status',
+        'return_status',
         'subtotal',
         'tax_amount',
         'shipping_amount',
@@ -123,5 +124,25 @@ class Order extends Model
     public function platformMappings(): MorphMany
     {
         return $this->morphMany(PlatformMapping::class, 'entity');
+    }
+
+    public function returns(): HasMany
+    {
+        return $this->hasMany(OrderReturn::class);
+    }
+
+    public function hasReturns(): bool
+    {
+        return $this->return_status && $this->return_status !== 'none';
+    }
+
+    public function hasPartialReturn(): bool
+    {
+        return $this->return_status === 'partial';
+    }
+
+    public function hasFullReturn(): bool
+    {
+        return $this->return_status === 'full';
     }
 }

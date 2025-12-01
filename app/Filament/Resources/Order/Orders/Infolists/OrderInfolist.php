@@ -116,24 +116,13 @@ class OrderInfolist
                                     ->color('danger')
                                     ->visible(fn ($record) => $record->discount_amount->getAmount() > 0),
 
-                                Infolists\Components\TextEntry::make('tax_rate')
-                                    ->label(__('VAT Rate'))
-                                    ->suffix('%')
-                                    ->visible(fn ($record) => $record->tax_rate > 0),
-
                                 Infolists\Components\TextEntry::make('tax_amount')
-                                    ->label(__('VAT Amount'))
+                                    ->label(fn ($record) => __('VAT').' ('.number_format($record->tax_rate, 1).'%)')
                                     ->money(fn ($record) => $record->order->currency)
                                     ->visible(fn ($record) => $record->tax_amount->getAmount() > 0),
 
-                                Infolists\Components\TextEntry::make('commission_rate')
-                                    ->label(__('Commission Rate'))
-                                    ->suffix('%')
-                                    ->color('warning')
-                                    ->visible(fn ($record) => $record->commission_rate > 0),
-
                                 Infolists\Components\TextEntry::make('commission_amount')
-                                    ->label(__('Commission'))
+                                    ->label(fn ($record) => __('Commission').' ('.number_format($record->commission_rate, 1).'%)')
                                     ->money(fn ($record) => $record->order->currency)
                                     ->color('warning')
                                     ->visible(fn ($record) => $record->commission_amount->getAmount() > 0),
