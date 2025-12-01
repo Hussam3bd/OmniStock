@@ -272,8 +272,9 @@ class OrderMapper extends BaseOrderMapper
                 continue;
             }
 
-            $price = $this->convertToMinorUnits((float) ($lineItem['price'] ?? 0), $order->currency);
+            $unitPrice = $this->convertToMinorUnits((float) ($lineItem['price'] ?? 0), $order->currency);
             $quantity = (int) ($lineItem['quantity'] ?? 1);
+            $totalPrice = $unitPrice * $quantity;
 
             $order->items()->updateOrCreate(
                 [
@@ -281,8 +282,10 @@ class OrderMapper extends BaseOrderMapper
                 ],
                 [
                     'quantity' => $quantity,
-                    'price' => $price,
+                    'unit_price' => $unitPrice,
+                    'total_price' => $totalPrice,
                     'discount_amount' => $this->convertToMinorUnits((float) ($lineItem['total_discount'] ?? 0), $order->currency),
+                    'tax_rate' => 0,
                     'tax_amount' => 0,
                     'commission_amount' => 0,
                     'commission_rate' => 0,
