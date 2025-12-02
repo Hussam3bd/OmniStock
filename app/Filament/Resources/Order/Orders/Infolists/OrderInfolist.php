@@ -20,7 +20,10 @@ class OrderInfolist
 
                         Infolists\Components\TextEntry::make('customer.full_name')
                             ->label(__('Customer'))
-                            ->icon('heroicon-o-user'),
+                            ->icon('heroicon-o-user')
+                            ->url(fn ($record) => $record->customer
+                                ? \App\Filament\Resources\Customer\Customers\CustomerResource::getUrl('edit', ['record' => $record->customer])
+                                : null),
 
                         Infolists\Components\TextEntry::make('channel')
                             ->label(__('Channel'))
@@ -123,84 +126,6 @@ class OrderInfolist
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
-
-                Schemas\Components\Section::make(__('Shipping Address'))
-                    ->schema([
-                        Infolists\Components\TextEntry::make('shippingAddress.full_name')
-                            ->label(__('Name'))
-                            ->icon('heroicon-o-user')
-                            ->placeholder(__('Not available')),
-
-                        Infolists\Components\TextEntry::make('shippingAddress.phone')
-                            ->label(__('Phone'))
-                            ->icon('heroicon-o-phone')
-                            ->placeholder(__('Not available')),
-
-                        Infolists\Components\TextEntry::make('shippingAddress.email')
-                            ->label(__('Email'))
-                            ->icon('heroicon-o-envelope')
-                            ->placeholder(__('Not available'))
-                            ->visible(fn ($record) => $record->shippingAddress?->email),
-
-                        Infolists\Components\TextEntry::make('shippingAddress.type')
-                            ->label(__('Type'))
-                            ->badge()
-                            ->visible(fn ($record) => $record->shippingAddress?->type),
-
-                        Infolists\Components\TextEntry::make('shippingAddress.full_address')
-                            ->label(__('Address'))
-                            ->icon('heroicon-o-map-pin')
-                            ->placeholder(__('Not available'))
-                            ->columnSpanFull()
-                            ->prose(),
-                    ])
-                    ->columns(2)
-                    ->collapsible()
-                    ->visible(fn ($record) => $record->shippingAddress),
-
-                Schemas\Components\Section::make(__('Billing Address'))
-                    ->schema([
-                        Infolists\Components\TextEntry::make('billingAddress.full_name')
-                            ->label(__('Name'))
-                            ->icon('heroicon-o-user')
-                            ->placeholder(__('Not available')),
-
-                        Infolists\Components\TextEntry::make('billingAddress.phone')
-                            ->label(__('Phone'))
-                            ->icon('heroicon-o-phone')
-                            ->placeholder(__('Not available')),
-
-                        Infolists\Components\TextEntry::make('billingAddress.email')
-                            ->label(__('Email'))
-                            ->icon('heroicon-o-envelope')
-                            ->placeholder(__('Not available'))
-                            ->visible(fn ($record) => $record->billingAddress?->email),
-
-                        Infolists\Components\TextEntry::make('billingAddress.type')
-                            ->label(__('Type'))
-                            ->badge()
-                            ->visible(fn ($record) => $record->billingAddress?->type),
-
-                        Infolists\Components\TextEntry::make('billingAddress.tax_office')
-                            ->label(__('Tax Office'))
-                            ->placeholder(__('Not available'))
-                            ->visible(fn ($record) => $record->billingAddress?->tax_office),
-
-                        Infolists\Components\TextEntry::make('billingAddress.tax_number')
-                            ->label(__('Tax Number'))
-                            ->placeholder(__('Not available'))
-                            ->visible(fn ($record) => $record->billingAddress?->tax_number),
-
-                        Infolists\Components\TextEntry::make('billingAddress.full_address')
-                            ->label(__('Address'))
-                            ->icon('heroicon-o-map-pin')
-                            ->placeholder(__('Not available'))
-                            ->columnSpanFull()
-                            ->prose(),
-                    ])
-                    ->columns(2)
-                    ->collapsible()
-                    ->visible(fn ($record) => $record->billingAddress),
 
                 Schemas\Components\Section::make(__('Shipping Information'))
                     ->schema([

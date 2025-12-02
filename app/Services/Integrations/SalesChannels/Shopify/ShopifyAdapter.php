@@ -349,6 +349,43 @@ class ShopifyAdapter implements SalesChannelAdapter
         return $response->successful();
     }
 
+    public function fetchOrderRefunds(string $orderId): Collection
+    {
+        $response = $this->makeRequest('get', "/orders/{$orderId}/refunds.json");
+
+        if (! $response->successful()) {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'order_id' => $orderId,
+                    'error' => $response->body(),
+                    'status' => $response->status(),
+                ])
+                ->log('shopify_fetch_refunds_failed');
+
+            return collect();
+        }
+
+        return collect($response->json('refunds', []));
+    }
+
+    public function fetchRefundsForOrders(Collection $orderIds): Collection
+    {
+        $allRefunds = collect();
+
+        foreach ($orderIds as $orderId) {
+            $refunds = $this->fetchOrderRefunds($orderId);
+
+            foreach ($refunds as $refund) {
+                // Add order_id to each refund for mapping
+                $refund['order_id'] = $orderId;
+                $allRefunds->push($refund);
+            }
+        }
+
+        return $allRefunds;
+    }
+
     public function syncCustomer(Customer $customer): bool
     {
         // Shopify customer sync can be implemented if needed
@@ -377,6 +414,7 @@ class ShopifyAdapter implements SalesChannelAdapter
             'orders/cancelled',
             'orders/fulfilled',
             'orders/paid',
+            'refunds/create',
         ];
 
         $webhooks = [];

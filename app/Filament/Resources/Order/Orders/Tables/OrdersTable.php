@@ -28,6 +28,9 @@ class OrdersTable
                                 ->orWhere('last_name', 'like', "%{$search}%");
                         });
                     })
+                    ->url(fn ($record) => $record->customer
+                        ? \App\Filament\Resources\Customer\Customers\CustomerResource::getUrl('edit', ['record' => $record->customer])
+                        : null)
                     ->sortable(),
                 TextColumn::make('channel')
                     ->badge()

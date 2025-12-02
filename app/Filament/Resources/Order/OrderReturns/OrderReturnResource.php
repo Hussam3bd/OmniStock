@@ -51,7 +51,7 @@ class OrderReturnResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\RefundsRelationManager::class,
         ];
     }
 

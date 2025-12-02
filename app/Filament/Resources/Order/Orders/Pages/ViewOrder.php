@@ -27,6 +27,7 @@ class ViewOrder extends ViewRecord
     public function getRelationManagers(): array
     {
         return [
+            \App\Filament\Resources\Order\Orders\RelationManagers\AddressesRelationManager::class,
             \App\Filament\Resources\Order\Orders\RelationManagers\ItemsRelationManager::class,
             ReturnsRelationManager::class,
         ];

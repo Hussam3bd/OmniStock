@@ -110,4 +110,11 @@ class ViewOrderReturn extends ViewRecord
                 }),
         ];
     }
+
+    public function getRelationManagers(): array
+    {
+        return [
+            \App\Filament\Resources\Order\OrderReturns\RelationManagers\RefundsRelationManager::class,
+        ];
+    }
 }

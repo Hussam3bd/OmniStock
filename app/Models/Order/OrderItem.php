@@ -6,6 +6,8 @@ use App\Models\Product\ProductVariant;
 use Cknow\Money\Casts\MoneyIntegerCast;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class OrderItem extends Model
 {
@@ -43,5 +45,38 @@ class OrderItem extends Model
     public function productVariant(): BelongsTo
     {
         return $this->belongsTo(ProductVariant::class);
+    }
+
+    public function returnItems(): HasMany
+    {
+        return $this->hasMany(ReturnItem::class);
+    }
+
+    public function platformMappings(): MorphMany
+    {
+        return $this->morphMany(\App\Models\Platform\PlatformMapping::class, 'entity');
+    }
+
+    public function getReturnedQuantity(): int
+    {
+        // If returned_quantity is loaded via withSum, use it
+        if (isset($this->attributes['returned_quantity'])) {
+            return (int) $this->attributes['returned_quantity'];
+        }
+
+        // Otherwise, calculate it
+        return $this->returnItems()->sum('quantity');
+    }
+
+    public function isFullyReturned(): bool
+    {
+        return $this->getReturnedQuantity() >= $this->quantity;
+    }
+
+    public function isPartiallyReturned(): bool
+    {
+        $returned = $this->getReturnedQuantity();
+
+        return $returned > 0 && $returned < $this->quantity;
     }
 }

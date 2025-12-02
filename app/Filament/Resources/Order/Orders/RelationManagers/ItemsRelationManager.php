@@ -16,6 +16,7 @@ class ItemsRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('id')
+            ->modifyQueryUsing(fn ($query) => $query->withSum('returnItems as returned_quantity', 'quantity'))
             ->columns([
                 TextColumn::make('productVariant.sku')
                     ->label(__('SKU'))
@@ -38,7 +39,11 @@ class ItemsRelationManager extends RelationManager
                 TextColumn::make('quantity')
                     ->label(__('Qty'))
                     ->badge()
-                    ->color('gray')
+                    ->color(fn ($record) => $record->isFullyReturned() ? 'danger' : ($record->isPartiallyReturned() ? 'warning' : 'gray'))
+                    ->icon(fn ($record) => $record->isFullyReturned() || $record->isPartiallyReturned() ? 'heroicon-o-arrow-uturn-left' : null)
+                    ->description(fn ($record) => $record->getReturnedQuantity() > 0
+                        ? __(':returned returned', ['returned' => $record->getReturnedQuantity()])
+                        : null)
                     ->alignCenter(),
 
                 TextColumn::make('unit_price')
@@ -77,6 +82,27 @@ class ItemsRelationManager extends RelationManager
                     ->money(fn ($record) => $record->order->currency)
                     ->weight('medium')
                     ->sortable(),
+
+                TextColumn::make('return_status')
+                    ->label(__('Return Status'))
+                    ->badge()
+                    ->getStateUsing(function ($record) {
+                        if ($record->isFullyReturned()) {
+                            return __('Fully Returned');
+                        }
+                        if ($record->isPartiallyReturned()) {
+                            return __('Partially Returned');
+                        }
+
+                        return __('Not Returned');
+                    })
+                    ->color(fn ($record) => $record->isFullyReturned() ? 'danger' : ($record->isPartiallyReturned() ? 'warning' : 'success'))
+                    ->icon(fn ($record) => match (true) {
+                        $record->isFullyReturned() => 'heroicon-o-arrow-uturn-left',
+                        $record->isPartiallyReturned() => 'heroicon-o-arrow-uturn-left',
+                        default => 'heroicon-o-check-circle',
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('id', 'asc');
     }

@@ -258,6 +258,50 @@ class TrendyolAdapter implements SalesChannelAdapter
         return $response->json();
     }
 
+    public function fetchAllClaims(int $size = 50): Collection
+    {
+        $allClaims = collect();
+        $page = 0;
+
+        do {
+            $response = Http::withBasicAuth(
+                $this->integration->settings['api_key'],
+                $this->integration->settings['api_secret']
+            )->get("https://apigw.trendyol.com/integration/order/sellers/{$this->integration->settings['supplier_id']}/claims", [
+                'size' => $size,
+                'page' => $page,
+            ]);
+
+            if (! $response->successful()) {
+                break;
+            }
+
+            $data = $response->json();
+            $claims = collect($data['content'] ?? []);
+
+            if ($claims->isEmpty()) {
+                break;
+            }
+
+            $allClaims = $allClaims->merge($claims);
+
+            $page++;
+            $totalPages = $data['totalPages'] ?? 1;
+
+            // Break if we've fetched all pages
+            if ($page >= $totalPages) {
+                break;
+            }
+
+            // Safety limit
+            if ($page > 100) {
+                break;
+            }
+        } while (true);
+
+        return $allClaims;
+    }
+
     public function updateInventory(ProductVariant $variant): bool
     {
         $mapping = $variant->platformMappings()

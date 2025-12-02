@@ -9,6 +9,7 @@ use Cknow\Money\Money;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -85,6 +86,11 @@ class OrderReturn extends Model implements HasMedia
     public function refunds(): HasMany
     {
         return $this->hasMany(ReturnRefund::class, 'return_id');
+    }
+
+    public function platformMappings(): MorphMany
+    {
+        return $this->morphMany(\App\Models\Platform\PlatformMapping::class, 'entity');
     }
 
     public function approvedBy(): BelongsTo

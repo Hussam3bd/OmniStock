@@ -2,11 +2,15 @@
 
 namespace App\Filament\Resources\Integration\Integrations\Tables;
 
+use App\Enums\Order\OrderChannel;
 use App\Jobs\SyncShopifyOrders;
 use App\Jobs\SyncShopifyProducts;
+use App\Jobs\SyncShopifyReturns;
+use App\Jobs\SyncTrendyolClaims;
 use App\Jobs\SyncTrendyolOrders;
 use App\Jobs\SyncTrendyolProducts;
 use App\Models\Integration\Integration;
+use App\Models\Platform\PlatformMapping;
 use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
 use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
 use Filament\Actions\Action;
@@ -319,6 +323,221 @@ class IntegrationsTable
                         } catch (\Exception $e) {
                             Notification::make()
                                 ->title(__('Error starting order sync'))
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+
+                Action::make('sync_refunds')
+                    ->label(__('Sync Refunds'))
+                    ->icon(Heroicon::OutlinedArrowPath)
+                    ->color('danger')
+                    ->visible(fn (Integration $record) => $record->provider === 'shopify' && $record->is_active)
+                    ->requiresConfirmation()
+                    ->modalHeading(__('Sync Refunds'))
+                    ->modalDescription(__('This will fetch and sync refunds from Shopify orders. The process will run in the background.'))
+                    ->modalSubmitActionLabel(__('Start Sync'))
+                    ->action(function (Integration $record) {
+                        try {
+                            $adapter = new ShopifyAdapter($record);
+
+                            // Get all Shopify order IDs from platform mappings
+                            $orderIds = PlatformMapping::where('platform', OrderChannel::SHOPIFY->value)
+                                ->where('entity_type', \App\Models\Order\Order::class)
+                                ->pluck('platform_id');
+
+                            if ($orderIds->isEmpty()) {
+                                Notification::make()
+                                    ->title(__('No orders found'))
+                                    ->body(__('No Shopify orders to sync refunds for'))
+                                    ->warning()
+                                    ->send();
+
+                                return;
+                            }
+
+                            // Fetch all refunds for these orders
+                            $allRefunds = collect();
+
+                            foreach ($orderIds as $orderId) {
+                                $refunds = $adapter->fetchOrderRefunds($orderId);
+
+                                foreach ($refunds as $refund) {
+                                    // Add order_id to refund data for mapping
+                                    $refund['order_id'] = $orderId;
+                                    $allRefunds->push($refund);
+                                }
+                            }
+
+                            $totalRefunds = count($allRefunds);
+
+                            if ($totalRefunds === 0) {
+                                Notification::make()
+                                    ->title(__('No refunds found'))
+                                    ->body(__('No refunds to sync from Shopify'))
+                                    ->warning()
+                                    ->send();
+
+                                return;
+                            }
+
+                            // Create jobs for each refund
+                            $jobs = $allRefunds->map(function ($refund) use ($record) {
+                                return new SyncShopifyReturns($record, $refund);
+                            })->toArray();
+
+                            // Get current user for notifications
+                            $user = auth()->user();
+
+                            // Dispatch batch
+                            $batch = Bus::batch($jobs)
+                                ->name("Sync {$totalRefunds} refunds from Shopify")
+                                ->allowFailures()
+                                ->onQueue('default')
+                                ->then(function (Batch $batch) use ($user, $totalRefunds) {
+                                    // All jobs completed successfully
+                                    Notification::make()
+                                        ->title(__('Refund sync completed'))
+                                        ->body(__('Successfully synced all :count refunds from Shopify', [
+                                            'count' => $totalRefunds,
+                                        ]))
+                                        ->success()
+                                        ->sendToDatabase($user);
+                                })
+                                ->catch(function (Batch $batch, \Throwable $e) use ($user) {
+                                    // First batch job failure
+                                    Notification::make()
+                                        ->title(__('Refund sync error'))
+                                        ->body(__('An error occurred during refund sync from Shopify: :error', [
+                                            'error' => $e->getMessage(),
+                                        ]))
+                                        ->danger()
+                                        ->sendToDatabase($user);
+                                })
+                                ->finally(function (Batch $batch) use ($user, $totalRefunds) {
+                                    // Always runs, even with failures
+                                    if ($batch->failedJobs > 0) {
+                                        $successCount = $batch->totalJobs - $batch->failedJobs;
+
+                                        Notification::make()
+                                            ->title(__('Refund sync completed with errors'))
+                                            ->body(__('Synced :success of :total refunds from Shopify. :failed failed.', [
+                                                'success' => $successCount,
+                                                'total' => $totalRefunds,
+                                                'failed' => $batch->failedJobs,
+                                            ]))
+                                            ->warning()
+                                            ->sendToDatabase($user);
+                                    }
+                                })
+                                ->dispatch();
+
+                            Notification::make()
+                                ->title(__('Refund sync started'))
+                                ->body(__('Syncing :count refunds from Shopify in the background. You will be notified when complete.', [
+                                    'count' => $totalRefunds,
+                                ]))
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title(__('Error starting refund sync'))
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+
+                Action::make('sync_claims')
+                    ->label(__('Sync Claims'))
+                    ->icon(Heroicon::OutlinedArrowPath)
+                    ->color('danger')
+                    ->visible(fn (Integration $record) => $record->provider === 'trendyol' && $record->is_active)
+                    ->requiresConfirmation()
+                    ->modalHeading(__('Sync Claims'))
+                    ->modalDescription(__('This will fetch and sync return claims from Trendyol. The process will run in the background.'))
+                    ->modalSubmitActionLabel(__('Start Sync'))
+                    ->action(function (Integration $record) {
+                        try {
+                            $adapter = new TrendyolAdapter($record);
+
+                            // Fetch all claims
+                            $allClaims = $adapter->fetchAllClaims();
+
+                            $totalClaims = count($allClaims);
+
+                            if ($totalClaims === 0) {
+                                Notification::make()
+                                    ->title(__('No claims found'))
+                                    ->body(__('No claims to sync from Trendyol'))
+                                    ->warning()
+                                    ->send();
+
+                                return;
+                            }
+
+                            // Create jobs for each claim
+                            $jobs = $allClaims->map(function ($claim) use ($record) {
+                                return new SyncTrendyolClaims($record, $claim);
+                            })->toArray();
+
+                            // Get current user for notifications
+                            $user = auth()->user();
+
+                            // Dispatch batch
+                            $batch = Bus::batch($jobs)
+                                ->name("Sync {$totalClaims} claims from Trendyol")
+                                ->allowFailures()
+                                ->onQueue('default')
+                                ->then(function (Batch $batch) use ($user, $totalClaims) {
+                                    // All jobs completed successfully
+                                    Notification::make()
+                                        ->title(__('Claim sync completed'))
+                                        ->body(__('Successfully synced all :count claims from Trendyol', [
+                                            'count' => $totalClaims,
+                                        ]))
+                                        ->success()
+                                        ->sendToDatabase($user);
+                                })
+                                ->catch(function (Batch $batch, \Throwable $e) use ($user) {
+                                    // First batch job failure
+                                    Notification::make()
+                                        ->title(__('Claim sync error'))
+                                        ->body(__('An error occurred during claim sync from Trendyol: :error', [
+                                            'error' => $e->getMessage(),
+                                        ]))
+                                        ->danger()
+                                        ->sendToDatabase($user);
+                                })
+                                ->finally(function (Batch $batch) use ($user, $totalClaims) {
+                                    // Always runs, even with failures
+                                    if ($batch->failedJobs > 0) {
+                                        $successCount = $batch->totalJobs - $batch->failedJobs;
+
+                                        Notification::make()
+                                            ->title(__('Claim sync completed with errors'))
+                                            ->body(__('Synced :success of :total claims from Trendyol. :failed failed.', [
+                                                'success' => $successCount,
+                                                'total' => $totalClaims,
+                                                'failed' => $batch->failedJobs,
+                                            ]))
+                                            ->warning()
+                                            ->sendToDatabase($user);
+                                    }
+                                })
+                                ->dispatch();
+
+                            Notification::make()
+                                ->title(__('Claim sync started'))
+                                ->body(__('Syncing :count claims from Trendyol in the background. You will be notified when complete.', [
+                                    'count' => $totalClaims,
+                                ]))
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title(__('Error starting claim sync'))
                                 ->body($e->getMessage())
                                 ->danger()
                                 ->send();
