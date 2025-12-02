@@ -7,6 +7,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
 
 class CustomerForm
 {
@@ -24,18 +25,11 @@ class CustomerForm
                 TextInput::make('email')
                     ->label('Email address')
                     ->email(),
-                TextInput::make('phone')
-                    ->tel(),
-                Textarea::make('address_line1')
-                    ->columnSpanFull(),
-                Textarea::make('address_line2')
-                    ->columnSpanFull(),
-                TextInput::make('city'),
-                TextInput::make('state'),
-                TextInput::make('postal_code'),
-                TextInput::make('country')
-                    ->required()
-                    ->default('TR'),
+                PhoneInput::make('phone')
+                    ->defaultCountry('TR')
+                    ->countryOrder(['TR', 'US', 'GB'])
+                    ->initialCountry('TR')
+                    ->validateFor(),
                 Textarea::make('notes')
                     ->columnSpanFull(),
             ]);

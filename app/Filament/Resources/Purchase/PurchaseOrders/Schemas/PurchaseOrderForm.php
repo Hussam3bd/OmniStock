@@ -10,6 +10,7 @@ use Filament\Forms;
 use Filament\Infolists;
 use Filament\Schemas;
 use Filament\Schemas\Schema;
+use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
 
 class PurchaseOrderForm
 {
@@ -46,10 +47,12 @@ class PurchaseOrderForm
                                     ->label(__('Email'))
                                     ->email()
                                     ->maxLength(255),
-                                Forms\Components\TextInput::make('phone')
+                                PhoneInput::make('phone')
                                     ->label(__('Phone'))
-                                    ->tel()
-                                    ->maxLength(255),
+                                    ->defaultCountry('TR')
+                                    ->countryOrder(['TR', 'US', 'GB'])
+                                    ->initialCountry('TR')
+                                    ->validateFor(),
                             ]),
 
                         Forms\Components\Select::make('location_id')

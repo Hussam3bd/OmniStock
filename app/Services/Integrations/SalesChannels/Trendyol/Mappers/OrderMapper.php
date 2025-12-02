@@ -10,6 +10,7 @@ use App\Models\Customer\Customer;
 use App\Models\Order\Order;
 use App\Models\Platform\PlatformMapping;
 use App\Models\Product\ProductVariant;
+use App\Services\Address\AddressService;
 use App\Services\Integrations\Concerns\BaseOrderMapper;
 use App\Services\Product\AttributeMappingService;
 use Carbon\Carbon;
@@ -18,7 +19,8 @@ use Illuminate\Support\Facades\DB;
 class OrderMapper extends BaseOrderMapper
 {
     public function __construct(
-        protected AttributeMappingService $attributeMappingService
+        protected AttributeMappingService $attributeMappingService,
+        protected AddressService $addressService
     ) {}
 
     protected function getChannel(): OrderChannel
@@ -71,12 +73,6 @@ class OrderMapper extends BaseOrderMapper
             'last_name' => $trendyolPackage['customerLastName'] ?? $shipmentAddress['lastName'] ?? '',
             'email' => $trendyolPackage['customerEmail'] ?? null,
             'phone' => $shipmentAddress['phone'] ?? null,
-            'address_line1' => $shipmentAddress['address1'] ?? null,
-            'address_line2' => $shipmentAddress['address2'] ?? null,
-            'city' => $shipmentAddress['city'] ?? null,
-            'state' => $shipmentAddress['district'] ?? null,
-            'postal_code' => $shipmentAddress['postalCode'] ?? null,
-            'country' => $shipmentAddress['countryCode'] ?? 'TR',
             'notes' => null,
         ];
 
@@ -112,6 +108,66 @@ class OrderMapper extends BaseOrderMapper
         $paymentStatus = $this->mapPaymentStatus($trendyolPackage);
         $fulfillmentStatus = $this->mapFulfillmentStatus($trendyolPackage['status'] ?? '');
 
+        // Create addresses
+        $shippingAddressId = null;
+        $billingAddressId = null;
+
+        $hasShippingAddress = ! empty($trendyolPackage['shipmentAddress']);
+        $hasBillingAddress = ! empty($trendyolPackage['invoiceAddress']);
+
+        // Check if both addresses exist and are the same
+        if ($hasShippingAddress && $hasBillingAddress) {
+            $mappedShippingAddress = $this->mapTrendyolAddress($trendyolPackage['shipmentAddress']);
+            $mappedBillingAddress = $this->mapTrendyolAddress($trendyolPackage['invoiceAddress']);
+
+            $addressesAreSame = $this->addressService->isSameAddress(
+                $mappedShippingAddress,
+                $mappedBillingAddress
+            );
+
+            if ($addressesAreSame) {
+                // Create only one address for both shipping and billing
+                $address = $this->addressService->createOrUpdateAddress(
+                    $customer,
+                    $mappedShippingAddress,
+                    'shipping'
+                );
+                $shippingAddressId = $address->id;
+                $billingAddressId = $address->id;
+            } else {
+                // Create separate addresses
+                $shippingAddress = $this->addressService->createOrUpdateAddress(
+                    $customer,
+                    $mappedShippingAddress,
+                    'shipping'
+                );
+                $shippingAddressId = $shippingAddress->id;
+
+                $billingAddress = $this->addressService->createOrUpdateAddress(
+                    $customer,
+                    $mappedBillingAddress,
+                    'billing'
+                );
+                $billingAddressId = $billingAddress->id;
+            }
+        } elseif ($hasShippingAddress) {
+            // Only shipping address exists
+            $shippingAddress = $this->addressService->createOrUpdateAddress(
+                $customer,
+                $this->mapTrendyolAddress($trendyolPackage['shipmentAddress']),
+                'shipping'
+            );
+            $shippingAddressId = $shippingAddress->id;
+        } elseif ($hasBillingAddress) {
+            // Only billing address exists
+            $billingAddress = $this->addressService->createOrUpdateAddress(
+                $customer,
+                $this->mapTrendyolAddress($trendyolPackage['invoiceAddress']),
+                'billing'
+            );
+            $billingAddressId = $billingAddress->id;
+        }
+
         // Extract shipping information
         $shippedAt = isset($trendyolPackage['originShipmentDate'])
             ? Carbon::createFromTimestampMs($trendyolPackage['originShipmentDate'])
@@ -133,6 +189,8 @@ class OrderMapper extends BaseOrderMapper
 
         $order = Order::create([
             'customer_id' => $customer->id,
+            'shipping_address_id' => $shippingAddressId,
+            'billing_address_id' => $billingAddressId,
             'channel' => $this->getChannel(),
             'order_number' => $trendyolPackage['orderNumber'] ?? null,
             'order_status' => $orderStatus,
@@ -618,5 +676,30 @@ class OrderMapper extends BaseOrderMapper
             'product_type' => 'Imported',
             'status' => 'active',
         ]);
+    }
+
+    /**
+     * Map Trendyol address format to AddressService format
+     */
+    protected function mapTrendyolAddress(array $trendyolAddress): array
+    {
+        return [
+            'first_name' => $trendyolAddress['firstName'] ?? null,
+            'last_name' => $trendyolAddress['lastName'] ?? null,
+            'company' => $trendyolAddress['company'] ?? null,
+            'phone' => $trendyolAddress['phone'] ?? null,
+            'address1' => $trendyolAddress['address1'] ?? $trendyolAddress['fullAddress'] ?? null,
+            'address2' => $trendyolAddress['address2'] ?? null,
+            'city' => $trendyolAddress['city'] ?? null,
+            'province' => $trendyolAddress['cityCode'] ?? $trendyolAddress['city'] ?? null,
+            'district' => $trendyolAddress['district'] ?? $trendyolAddress['districtName'] ?? null,
+            'neighborhood' => $trendyolAddress['neighborhood'] ?? null,
+            'zip' => $trendyolAddress['postalCode'] ?? null,
+            'country' => $trendyolAddress['country'] ?? null,
+            'country_code' => $trendyolAddress['countryCode'] ?? 'TR',
+            'tax_number' => $trendyolAddress['taxNumber'] ?? null,
+            'tax_office' => $trendyolAddress['taxOffice'] ?? null,
+            'identity_number' => $trendyolAddress['identityNumber'] ?? null,
+        ];
     }
 }

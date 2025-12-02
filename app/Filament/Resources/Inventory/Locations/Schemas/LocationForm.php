@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Inventory\Locations\Schemas;
 use Filament\Forms;
 use Filament\Schemas;
 use Filament\Schemas\Schema;
+use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
 
 class LocationForm
 {
@@ -61,9 +62,12 @@ class LocationForm
 
                 Schemas\Components\Section::make(__('Contact Information'))
                     ->schema([
-                        Forms\Components\TextInput::make('phone')
+                        PhoneInput::make('phone')
                             ->label(__('Phone'))
-                            ->tel(),
+                            ->defaultCountry('TR')
+                            ->countryOrder(['TR', 'US', 'GB'])
+                            ->initialCountry('TR')
+                            ->validateFor(),
 
                         Forms\Components\TextInput::make('email')
                             ->label(__('Email'))

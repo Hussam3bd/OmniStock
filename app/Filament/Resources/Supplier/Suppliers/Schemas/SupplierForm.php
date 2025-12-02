@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Supplier\Suppliers\Schemas;
 use Filament\Forms;
 use Filament\Schemas;
 use Filament\Schemas\Schema;
+use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
 
 class SupplierForm
 {
@@ -35,10 +36,12 @@ class SupplierForm
                             ->email()
                             ->maxLength(255),
 
-                        Forms\Components\TextInput::make('phone')
+                        PhoneInput::make('phone')
                             ->label(__('Phone'))
-                            ->tel()
-                            ->maxLength(255),
+                            ->defaultCountry('TR')
+                            ->countryOrder(['TR', 'US', 'GB'])
+                            ->initialCountry('TR')
+                            ->validateFor(),
 
                         Forms\Components\Toggle::make('is_active')
                             ->label(__('Active'))

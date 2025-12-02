@@ -8,11 +8,17 @@ use App\Models\Address\Country;
 use App\Models\Address\District;
 use App\Models\Address\Neighborhood;
 use App\Models\Address\Province;
+use App\Services\PhoneNumberService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 class AddressService
 {
+    public function __construct(
+        protected TurkishAddressParser $parser,
+        protected PhoneNumberService $phoneService
+    ) {}
+
     /**
      * Create or update an address for an entity
      */
@@ -30,6 +36,7 @@ class AddressService
 
         // Only match Turkish addresses
         if ($country && $country->iso2 === 'TR') {
+            // Try structured data first
             $province = $this->matchProvince($addressData['province'] ?? $addressData['city'] ?? null);
 
             if ($province) {
@@ -39,10 +46,44 @@ class AddressService
                     $neighborhood = $this->matchNeighborhood($district, $addressData['neighborhood'] ?? null);
                 }
             }
+
+            // If we still don't have province/district, try parsing the full address
+            if (! $province || ! $district) {
+                $parsed = $this->parseFullAddress($addressData);
+
+                if (! $province && $parsed['province']) {
+                    $province = $parsed['province'];
+                }
+
+                if (! $district && $parsed['district']) {
+                    $district = $parsed['district'];
+                }
+
+                if (! $neighborhood && $parsed['neighborhood']) {
+                    $neighborhood = $parsed['neighborhood'];
+                }
+
+                // Extract building details from parsed data
+                $addressData['building_number'] = $addressData['building_number'] ?? $parsed['building_number'];
+                $addressData['floor'] = $addressData['floor'] ?? $parsed['floor'];
+                $addressData['apartment'] = $addressData['apartment'] ?? $parsed['apartment'];
+            }
         }
 
         // Determine address type
         $type = $this->determineAddressType($addressData);
+
+        // Normalize phone number based on country
+        $phone = $this->phoneService->normalize(
+            $addressData['phone'] ?? null,
+            $country?->iso2
+        );
+
+        // Use customer email as fallback if address email is not provided
+        $email = $addressData['email'] ?? null;
+        if (! $email && method_exists($addressable, 'email')) {
+            $email = $addressable->email;
+        }
 
         return Address::updateOrCreate(
             [
@@ -59,10 +100,13 @@ class AddressService
                 'first_name' => $addressData['first_name'] ?? null,
                 'last_name' => $addressData['last_name'] ?? null,
                 'company_name' => $addressData['company'] ?? $addressData['company_name'] ?? null,
-                'phone' => $addressData['phone'] ?? null,
-                'email' => $addressData['email'] ?? null,
+                'phone' => $phone,
+                'email' => $email,
                 'address_line1' => $addressData['address1'] ?? $addressData['address_line1'] ?? null,
                 'address_line2' => $addressData['address2'] ?? $addressData['address_line2'] ?? null,
+                'building_number' => $addressData['building_number'] ?? null,
+                'floor' => $addressData['floor'] ?? null,
+                'apartment' => $addressData['apartment'] ?? null,
                 'postal_code' => $addressData['zip'] ?? $addressData['postal_code'] ?? null,
                 'tax_office' => $addressData['tax_office'] ?? null,
                 'tax_number' => $addressData['tax_number'] ?? null,
@@ -220,5 +264,51 @@ class AddressService
         }
 
         return AddressType::RESIDENTIAL;
+    }
+
+    /**
+     * Parse full address text to extract province/district/neighborhood
+     */
+    protected function parseFullAddress(array $addressData): array
+    {
+        // Combine all address fields into one string for parsing
+        $addressText = array_filter([
+            $addressData['address1'] ?? $addressData['address_line1'] ?? null,
+            $addressData['address2'] ?? $addressData['address_line2'] ?? null,
+            $addressData['city'] ?? null,
+            $addressData['province'] ?? null,
+            $addressData['district'] ?? null,
+            $addressData['zip'] ?? $addressData['postal_code'] ?? null,
+            $addressData['country'] ?? null,
+        ]);
+
+        return $this->parser->parse($addressText);
+    }
+
+    /**
+     * Check if two address arrays are the same
+     */
+    public function isSameAddress(array $address1, array $address2): bool
+    {
+        // Normalize addresses for comparison
+        $normalizeAddress = function ($address) {
+            return [
+                'address1' => trim(strtolower($address['address1'] ?? $address['address_line1'] ?? '')),
+                'address2' => trim(strtolower($address['address2'] ?? $address['address_line2'] ?? '')),
+                'city' => trim(strtolower($address['city'] ?? $address['province'] ?? '')),
+                'province' => trim(strtolower($address['province'] ?? $address['city'] ?? '')),
+                'district' => trim(strtolower($address['district'] ?? '')),
+                'zip' => trim($address['zip'] ?? $address['postal_code'] ?? ''),
+                'country' => trim(strtolower($address['country'] ?? $address['country_code'] ?? '')),
+            ];
+        };
+
+        $norm1 = $normalizeAddress($address1);
+        $norm2 = $normalizeAddress($address2);
+
+        // Check if all key fields match
+        return $norm1['address1'] === $norm2['address1']
+            && $norm1['zip'] === $norm2['zip']
+            && $norm1['city'] === $norm2['city'];
     }
 }

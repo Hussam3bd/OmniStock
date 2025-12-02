@@ -44,24 +44,32 @@ class ItemsRelationManager extends RelationManager
                 TextColumn::make('unit_price')
                     ->label(__('Unit Price'))
                     ->money(fn ($record) => $record->order->currency)
-                    ->sortable(),
+                    ->description(function ($record) {
+                        $hasDiscount = $record->discount_amount->getAmount() > 0;
+                        if (! $hasDiscount) {
+                            return null;
+                        }
 
-                TextColumn::make('discount_amount')
-                    ->label(__('Discount'))
-                    ->money(fn ($record) => $record->order->currency)
-                    ->color('danger')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                        $perUnitDiscount = $record->discount_amount->divide($record->quantity);
+                        $finalUnitPrice = $record->unit_price->subtract($perUnitDiscount);
+
+                        return 'Discount: -'.$perUnitDiscount->format().' → Final: '.$finalUnitPrice->format();
+                    })
+                    ->color(fn ($record) => $record->discount_amount->getAmount() > 0 ? 'danger' : null)
+                    ->icon(fn ($record) => $record->discount_amount->getAmount() > 0 ? 'heroicon-o-tag' : null)
+                    ->sortable(),
 
                 TextColumn::make('tax_amount')
                     ->label(__('VAT'))
                     ->money(fn ($record) => $record->order->currency)
-                    ->description(fn ($record) => number_format($record->tax_rate, 1).'%'),
+                    ->description(fn ($record) => $record->tax_rate > 0 ? number_format($record->tax_rate, 1).'%' : null)
+                    ->placeholder('-'),
 
                 TextColumn::make('commission_amount')
                     ->label(__('Commission'))
                     ->money(fn ($record) => $record->order->currency)
                     ->color('warning')
-                    ->description(fn ($record) => number_format($record->commission_rate, 1).'%')
+                    ->description(fn ($record) => $record->commission_rate > 0 ? number_format($record->commission_rate, 1).'%' : null)
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('total_price')

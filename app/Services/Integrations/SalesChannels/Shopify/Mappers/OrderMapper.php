@@ -70,12 +70,6 @@ class OrderMapper extends BaseOrderMapper
             'last_name' => $shopifyCustomer['last_name'] ?? $shippingAddress['last_name'] ?? '',
             'email' => $shopifyCustomer['email'] ?? $shopifyOrder['email'] ?? null,
             'phone' => $shopifyCustomer['phone'] ?? $shippingAddress['phone'] ?? null,
-            'address_line1' => $shippingAddress['address1'] ?? null,
-            'address_line2' => $shippingAddress['address2'] ?? null,
-            'city' => $shippingAddress['city'] ?? null,
-            'state' => $shippingAddress['province'] ?? null,
-            'postal_code' => $shippingAddress['zip'] ?? null,
-            'country' => ! empty($shippingAddress['country_code']) ? $shippingAddress['country_code'] : (! empty($shippingAddress['country']) ? $shippingAddress['country'] : 'Unknown'),
             'notes' => $shopifyOrder['note'] ?? null,
         ];
 
@@ -134,16 +128,51 @@ class OrderMapper extends BaseOrderMapper
         $shippingAddressId = null;
         $billingAddressId = null;
 
-        if (! empty($shopifyOrder['shipping_address'])) {
+        $hasShippingAddress = ! empty($shopifyOrder['shipping_address']);
+        $hasBillingAddress = ! empty($shopifyOrder['billing_address']);
+
+        // Check if both addresses exist and are the same
+        if ($hasShippingAddress && $hasBillingAddress) {
+            $addressesAreSame = $this->addressService->isSameAddress(
+                $shopifyOrder['shipping_address'],
+                $shopifyOrder['billing_address']
+            );
+
+            if ($addressesAreSame) {
+                // Create only one address for both shipping and billing
+                $address = $this->addressService->createOrUpdateAddress(
+                    $customer,
+                    $shopifyOrder['shipping_address'],
+                    'shipping'
+                );
+                $shippingAddressId = $address->id;
+                $billingAddressId = $address->id;
+            } else {
+                // Create separate addresses
+                $shippingAddress = $this->addressService->createOrUpdateAddress(
+                    $customer,
+                    $shopifyOrder['shipping_address'],
+                    'shipping'
+                );
+                $shippingAddressId = $shippingAddress->id;
+
+                $billingAddress = $this->addressService->createOrUpdateAddress(
+                    $customer,
+                    $shopifyOrder['billing_address'],
+                    'billing'
+                );
+                $billingAddressId = $billingAddress->id;
+            }
+        } elseif ($hasShippingAddress) {
+            // Only shipping address exists
             $shippingAddress = $this->addressService->createOrUpdateAddress(
                 $customer,
                 $shopifyOrder['shipping_address'],
                 'shipping'
             );
             $shippingAddressId = $shippingAddress->id;
-        }
-
-        if (! empty($shopifyOrder['billing_address'])) {
+        } elseif ($hasBillingAddress) {
+            // Only billing address exists
             $billingAddress = $this->addressService->createOrUpdateAddress(
                 $customer,
                 $shopifyOrder['billing_address'],
@@ -312,7 +341,21 @@ class OrderMapper extends BaseOrderMapper
 
             $unitPrice = $this->convertToMinorUnits((float) ($lineItem['price'] ?? 0), $order->currency);
             $quantity = (int) ($lineItem['quantity'] ?? 1);
-            $totalPrice = $unitPrice * $quantity;
+            $discountAmount = $this->convertToMinorUnits((float) ($lineItem['total_discount'] ?? 0), $order->currency);
+
+            // Total price = (unit price * quantity) - discount
+            $totalPrice = ($unitPrice * $quantity) - $discountAmount;
+
+            // Extract tax information from line item
+            $taxRate = 0;
+            $taxAmount = 0;
+
+            if (! empty($lineItem['tax_lines'])) {
+                // Get the first tax line (usually only one per line item)
+                $taxLine = $lineItem['tax_lines'][0];
+                $taxRate = ((float) ($taxLine['rate'] ?? 0)) * 100; // Convert to percentage (0.1 -> 10)
+                $taxAmount = $this->convertToMinorUnits((float) ($taxLine['price'] ?? 0), $order->currency);
+            }
 
             $order->items()->updateOrCreate(
                 [
@@ -322,9 +365,9 @@ class OrderMapper extends BaseOrderMapper
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'total_price' => $totalPrice,
-                    'discount_amount' => $this->convertToMinorUnits((float) ($lineItem['total_discount'] ?? 0), $order->currency),
-                    'tax_rate' => 0,
-                    'tax_amount' => 0,
+                    'discount_amount' => $discountAmount,
+                    'tax_rate' => $taxRate,
+                    'tax_amount' => $taxAmount,
                     'commission_amount' => 0,
                     'commission_rate' => 0,
                 ]
