@@ -10,6 +10,7 @@ use App\Models\Customer\Customer;
 use App\Models\Order\Order;
 use App\Models\Platform\PlatformMapping;
 use App\Models\Product\ProductVariant;
+use App\Services\Address\AddressService;
 use App\Services\Integrations\Concerns\BaseOrderMapper;
 use App\Services\Product\AttributeMappingService;
 use Carbon\Carbon;
@@ -18,7 +19,8 @@ use Illuminate\Support\Facades\DB;
 class OrderMapper extends BaseOrderMapper
 {
     public function __construct(
-        protected AttributeMappingService $attributeMappingService
+        protected AttributeMappingService $attributeMappingService,
+        protected AddressService $addressService
     ) {}
 
     protected function getChannel(): OrderChannel
@@ -128,8 +130,32 @@ class OrderMapper extends BaseOrderMapper
             ? Carbon::parse($firstFulfillment['updated_at'])
             : null;
 
+        // Create addresses
+        $shippingAddressId = null;
+        $billingAddressId = null;
+
+        if (! empty($shopifyOrder['shipping_address'])) {
+            $shippingAddress = $this->addressService->createOrUpdateAddress(
+                $customer,
+                $shopifyOrder['shipping_address'],
+                'shipping'
+            );
+            $shippingAddressId = $shippingAddress->id;
+        }
+
+        if (! empty($shopifyOrder['billing_address'])) {
+            $billingAddress = $this->addressService->createOrUpdateAddress(
+                $customer,
+                $shopifyOrder['billing_address'],
+                'billing'
+            );
+            $billingAddressId = $billingAddress->id;
+        }
+
         $order = Order::create([
             'customer_id' => $customer->id,
+            'shipping_address_id' => $shippingAddressId,
+            'billing_address_id' => $billingAddressId,
             'channel' => $this->getChannel(),
             'order_number' => $shopifyOrder['order_number'] ?? $shopifyOrder['name'] ?? null,
             'order_status' => $orderStatus,

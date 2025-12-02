@@ -7,6 +7,7 @@ use App\Enums\Order\OrderChannel;
 use App\Enums\Order\OrderStatus;
 use App\Enums\Order\PaymentStatus;
 use App\Models\Accounting\Transaction;
+use App\Models\Address\Address;
 use App\Models\Customer\Customer;
 use App\Models\Inventory\InventoryMovement;
 use App\Models\Platform\PlatformMapping;
@@ -24,6 +25,8 @@ class Order extends Model
 
     protected $fillable = [
         'customer_id',
+        'shipping_address_id',
+        'billing_address_id',
         'channel',
         'order_number',
         'order_status',
@@ -107,6 +110,16 @@ class Order extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function shippingAddress(): BelongsTo
+    {
+        return $this->belongsTo(Address::class, 'shipping_address_id');
+    }
+
+    public function billingAddress(): BelongsTo
+    {
+        return $this->belongsTo(Address::class, 'billing_address_id');
     }
 
     public function items(): HasMany

@@ -3,6 +3,7 @@
 namespace App\Models\Customer;
 
 use App\Enums\Order\OrderChannel;
+use App\Models\Address\Address;
 use App\Models\Order\Order;
 use App\Models\Platform\PlatformMapping;
 use Illuminate\Database\Eloquent\Model;
@@ -41,6 +42,11 @@ class Customer extends Model
     public function platformMappings(): MorphMany
     {
         return $this->morphMany(PlatformMapping::class, 'entity');
+    }
+
+    public function addresses(): MorphMany
+    {
+        return $this->morphMany(Address::class, 'addressable');
     }
 
     public function getFullNameAttribute(): string
