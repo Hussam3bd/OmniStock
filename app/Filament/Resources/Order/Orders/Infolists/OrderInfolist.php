@@ -49,6 +49,47 @@ class OrderInfolist
                     ])
                     ->columns(2),
 
+                Schemas\Components\Section::make(__('Payment Information'))
+                    ->schema([
+                        Infolists\Components\TextEntry::make('payment_method')
+                            ->label(__('Payment Method'))
+                            ->formatStateUsing(fn ($state) => match ($state) {
+                                'cod' => 'Cash on Delivery',
+                                'bank_transfer' => 'Bank Transfer',
+                                'online' => 'Online Payment',
+                                default => $state ? ucfirst($state) : '-',
+                            })
+                            ->icon(fn ($state) => match ($state) {
+                                'cod' => 'heroicon-o-banknotes',
+                                'bank_transfer' => 'heroicon-o-building-library',
+                                'online' => 'heroicon-o-credit-card',
+                                default => 'heroicon-o-currency-dollar',
+                            })
+                            ->color(fn ($state) => match ($state) {
+                                'cod' => 'warning',
+                                'bank_transfer' => 'info',
+                                'online' => 'success',
+                                default => 'gray',
+                            })
+                            ->badge(),
+
+                        Infolists\Components\TextEntry::make('payment_gateway')
+                            ->label(__('Payment Gateway'))
+                            ->formatStateUsing(fn ($state) => $state ? ucfirst($state) : '-')
+                            ->placeholder(__('Not available'))
+                            ->badge()
+                            ->color('gray'),
+
+                        Infolists\Components\TextEntry::make('payment_transaction_id')
+                            ->label(__('Transaction ID'))
+                            ->copyable()
+                            ->placeholder(__('Not available'))
+                            ->visible(fn ($record) => $record->payment_transaction_id)
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->visible(fn ($record) => $record->payment_method || $record->payment_gateway),
+
                 Schemas\Components\Section::make(__('Order Summary'))
                     ->schema([
                         Infolists\Components\TextEntry::make('subtotal')

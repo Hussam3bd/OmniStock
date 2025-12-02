@@ -38,6 +38,27 @@ class OrdersTable
                 TextColumn::make('payment_status')
                     ->badge()
                     ->sortable(),
+                TextColumn::make('payment_gateway')
+                    ->label('Payment Method')
+                    ->formatStateUsing(function ($record) {
+                        $parts = [];
+                        if ($record->payment_method) {
+                            $parts[] = match ($record->payment_method) {
+                                'cod' => 'COD',
+                                'bank_transfer' => 'Bank Transfer',
+                                'online' => 'Online',
+                                default => ucfirst($record->payment_method),
+                            };
+                        }
+                        if ($record->payment_gateway) {
+                            $parts[] = '('.ucfirst($record->payment_gateway).')';
+                        }
+
+                        return ! empty($parts) ? implode(' ', $parts) : '-';
+                    })
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('fulfillment_status')
                     ->badge()
                     ->sortable(),

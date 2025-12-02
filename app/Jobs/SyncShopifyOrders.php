@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Integration\Integration;
 use App\Services\Integrations\SalesChannels\Shopify\Mappers\OrderMapper;
+use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -37,7 +38,14 @@ class SyncShopifyOrders implements ShouldQueue
         }
 
         try {
-            $mapper->mapOrder($this->orderData);
+            // Fetch full order details with transactions
+            $adapter = new ShopifyAdapter($this->integration);
+            $orderWithTransactions = $adapter->fetchOrderWithTransactions((string) $this->orderData['id']);
+
+            // If we couldn't fetch the order, use the basic data we have
+            $orderData = $orderWithTransactions ?? $this->orderData;
+
+            $mapper->mapOrder($orderData);
         } catch (\Exception $e) {
             // Log error but don't fail the entire batch
             activity()

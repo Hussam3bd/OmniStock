@@ -73,7 +73,7 @@ class OrderMapper extends BaseOrderMapper
             'city' => $shippingAddress['city'] ?? null,
             'state' => $shippingAddress['province'] ?? null,
             'postal_code' => $shippingAddress['zip'] ?? null,
-            'country' => $shippingAddress['country_code'] ?? $shippingAddress['country'] ?? 'Unknown',
+            'country' => ! empty($shippingAddress['country_code']) ? $shippingAddress['country_code'] : (! empty($shippingAddress['country']) ? $shippingAddress['country'] : 'Unknown'),
             'notes' => $shopifyOrder['note'] ?? null,
         ];
 
@@ -113,6 +113,9 @@ class OrderMapper extends BaseOrderMapper
         $paymentStatus = $this->mapPaymentStatus($shopifyOrder);
         $fulfillmentStatus = $this->mapFulfillmentStatus($shopifyOrder);
 
+        // Extract payment information
+        $paymentInfo = $this->extractPaymentInformation($shopifyOrder);
+
         // Extract shipping information
         $fulfillments = $shopifyOrder['fulfillments'] ?? [];
         $firstFulfillment = $fulfillments[0] ?? null;
@@ -131,6 +134,9 @@ class OrderMapper extends BaseOrderMapper
             'order_number' => $shopifyOrder['order_number'] ?? $shopifyOrder['name'] ?? null,
             'order_status' => $orderStatus,
             'payment_status' => $paymentStatus,
+            'payment_method' => $paymentInfo['method'],
+            'payment_gateway' => $paymentInfo['gateway'],
+            'payment_transaction_id' => $paymentInfo['transaction_id'],
             'fulfillment_status' => $fulfillmentStatus,
             'subtotal' => $subtotal,
             'tax_amount' => $taxAmount,
@@ -182,6 +188,9 @@ class OrderMapper extends BaseOrderMapper
         $newPaymentStatus = $this->mapPaymentStatus($shopifyOrder);
         $newFulfillmentStatus = $this->mapFulfillmentStatus($shopifyOrder);
 
+        // Extract payment information
+        $paymentInfo = $this->extractPaymentInformation($shopifyOrder);
+
         // Track status changes
         $statusChanges = [];
         if ($order->order_status !== $newOrderStatus) {
@@ -218,6 +227,9 @@ class OrderMapper extends BaseOrderMapper
         $order->update([
             'order_status' => $newOrderStatus,
             'payment_status' => $newPaymentStatus,
+            'payment_method' => $paymentInfo['method'],
+            'payment_gateway' => $paymentInfo['gateway'],
+            'payment_transaction_id' => $paymentInfo['transaction_id'],
             'fulfillment_status' => $newFulfillmentStatus,
             'subtotal' => $subtotal,
             'tax_amount' => $taxAmount,
@@ -358,6 +370,58 @@ class OrderMapper extends BaseOrderMapper
             'PARTIAL' => FulfillmentStatus::PARTIALLY_FULFILLED,
             'RESTOCKED' => FulfillmentStatus::RETURNED,
             default => FulfillmentStatus::UNFULFILLED,
+        };
+    }
+
+    protected function extractPaymentInformation(array $shopifyOrder): array
+    {
+        // Get payment gateway names from Shopify
+        $gatewayNames = $shopifyOrder['payment_gateway_names'] ?? [];
+        $gateway = ! empty($gatewayNames) ? strtolower($gatewayNames[0]) : null;
+
+        // Try to get transaction ID from payment details
+        $transactionId = null;
+        if (isset($shopifyOrder['transactions']) && is_array($shopifyOrder['transactions'])) {
+            foreach ($shopifyOrder['transactions'] as $transaction) {
+                if (($transaction['status'] ?? '') === 'success') {
+                    // Try authorization first, then payment_id, then transaction id
+                    $transactionId = $transaction['authorization']
+                        ?? $transaction['payment_id']
+                        ?? $transaction['id']
+                        ?? null;
+                    if ($transactionId) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Determine payment method based on gateway
+        $method = $this->determinePaymentMethod($gateway);
+
+        return [
+            'method' => $method,
+            'gateway' => $gateway,
+            'transaction_id' => $transactionId ? (string) $transactionId : null,
+        ];
+    }
+
+    protected function determinePaymentMethod(?string $gateway): ?string
+    {
+        if (! $gateway) {
+            return null;
+        }
+
+        // Map common gateways to payment methods
+        // Check specific payment gateways first before generic keywords
+        return match (true) {
+            str_contains($gateway, 'cash') || str_contains($gateway, 'cod') => 'cod',
+            str_contains($gateway, 'iyzico') => 'online',
+            str_contains($gateway, 'stripe') => 'online',
+            str_contains($gateway, 'paypal') => 'online',
+            str_contains($gateway, 'credit') || str_contains($gateway, 'card') || str_contains($gateway, 'kart') => 'online',
+            str_contains($gateway, 'bank') || str_contains($gateway, 'wire') || str_contains($gateway, 'transfer') || str_contains($gateway, 'eft') || str_contains($gateway, 'havale') => 'bank_transfer',
+            default => 'online',
         };
     }
 }

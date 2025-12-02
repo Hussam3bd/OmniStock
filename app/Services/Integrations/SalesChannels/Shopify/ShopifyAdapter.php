@@ -92,6 +92,42 @@ class ShopifyAdapter implements SalesChannelAdapter
         return collect($response->json('orders', []));
     }
 
+    public function fetchOrderWithTransactions(string $orderId): ?array
+    {
+        $response = $this->makeRequest('get', "/orders/{$orderId}.json");
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $order = $response->json('order');
+        $order['transactions'] = $this->fetchOrderTransactions($orderId);
+
+        return $order;
+    }
+
+    protected function fetchOrderTransactions(string $orderId): array
+    {
+        try {
+            $response = $this->makeRequest('get', "/orders/{$orderId}/transactions.json");
+
+            if ($response->successful()) {
+                return $response->json('transactions', []);
+            }
+        } catch (\Exception $e) {
+            // Log but don't fail the order sync if transactions can't be fetched
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'order_id' => $orderId,
+                    'error' => $e->getMessage(),
+                ])
+                ->log('shopify_fetch_transactions_failed');
+        }
+
+        return [];
+    }
+
     public function fetchAllOrders(?Carbon $since = null): Collection
     {
         $allOrders = collect();
