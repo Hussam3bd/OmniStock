@@ -54,6 +54,9 @@ class OrderMapper extends BaseOrderMapper
 
             $this->syncOrderItems($order, $trendyolPackage['lines'] ?? []);
 
+            // Calculate and store total product cost
+            $this->calculateTotalProductCost($order);
+
             // Calculate and update total commission
             $totalCommission = $order->items->sum(function ($item) {
                 return $item->commission_amount->getAmount();
@@ -376,6 +379,7 @@ class OrderMapper extends BaseOrderMapper
             $itemData = [
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
+                'unit_cost' => $variant->cost_price?->getAmount() ?? 0,
                 'total_price' => $totalPrice,
                 'discount_amount' => $discount,
                 'tax_rate' => $taxRate,
@@ -422,6 +426,22 @@ class OrderMapper extends BaseOrderMapper
         }
 
         $order->items()->whereNotIn('id', $existingItemIds)->delete();
+    }
+
+    /**
+     * Calculate and update total product cost (COGS) for the order
+     */
+    protected function calculateTotalProductCost(Order $order): void
+    {
+        $totalCost = $order->items()
+            ->get()
+            ->sum(function ($item) {
+                return ($item->unit_cost?->getAmount() ?? 0) * $item->quantity;
+            });
+
+        $order->update([
+            'total_product_cost' => $totalCost,
+        ]);
     }
 
     protected function findProductVariant(array $line): ?ProductVariant

@@ -16,6 +16,7 @@ class OrderItem extends Model
         'product_variant_id',
         'quantity',
         'unit_price',
+        'unit_cost',
         'total_price',
         'discount_amount',
         'tax_rate',
@@ -28,6 +29,7 @@ class OrderItem extends Model
     {
         return [
             'unit_price' => MoneyIntegerCast::class,
+            'unit_cost' => MoneyIntegerCast::class,
             'total_price' => MoneyIntegerCast::class,
             'discount_amount' => MoneyIntegerCast::class,
             'tax_amount' => MoneyIntegerCast::class,
@@ -35,6 +37,20 @@ class OrderItem extends Model
             'tax_rate' => 'decimal:2',
             'commission_rate' => 'decimal:2',
         ];
+    }
+
+    /**
+     * Get total cost of goods for this line item (quantity × unit_cost)
+     */
+    public function getTotalCostAttribute(): ?\Cknow\Money\Money
+    {
+        if (! $this->unit_cost) {
+            return null;
+        }
+
+        $totalCost = $this->unit_cost->getAmount() * $this->quantity;
+
+        return new \Cknow\Money\Money($totalCost, $this->unit_cost->getCurrency());
     }
 
     public function order(): BelongsTo

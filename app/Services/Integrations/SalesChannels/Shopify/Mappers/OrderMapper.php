@@ -55,6 +55,9 @@ class OrderMapper extends BaseOrderMapper
 
             $this->syncOrderItems($order, $shopifyOrder['line_items'] ?? [], $shopifyOrder['refunds'] ?? []);
 
+            // Calculate and store total product cost
+            $this->calculateTotalProductCost($order);
+
             // Recalculate totals
             $order->refresh();
 
@@ -406,6 +409,7 @@ class OrderMapper extends BaseOrderMapper
                 [
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
+                    'unit_cost' => $variant->cost_price?->getAmount() ?? 0,
                     'total_price' => $totalPrice,
                     'discount_amount' => $discountAmount,
                     'tax_rate' => $taxRate,
@@ -431,6 +435,22 @@ class OrderMapper extends BaseOrderMapper
         }
 
         return $cancelledIds;
+    }
+
+    /**
+     * Calculate and update total product cost (COGS) for the order
+     */
+    protected function calculateTotalProductCost(Order $order): void
+    {
+        $totalCost = $order->items()
+            ->get()
+            ->sum(function ($item) {
+                return ($item->unit_cost?->getAmount() ?? 0) * $item->quantity;
+            });
+
+        $order->update([
+            'total_product_cost' => $totalCost,
+        ]);
     }
 
     protected function findVariantByShopifyVariantId(?string $shopifyVariantId): ?ProductVariant

@@ -137,6 +137,53 @@ class OrderInfolist
                     ])
                     ->columns(2),
 
+                Schemas\Components\Section::make(__('Profit Breakdown'))
+                    ->schema([
+                        Infolists\Components\TextEntry::make('total_amount')
+                            ->label(__('Revenue (Customer Paid)'))
+                            ->helperText(__('Total amount customer paid'))
+                            ->money(fn ($record) => $record->currency),
+
+                        Infolists\Components\TextEntry::make('total_product_cost')
+                            ->label(__('Product Cost (COGS)'))
+                            ->helperText(__('Cost of goods sold'))
+                            ->money(fn ($record) => $record->currency)
+                            ->color('danger')
+                            ->visible(fn ($record) => $record->total_product_cost),
+
+                        Infolists\Components\TextEntry::make('total_shipping_cost')
+                            ->label(__('Shipping Cost'))
+                            ->helperText(__('Cost paid to carrier including VAT'))
+                            ->money(fn ($record) => $record->currency)
+                            ->color('danger')
+                            ->visible(fn ($record) => $record->total_shipping_cost),
+
+                        Infolists\Components\TextEntry::make('total_commission')
+                            ->label(__('Platform Commission'))
+                            ->helperText(__('Commission paid to sales channel'))
+                            ->money(fn ($record) => $record->currency)
+                            ->color('danger')
+                            ->visible(fn ($record) => $record->total_commission && $record->total_commission->getAmount() > 0),
+
+                        Infolists\Components\TextEntry::make('gross_profit')
+                            ->label(__('Gross Profit'))
+                            ->helperText(__('Revenue - All Costs'))
+                            ->money(fn ($record) => $record->currency)
+                            ->weight('bold')
+                            ->size('lg')
+                            ->color(fn ($record) => match (true) {
+                                ! $record->gross_profit => 'gray',
+                                $record->gross_profit->getAmount() > 0 => 'success',
+                                $record->gross_profit->getAmount() < 0 => 'danger',
+                                default => 'gray',
+                            })
+                            ->visible(fn ($record) => $record->gross_profit)
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->collapsible()
+                    ->visible(fn ($record) => $record->total_product_cost || $record->total_shipping_cost),
+
                 Schemas\Components\Section::make(__('Shipping Information'))
                     ->schema([
                         Infolists\Components\TextEntry::make('shipping_carrier')
