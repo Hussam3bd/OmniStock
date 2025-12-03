@@ -9,6 +9,7 @@ enum ShippingCarrier: string implements HasColor, HasLabel
 {
     case ARAS = 'aras';
     case DHL = 'dhl';
+    case HEPSIJET = 'hepsijet';
     case KOLAY_GELSIN = 'kolay_gelsin';
     case PTT = 'ptt';
     case SURAT = 'surat';
@@ -23,6 +24,7 @@ enum ShippingCarrier: string implements HasColor, HasLabel
         return match ($this) {
             self::ARAS => 'Aras',
             self::DHL => 'DHL eCommerce',
+            self::HEPSIJET => 'HepsiJET',
             self::KOLAY_GELSIN => 'Kolay Gelsin',
             self::PTT => 'PTT',
             self::SURAT => 'Sürat',
@@ -39,6 +41,7 @@ enum ShippingCarrier: string implements HasColor, HasLabel
         return match ($this) {
             self::ARAS => 'orange',
             self::DHL => 'yellow',
+            self::HEPSIJET => 'cyan',
             self::KOLAY_GELSIN => 'blue',
             self::PTT => 'red',
             self::SURAT => 'green',
@@ -68,6 +71,7 @@ enum ShippingCarrier: string implements HasColor, HasLabel
         return match (true) {
             str_contains($normalized, 'aras') => self::ARAS,
             str_contains($normalized, 'dhl') => self::DHL,
+            str_contains($normalized, 'hepsijet') || str_contains($normalized, 'hepsi') => self::HEPSIJET,
             str_contains($normalized, 'kolay') => self::KOLAY_GELSIN,
             str_contains($normalized, 'ptt') => self::PTT,
             str_contains($normalized, 'sürat') || str_contains($normalized, 'surat') => self::SURAT,

@@ -208,14 +208,96 @@ class BasitKargoAdapter implements ShippingProviderAdapter
         }
     }
 
+    /**
+     * Filter orders by date range and other criteria
+     */
+    public function filterOrders(
+        string $startDate,
+        string $endDate,
+        ?array $statusList = null,
+        ?string $handlerCode = null,
+        string $sortBy = 'CREATED_TIME',
+        int $page = 0,
+        int $size = 100
+    ): array {
+        try {
+            $payload = [
+                'startDate' => $startDate,
+                'endDate' => $endDate,
+                'sortBy' => $sortBy,
+                'page' => $page,
+                'size' => min($size, 100), // Max 100 per API docs
+            ];
+
+            if ($statusList) {
+                $payload['statusList'] = $statusList;
+            }
+
+            if ($handlerCode) {
+                $payload['handlerCode'] = $handlerCode;
+            }
+
+            $response = $this->client()->post('/v2/order/filter', $payload);
+
+            if (! $response->successful()) {
+                activity()
+                    ->withProperties([
+                        'integration_id' => $this->integration->id,
+                        'start_date' => $startDate,
+                        'end_date' => $endDate,
+                        'status_code' => $response->status(),
+                        'response_body' => $response->body(),
+                        'payload' => $payload,
+                        'error' => 'HTTP '.$response->status(),
+                    ])
+                    ->log('basitkargo_filter_orders_http_error');
+
+                throw new \Exception('Failed to filter orders: HTTP '.$response->status().' - '.$response->body());
+            }
+
+            $data = $response->json();
+
+            // Log response for debugging
+            // API returns orders directly as an array, not wrapped in 'content'
+            $orders = is_array($data) && isset($data[0]) ? $data : ($data['content'] ?? []);
+
+            activity()
+                ->withProperties([
+                    'integration_id' => $this->integration->id,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'payload' => $payload,
+                    'response_structure' => is_array($data) && isset($data[0]) ? 'direct_array' : 'object',
+                    'orders_count' => count($orders),
+                    'total_elements' => $data['totalElements'] ?? null,
+                ])
+                ->log('basitkargo_filter_orders_success');
+
+            return $orders;
+        } catch (\Exception $e) {
+            activity()
+                ->withProperties([
+                    'integration_id' => $this->integration->id,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'payload' => $payload ?? null,
+                    'error' => $e->getMessage(),
+                ])
+                ->log('basitkargo_filter_orders_failed');
+
+            throw $e;
+        }
+    }
+
     protected function client(): PendingRequest
     {
         return Http::baseUrl($this->baseUrl)
             ->withHeaders([
                 'Authorization' => 'Bearer '.$this->apiToken,
-                'Accept' => 'application/json',
                 'Content-Type' => 'application/json',
             ])
+            ->acceptJson()
+            ->asJson()
             ->timeout(30);
     }
 
