@@ -2,6 +2,8 @@
 
 namespace App\Services\Integrations\SalesChannels\Shopify\Webhooks;
 
+use App\Enums\Integration\IntegrationProvider;
+use App\Enums\Integration\IntegrationType;
 use App\Models\Integration\Integration;
 use Illuminate\Http\Request;
 use Spatie\WebhookClient\SignatureValidator\SignatureValidator as SignatureValidatorInterface;
@@ -27,8 +29,8 @@ class SignatureValidator implements SignatureValidatorInterface
         }
 
         // Find the integration by shop domain
-        $integration = Integration::where('type', 'sales_channel')
-            ->where('provider', 'shopify')
+        $integration = Integration::where('type', IntegrationType::SALES_CHANNEL)
+            ->where('provider', IntegrationProvider::SHOPIFY)
             ->where('is_active', true)
             ->get()
             ->first(function ($integration) use ($shopDomain) {

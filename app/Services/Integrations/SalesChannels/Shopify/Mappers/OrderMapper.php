@@ -13,6 +13,7 @@ use App\Models\Product\ProductVariant;
 use App\Services\Address\AddressService;
 use App\Services\Integrations\Concerns\BaseOrderMapper;
 use App\Services\Product\AttributeMappingService;
+use App\Services\Shipping\ShippingCostSyncService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -20,7 +21,8 @@ class OrderMapper extends BaseOrderMapper
 {
     public function __construct(
         protected AttributeMappingService $attributeMappingService,
-        protected AddressService $addressService
+        protected AddressService $addressService,
+        protected ShippingCostSyncService $shippingCostSyncService
     ) {}
 
     protected function getChannel(): OrderChannel
@@ -54,6 +56,19 @@ class OrderMapper extends BaseOrderMapper
 
             // Recalculate totals
             $order->refresh();
+
+            // Sync shipping costs from BasitKargo if order has tracking number
+            if ($order->shipping_tracking_number && ! $order->carrier) {
+                try {
+                    $this->shippingCostSyncService->syncShippingCostFromBasitKargo($order);
+                } catch (\Exception $e) {
+                    // Log but don't fail the order sync
+                    activity()
+                        ->performedOn($order)
+                        ->withProperties(['error' => $e->getMessage()])
+                        ->log('shopify_shipping_cost_sync_failed');
+                }
+            }
 
             return $order->fresh('items', 'customer');
         });

@@ -72,8 +72,21 @@ class OrderReturnInfolist
                             ->money(fn ($record) => $record->currency)
                             ->color('warning'),
 
-                        Infolists\Components\TextEntry::make('return_shipping_cost')
-                            ->label(__('Return Shipping Cost'))
+                        Infolists\Components\TextEntry::make('return_shipping_cost_excluding_vat')
+                            ->label(__('Return Shipping (excl. VAT)'))
+                            ->money(fn ($record) => $record->currency)
+                            ->color('warning')
+                            ->visible(fn ($record) => $record->return_shipping_cost_excluding_vat),
+
+                        Infolists\Components\TextEntry::make('return_shipping_vat_amount')
+                            ->label(__('Return Shipping VAT'))
+                            ->money(fn ($record) => $record->currency)
+                            ->color('warning')
+                            ->visible(fn ($record) => $record->return_shipping_vat_amount),
+
+                        Infolists\Components\TextEntry::make('return_shipping_total')
+                            ->label(__('Return Shipping Total'))
+                            ->state(fn ($record) => $record->return_shipping_total)
                             ->money(fn ($record) => $record->currency)
                             ->color('warning'),
 
@@ -144,9 +157,29 @@ class OrderReturnInfolist
 
                 Schemas\Components\Section::make(__('Return Shipping'))
                     ->schema([
+                        Infolists\Components\TextEntry::make('carrier')
+                            ->label(__('Carrier (System)'))
+                            ->badge()
+                            ->icon('heroicon-o-truck')
+                            ->placeholder(__('Not detected'))
+                            ->visible(fn ($record) => $record->carrier),
+
                         Infolists\Components\TextEntry::make('return_shipping_carrier')
-                            ->label(__('Carrier'))
-                            ->placeholder(__('Not available')),
+                            ->label(__('Carrier (Original)'))
+                            ->placeholder(__('Not available'))
+                            ->visible(fn ($record) => $record->return_shipping_carrier && ! $record->carrier),
+
+                        Infolists\Components\TextEntry::make('return_shipping_desi')
+                            ->label(__('Desi (Volumetric Weight)'))
+                            ->suffix(' desi')
+                            ->placeholder(__('Not available'))
+                            ->visible(fn ($record) => $record->return_shipping_desi),
+
+                        Infolists\Components\TextEntry::make('return_shipping_vat_rate')
+                            ->label(__('VAT Rate'))
+                            ->suffix('%')
+                            ->placeholder(__('Not available'))
+                            ->visible(fn ($record) => $record->return_shipping_vat_rate),
 
                         Infolists\Components\TextEntry::make('return_tracking_number')
                             ->label(__('Tracking Number'))
@@ -179,7 +212,7 @@ class OrderReturnInfolist
                     ])
                     ->columns(2)
                     ->collapsible()
-                    ->visible(fn ($record) => $record->return_tracking_number || $record->return_label_url),
+                    ->visible(fn ($record) => $record->return_tracking_number || $record->return_label_url || $record->carrier),
 
                 Schemas\Components\Section::make(__('Audit Trail'))
                     ->schema([

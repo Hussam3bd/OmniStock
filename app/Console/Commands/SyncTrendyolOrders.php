@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\Integration\IntegrationProvider;
+use App\Enums\Integration\IntegrationType;
 use App\Models\Integration\Integration;
 use App\Services\Integrations\SalesChannels\Trendyol\Mappers\OrderMapper;
 use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
@@ -74,8 +76,8 @@ class SyncTrendyolOrders extends Command
 
     protected function getIntegrations(?string $integrationId, bool $force): \Illuminate\Support\Collection
     {
-        $query = Integration::where('type', 'sales_channel')
-            ->where('provider', 'trendyol');
+        $query = Integration::where('type', IntegrationType::SALES_CHANNEL)
+            ->where('provider', IntegrationProvider::TRENDYOL);
 
         if ($integrationId) {
             $query->where('id', $integrationId);

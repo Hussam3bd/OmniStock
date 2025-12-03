@@ -13,6 +13,7 @@ use App\Models\Product\ProductVariant;
 use App\Services\Address\AddressService;
 use App\Services\Integrations\Concerns\BaseOrderMapper;
 use App\Services\Product\AttributeMappingService;
+use App\Services\Shipping\ShippingCostService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -20,7 +21,8 @@ class OrderMapper extends BaseOrderMapper
 {
     public function __construct(
         protected AttributeMappingService $attributeMappingService,
-        protected AddressService $addressService
+        protected AddressService $addressService,
+        protected ShippingCostService $shippingCostService
     ) {}
 
     protected function getChannel(): OrderChannel
@@ -187,6 +189,9 @@ class OrderMapper extends BaseOrderMapper
             $deliveredAt = $shippedAt; // Approximate, exact delivery date not in API
         }
 
+        // Calculate shipping costs
+        $shippingCosts = $this->calculateShippingCosts($trendyolPackage);
+
         $order = Order::create([
             'customer_id' => $customer->id,
             'shipping_address_id' => $shippingAddressId,
@@ -198,7 +203,9 @@ class OrderMapper extends BaseOrderMapper
             'fulfillment_status' => $fulfillmentStatus,
             'subtotal' => $grossAmount,
             'tax_amount' => 0,
-            'shipping_amount' => 0,
+            'shipping_amount' => $shippingCosts['shipping_cost_excluding_vat'] && $shippingCosts['shipping_vat_amount']
+                ? $shippingCosts['shipping_cost_excluding_vat'] + $shippingCosts['shipping_vat_amount']
+                : 0,
             'discount_amount' => $totalDiscount,
             'total_amount' => $totalPrice,
             'total_commission' => 0, // Will be calculated from items
@@ -212,6 +219,11 @@ class OrderMapper extends BaseOrderMapper
                 : now(),
             'shipping_carrier' => $trendyolPackage['cargoProviderName'] ?? null,
             'shipping_desi' => $trendyolPackage['cargoDeci'] ?? null,
+            'carrier' => $shippingCosts['carrier'],
+            'shipping_cost_excluding_vat' => $shippingCosts['shipping_cost_excluding_vat'],
+            'shipping_vat_rate' => $shippingCosts['shipping_vat_rate'],
+            'shipping_vat_amount' => $shippingCosts['shipping_vat_amount'],
+            'shipping_rate_id' => $shippingCosts['shipping_rate_id'],
             'shipping_tracking_number' => $trendyolPackage['cargoTrackingNumber'] ?? null,
             'shipping_tracking_url' => $trendyolPackage['cargoTrackingLink'] ?? null,
             'shipped_at' => $shippedAt,
@@ -286,6 +298,9 @@ class OrderMapper extends BaseOrderMapper
             $deliveredAt = $shippedAt; // Approximate, exact delivery date not in API
         }
 
+        // Calculate shipping costs
+        $shippingCosts = $this->calculateShippingCosts($trendyolPackage);
+
         $order->update([
             'order_status' => $newOrderStatus,
             'payment_status' => $newPaymentStatus,
@@ -296,6 +311,14 @@ class OrderMapper extends BaseOrderMapper
             'invoice_url' => $trendyolPackage['invoiceLink'] ?? $order->invoice_url,
             'shipping_carrier' => $trendyolPackage['cargoProviderName'] ?? null,
             'shipping_desi' => $trendyolPackage['cargoDeci'] ?? null,
+            'carrier' => $shippingCosts['carrier'],
+            'shipping_amount' => $shippingCosts['shipping_cost_excluding_vat'] && $shippingCosts['shipping_vat_amount']
+                ? $shippingCosts['shipping_cost_excluding_vat'] + $shippingCosts['shipping_vat_amount']
+                : $order->shipping_amount,
+            'shipping_cost_excluding_vat' => $shippingCosts['shipping_cost_excluding_vat'],
+            'shipping_vat_rate' => $shippingCosts['shipping_vat_rate'],
+            'shipping_vat_amount' => $shippingCosts['shipping_vat_amount'],
+            'shipping_rate_id' => $shippingCosts['shipping_rate_id'],
             'shipping_tracking_number' => $trendyolPackage['cargoTrackingNumber'] ?? null,
             'shipping_tracking_url' => $trendyolPackage['cargoTrackingLink'] ?? null,
             'shipped_at' => $shippedAt,
@@ -701,5 +724,55 @@ class OrderMapper extends BaseOrderMapper
             'tax_office' => $trendyolAddress['taxOffice'] ?? null,
             'identity_number' => $trendyolAddress['identityNumber'] ?? null,
         ];
+    }
+
+    /**
+     * Calculate shipping costs from Trendyol package data
+     */
+    protected function calculateShippingCosts(array $trendyolPackage): array
+    {
+        $carrierName = $trendyolPackage['cargoProviderName'] ?? null;
+        $desi = $trendyolPackage['cargoDeci'] ?? null;
+
+        $shippingData = [
+            'carrier' => null,
+            'shipping_cost_excluding_vat' => null,
+            'shipping_vat_rate' => 20.00,
+            'shipping_vat_amount' => null,
+            'shipping_rate_id' => null,
+        ];
+
+        // Only calculate if we have both carrier name and desi
+        if (! $carrierName || ! $desi) {
+            return $shippingData;
+        }
+
+        // Parse carrier name to enum
+        $carrier = $this->shippingCostService->parseCarrier($carrierName);
+
+        if (! $carrier) {
+            activity()
+                ->withProperties([
+                    'carrier_name' => $carrierName,
+                    'order_number' => $trendyolPackage['orderNumber'] ?? null,
+                ])
+                ->log('trendyol_carrier_not_recognized');
+
+            return $shippingData;
+        }
+
+        $shippingData['carrier'] = $carrier;
+
+        // Calculate shipping cost
+        $costCalculation = $this->shippingCostService->calculateCost($carrier, (float) $desi);
+
+        if ($costCalculation) {
+            $shippingData['shipping_cost_excluding_vat'] = $costCalculation['cost_excluding_vat'];
+            $shippingData['shipping_vat_rate'] = $costCalculation['vat_rate'];
+            $shippingData['shipping_vat_amount'] = $costCalculation['vat_amount'];
+            $shippingData['shipping_rate_id'] = $costCalculation['rate_id'];
+        }
+
+        return $shippingData;
     }
 }

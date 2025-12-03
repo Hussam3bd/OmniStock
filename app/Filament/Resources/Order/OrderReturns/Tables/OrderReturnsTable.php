@@ -61,8 +61,20 @@ class OrderReturnsTable
                     ->sortable()
                     ->toggleable(),
 
-                TextColumn::make('return_shipping_cost')
-                    ->label('Return Shipping')
+                TextColumn::make('carrier')
+                    ->label('Return Carrier')
+                    ->badge()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('return_shipping_cost_excluding_vat')
+                    ->label('Return Shipping (excl. VAT)')
+                    ->money(fn ($record) => $record->currency)
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('return_shipping_total')
+                    ->label('Return Shipping Total')
                     ->money(fn ($record) => $record->currency)
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Integration\Integrations\Tables;
 
+use App\Enums\Integration\IntegrationProvider;
 use App\Enums\Order\OrderChannel;
 use App\Jobs\SyncShopifyOrders;
 use App\Jobs\SyncShopifyProducts;
@@ -39,26 +40,12 @@ class IntegrationsTable
                 TextColumn::make('type')
                     ->label(__('Type'))
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'sales_channel' => __('Sales Channel'),
-                        'shipping_provider' => __('Shipping Provider'),
-                        'payment_gateway' => __('Payment Gateway'),
-                        'invoice_provider' => __('Invoice Provider'),
-                        default => $state,
-                    })
-                    ->color(fn (string $state): string => match ($state) {
-                        'sales_channel' => 'success',
-                        'shipping_provider' => 'info',
-                        'payment_gateway' => 'warning',
-                        'invoice_provider' => 'primary',
-                        default => 'gray',
-                    })
                     ->searchable()
                     ->sortable(),
 
                 TextColumn::make('provider')
                     ->label(__('Provider'))
-                    ->formatStateUsing(fn (string $state): string => ucfirst($state))
+                    ->badge()
                     ->searchable()
                     ->sortable(),
 
@@ -71,14 +58,14 @@ class IntegrationsTable
                     ->label(__('Webhook'))
                     ->boolean()
                     ->getStateUsing(function ($record) {
-                        if (! in_array($record->provider, ['trendyol', 'shopify'])) {
+                        if (! in_array($record->provider, [IntegrationProvider::TRENDYOL, IntegrationProvider::SHOPIFY])) {
                             return null;
                         }
 
                         return isset($record->config['webhook']);
                     })
                     ->tooltip(function ($record) {
-                        if (! in_array($record->provider, ['trendyol', 'shopify'])) {
+                        if (! in_array($record->provider, [IntegrationProvider::TRENDYOL, IntegrationProvider::SHOPIFY])) {
                             return null;
                         }
 
@@ -115,16 +102,16 @@ class IntegrationsTable
                     ->label(__('Sync Products'))
                     ->icon(Heroicon::OutlinedArrowPath)
                     ->color('info')
-                    ->visible(fn (Integration $record) => in_array($record->provider, ['trendyol', 'shopify']) && $record->is_active)
+                    ->visible(fn (Integration $record) => in_array($record->provider, [IntegrationProvider::TRENDYOL, IntegrationProvider::SHOPIFY]) && $record->is_active)
                     ->requiresConfirmation()
                     ->modalHeading(__('Sync Products'))
-                    ->modalDescription(__('This will fetch and sync all products from :provider to your store. The process will run in the background.', ['provider' => fn (Integration $record) => ucfirst($record->provider)]))
+                    ->modalDescription(__('This will fetch and sync all products from :provider to your store. The process will run in the background.', ['provider' => fn (Integration $record) => $record->provider->getLabel()]))
                     ->modalSubmitActionLabel(__('Start Sync'))
                     ->action(function (Integration $record) {
                         try {
                             $adapter = match ($record->provider) {
-                                'trendyol' => new TrendyolAdapter($record),
-                                'shopify' => new ShopifyAdapter($record),
+                                IntegrationProvider::TRENDYOL => new TrendyolAdapter($record),
+                                IntegrationProvider::SHOPIFY => new ShopifyAdapter($record),
                                 default => null,
                             };
 
@@ -139,7 +126,7 @@ class IntegrationsTable
                             if ($totalProducts === 0) {
                                 Notification::make()
                                     ->title(__('No products found'))
-                                    ->body(__('No products to sync from :provider', ['provider' => ucfirst($record->provider)]))
+                                    ->body(__('No products to sync from :provider', ['provider' => $record->provider->getLabel()]))
                                     ->warning()
                                     ->send();
 
@@ -149,8 +136,8 @@ class IntegrationsTable
                             // Create jobs for each product
                             $jobs = collect($products)->map(function ($product) use ($record) {
                                 return match ($record->provider) {
-                                    'shopify' => new SyncShopifyProducts($record, $product),
-                                    'trendyol' => new SyncTrendyolProducts($record, $product),
+                                    IntegrationProvider::SHOPIFY => new SyncShopifyProducts($record, $product),
+                                    IntegrationProvider::TRENDYOL => new SyncTrendyolProducts($record, $product),
                                 };
                             })->toArray();
 
@@ -159,7 +146,7 @@ class IntegrationsTable
 
                             // Dispatch batch
                             $batch = Bus::batch($jobs)
-                                ->name("Sync {$totalProducts} products from ".ucfirst($record->provider))
+                                ->name("Sync {$totalProducts} products from ".$record->provider->getLabel())
                                 ->allowFailures()
                                 ->onQueue('default')
                                 ->then(function (Batch $batch) use ($user, $totalProducts, $record) {
@@ -168,7 +155,7 @@ class IntegrationsTable
                                         ->title(__('Product sync completed'))
                                         ->body(__('Successfully synced all :count products from :provider', [
                                             'count' => $totalProducts,
-                                            'provider' => ucfirst($record->provider),
+                                            'provider' => $record->provider->getLabel(),
                                         ]))
                                         ->success()
                                         ->sendToDatabase($user);
@@ -178,7 +165,7 @@ class IntegrationsTable
                                     Notification::make()
                                         ->title(__('Product sync error'))
                                         ->body(__('An error occurred during product sync from :provider: :error', [
-                                            'provider' => ucfirst($record->provider),
+                                            'provider' => $record->provider->getLabel(),
                                             'error' => $e->getMessage(),
                                         ]))
                                         ->danger()
@@ -195,7 +182,7 @@ class IntegrationsTable
                                                 'success' => $successCount,
                                                 'total' => $totalProducts,
                                                 'failed' => $batch->failedJobs,
-                                                'provider' => ucfirst($record->provider),
+                                                'provider' => $record->provider->getLabel(),
                                             ]))
                                             ->warning()
                                             ->sendToDatabase($user);
@@ -207,7 +194,7 @@ class IntegrationsTable
                                 ->title(__('Product sync started'))
                                 ->body(__('Syncing :count products from :provider in the background. You will be notified when complete.', [
                                     'count' => $totalProducts,
-                                    'provider' => ucfirst($record->provider),
+                                    'provider' => $record->provider->getLabel(),
                                 ]))
                                 ->success()
                                 ->send();
@@ -224,16 +211,16 @@ class IntegrationsTable
                     ->label(__('Sync Orders'))
                     ->icon(Heroicon::OutlinedArrowPath)
                     ->color('warning')
-                    ->visible(fn (Integration $record) => in_array($record->provider, ['trendyol', 'shopify']) && $record->is_active)
+                    ->visible(fn (Integration $record) => in_array($record->provider, [IntegrationProvider::TRENDYOL, IntegrationProvider::SHOPIFY]) && $record->is_active)
                     ->requiresConfirmation()
                     ->modalHeading(__('Sync Orders'))
-                    ->modalDescription(__('This will fetch and sync recent orders from :provider. The process will run in the background.', ['provider' => fn (Integration $record) => ucfirst($record->provider)]))
+                    ->modalDescription(__('This will fetch and sync recent orders from :provider. The process will run in the background.', ['provider' => fn (Integration $record) => $record->provider->getLabel()]))
                     ->modalSubmitActionLabel(__('Start Sync'))
                     ->action(function (Integration $record) {
                         try {
                             $adapter = match ($record->provider) {
-                                'trendyol' => new TrendyolAdapter($record),
-                                'shopify' => new ShopifyAdapter($record),
+                                IntegrationProvider::TRENDYOL => new TrendyolAdapter($record),
+                                IntegrationProvider::SHOPIFY => new ShopifyAdapter($record),
                                 default => null,
                             };
 
@@ -248,7 +235,7 @@ class IntegrationsTable
                             if ($totalOrders === 0) {
                                 Notification::make()
                                     ->title(__('No orders found'))
-                                    ->body(__('No orders to sync from :provider', ['provider' => ucfirst($record->provider)]))
+                                    ->body(__('No orders to sync from :provider', ['provider' => $record->provider->getLabel()]))
                                     ->warning()
                                     ->send();
 
@@ -258,8 +245,8 @@ class IntegrationsTable
                             // Create jobs for each order
                             $jobs = collect($orders)->map(function ($order) use ($record) {
                                 return match ($record->provider) {
-                                    'shopify' => new SyncShopifyOrders($record, $order),
-                                    'trendyol' => new SyncTrendyolOrders($record, $order),
+                                    IntegrationProvider::SHOPIFY => new SyncShopifyOrders($record, $order),
+                                    IntegrationProvider::TRENDYOL => new SyncTrendyolOrders($record, $order),
                                 };
                             })->toArray();
 
@@ -268,7 +255,7 @@ class IntegrationsTable
 
                             // Dispatch batch
                             $batch = Bus::batch($jobs)
-                                ->name("Sync {$totalOrders} orders from ".ucfirst($record->provider))
+                                ->name("Sync {$totalOrders} orders from ".$record->provider->getLabel())
                                 ->allowFailures()
                                 ->onQueue('default')
                                 ->then(function (Batch $batch) use ($user, $totalOrders, $record) {
@@ -277,7 +264,7 @@ class IntegrationsTable
                                         ->title(__('Order sync completed'))
                                         ->body(__('Successfully synced all :count orders from :provider', [
                                             'count' => $totalOrders,
-                                            'provider' => ucfirst($record->provider),
+                                            'provider' => $record->provider->getLabel(),
                                         ]))
                                         ->success()
                                         ->sendToDatabase($user);
@@ -287,7 +274,7 @@ class IntegrationsTable
                                     Notification::make()
                                         ->title(__('Order sync error'))
                                         ->body(__('An error occurred during order sync from :provider: :error', [
-                                            'provider' => ucfirst($record->provider),
+                                            'provider' => $record->provider->getLabel(),
                                             'error' => $e->getMessage(),
                                         ]))
                                         ->danger()
@@ -304,7 +291,7 @@ class IntegrationsTable
                                                 'success' => $successCount,
                                                 'total' => $totalOrders,
                                                 'failed' => $batch->failedJobs,
-                                                'provider' => ucfirst($record->provider),
+                                                'provider' => $record->provider->getLabel(),
                                             ]))
                                             ->warning()
                                             ->sendToDatabase($user);
@@ -316,7 +303,7 @@ class IntegrationsTable
                                 ->title(__('Order sync started'))
                                 ->body(__('Syncing :count orders from :provider in the background. You will be notified when complete.', [
                                     'count' => $totalOrders,
-                                    'provider' => ucfirst($record->provider),
+                                    'provider' => $record->provider->getLabel(),
                                 ]))
                                 ->success()
                                 ->send();
@@ -333,7 +320,7 @@ class IntegrationsTable
                     ->label(__('Sync Refunds'))
                     ->icon(Heroicon::OutlinedArrowPath)
                     ->color('danger')
-                    ->visible(fn (Integration $record) => $record->provider === 'shopify' && $record->is_active)
+                    ->visible(fn (Integration $record) => $record->provider === IntegrationProvider::SHOPIFY && $record->is_active)
                     ->requiresConfirmation()
                     ->modalHeading(__('Sync Refunds'))
                     ->modalDescription(__('This will fetch and sync refunds from Shopify orders. The process will run in the background.'))
@@ -453,7 +440,7 @@ class IntegrationsTable
                     ->label(__('Sync Claims'))
                     ->icon(Heroicon::OutlinedArrowPath)
                     ->color('danger')
-                    ->visible(fn (Integration $record) => $record->provider === 'trendyol' && $record->is_active)
+                    ->visible(fn (Integration $record) => $record->provider === IntegrationProvider::TRENDYOL && $record->is_active)
                     ->requiresConfirmation()
                     ->modalHeading(__('Sync Claims'))
                     ->modalDescription(__('This will fetch and sync return claims from Trendyol. The process will run in the background.'))
@@ -552,18 +539,18 @@ class IntegrationsTable
                     ->color(fn (Integration $record) => isset($record->config['webhook'])
                         ? 'info'
                         : 'success')
-                    ->visible(fn (Integration $record) => in_array($record->provider, ['trendyol', 'shopify']) && $record->is_active)
+                    ->visible(fn (Integration $record) => in_array($record->provider, [IntegrationProvider::TRENDYOL, IntegrationProvider::SHOPIFY]) && $record->is_active)
                     ->requiresConfirmation()
                     ->modalHeading(fn (Integration $record) => isset($record->config['webhook'])
-                        ? __('Update :provider Webhook', ['provider' => ucfirst($record->provider)])
-                        : __('Register :provider Webhook', ['provider' => ucfirst($record->provider)]))
-                    ->modalDescription(__('This will create/update webhooks to receive real-time updates from :provider.', ['provider' => fn (Integration $record) => ucfirst($record->provider)]))
+                        ? __('Update :provider Webhook', ['provider' => $record->provider->getLabel()])
+                        : __('Register :provider Webhook', ['provider' => $record->provider->getLabel()]))
+                    ->modalDescription(__('This will create/update webhooks to receive real-time updates from :provider.', ['provider' => fn (Integration $record) => $record->provider->getLabel()]))
                     ->modalSubmitActionLabel(__('Proceed'))
                     ->action(function (Integration $record) {
                         try {
                             $adapter = match ($record->provider) {
-                                'trendyol' => new TrendyolAdapter($record),
-                                'shopify' => new ShopifyAdapter($record),
+                                IntegrationProvider::TRENDYOL => new TrendyolAdapter($record),
+                                IntegrationProvider::SHOPIFY => new ShopifyAdapter($record),
                                 default => null,
                             };
 

@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Enums\Integration\IntegrationProvider;
+use App\Enums\Integration\IntegrationType;
 use App\Models\Integration\Integration;
 use App\Services\Integrations\SalesChannels\Shopify\Mappers\OrderMapper;
 use Illuminate\Bus\Queueable;
@@ -49,8 +51,8 @@ class ProcessShopifyWebhook extends ProcessWebhookJob implements ShouldQueue
         }
 
         // Search for integration with matching shop domain
-        $integration = Integration::where('type', 'sales_channel')
-            ->where('provider', 'shopify')
+        $integration = Integration::where('type', IntegrationType::SALES_CHANNEL)
+            ->where('provider', IntegrationProvider::SHOPIFY)
             ->where('is_active', true)
             ->get()
             ->first(function ($integration) use ($shopDomain) {

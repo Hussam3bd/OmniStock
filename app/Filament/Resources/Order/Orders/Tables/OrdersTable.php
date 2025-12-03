@@ -65,7 +65,48 @@ class OrdersTable
                 TextColumn::make('fulfillment_status')
                     ->badge()
                     ->sortable(),
+                TextColumn::make('subtotal')
+                    ->label('Subtotal')
+                    ->money(fn ($record) => $record->currency)
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('discount_amount')
+                    ->label('Discount')
+                    ->money(fn ($record) => $record->currency)
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('tax_amount')
+                    ->label('Tax')
+                    ->money(fn ($record) => $record->currency)
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('carrier')
+                    ->label('Shipping Carrier')
+                    ->badge()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('shipping_cost_excluding_vat')
+                    ->label('Shipping (excl. VAT)')
+                    ->money(fn ($record) => $record->currency)
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('shipping_vat_amount')
+                    ->label('Shipping VAT')
+                    ->money(fn ($record) => $record->currency)
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('shipping_amount')
+                    ->label('Shipping Total')
+                    ->money(fn ($record) => $record->currency)
+                    ->sortable()
+                    ->toggleable(),
+                TextColumn::make('total_commission')
+                    ->label('Commission')
+                    ->money(fn ($record) => $record->currency)
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('total_amount')
+                    ->label('Total')
                     ->money(fn ($record) => $record->currency)
                     ->sortable(),
                 TextColumn::make('order_date')

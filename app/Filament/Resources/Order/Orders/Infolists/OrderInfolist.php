@@ -103,8 +103,18 @@ class OrderInfolist
                             ->label(__('Tax'))
                             ->money(fn ($record) => $record->currency),
 
+                        Infolists\Components\TextEntry::make('shipping_cost_excluding_vat')
+                            ->label(__('Shipping (excl. VAT)'))
+                            ->money(fn ($record) => $record->currency)
+                            ->visible(fn ($record) => $record->shipping_cost_excluding_vat),
+
+                        Infolists\Components\TextEntry::make('shipping_vat_amount')
+                            ->label(__('Shipping VAT'))
+                            ->money(fn ($record) => $record->currency)
+                            ->visible(fn ($record) => $record->shipping_vat_amount),
+
                         Infolists\Components\TextEntry::make('shipping_amount')
-                            ->label(__('Shipping'))
+                            ->label(__('Shipping Total'))
                             ->money(fn ($record) => $record->currency),
 
                         Infolists\Components\TextEntry::make('discount_amount')
@@ -129,16 +139,29 @@ class OrderInfolist
 
                 Schemas\Components\Section::make(__('Shipping Information'))
                     ->schema([
-                        Infolists\Components\TextEntry::make('shipping_carrier')
-                            ->label(__('Carrier'))
+                        Infolists\Components\TextEntry::make('carrier')
+                            ->label(__('Carrier (System)'))
+                            ->badge()
                             ->icon('heroicon-o-truck')
-                            ->placeholder(__('Not available')),
+                            ->placeholder(__('Not detected'))
+                            ->visible(fn ($record) => $record->carrier),
+
+                        Infolists\Components\TextEntry::make('shipping_carrier')
+                            ->label(__('Carrier (Original)'))
+                            ->placeholder(__('Not available'))
+                            ->visible(fn ($record) => $record->shipping_carrier && ! $record->carrier),
 
                         Infolists\Components\TextEntry::make('shipping_desi')
                             ->label(__('Desi (Volumetric Weight)'))
                             ->suffix(' desi')
                             ->placeholder(__('Not available'))
                             ->visible(fn ($record) => $record->shipping_desi > 0),
+
+                        Infolists\Components\TextEntry::make('shipping_vat_rate')
+                            ->label(__('VAT Rate'))
+                            ->suffix('%')
+                            ->placeholder(__('Not available'))
+                            ->visible(fn ($record) => $record->shipping_vat_rate),
 
                         Infolists\Components\TextEntry::make('shipping_tracking_number')
                             ->label(__('Tracking Number'))

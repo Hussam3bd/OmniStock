@@ -2,13 +2,16 @@
 
 namespace App\Services\Integrations;
 
+use App\Enums\Integration\IntegrationProvider;
+use App\Enums\Integration\IntegrationType;
+
 class ProviderRegistry
 {
     public static function getProviders(): array
     {
         return [
-            'sales_channel' => [
-                'shopify' => [
+            IntegrationType::SALES_CHANNEL->value => [
+                IntegrationProvider::SHOPIFY->value => [
                     'name' => 'Shopify',
                     'description' => 'Connect your Shopify store to sync orders, products, inventory, customers, and addresses. Purchase orders will be supported in a future update.',
                     'icon' => 'heroicon-o-shopping-bag',
@@ -60,7 +63,7 @@ class ProviderRegistry
                     ],
                     'documentation_url' => 'https://shopify.dev/docs/api/admin-rest',
                 ],
-                'trendyol' => [
+                IntegrationProvider::TRENDYOL->value => [
                     'name' => 'Trendyol',
                     'description' => 'Connect your Trendyol seller account to manage Turkish marketplace orders',
                     'icon' => 'heroicon-o-building-storefront',
@@ -88,18 +91,25 @@ class ProviderRegistry
                     'documentation_url' => 'https://developers.trendyol.com/',
                 ],
             ],
-            'shipping_provider' => [
-                'basit_kargo' => [
+            IntegrationType::SHIPPING_PROVIDER->value => [
+                IntegrationProvider::BASIT_KARGO->value => [
                     'name' => 'Basit Kargo',
                     'description' => 'Turkish shipping aggregator - compare rates and ship with multiple carriers',
                     'icon' => 'heroicon-o-truck',
                     'color' => 'info',
                     'required_fields' => [
-                        'api_key' => [
-                            'label' => 'API Key',
+                        'api_token' => [
+                            'label' => 'API Token',
                             'type' => 'password',
                             'required' => true,
-                            'helper' => 'Your Basit Kargo API key',
+                            'helper' => 'Your Basit Kargo API token',
+                        ],
+                        'vat_included' => [
+                            'label' => 'Prices Include VAT',
+                            'type' => 'toggle',
+                            'required' => false,
+                            'default' => true,
+                            'helper' => 'Whether the prices returned by Basit Kargo API include VAT (default: Yes)',
                         ],
                         'test_mode' => [
                             'label' => 'Test Mode',
@@ -112,8 +122,8 @@ class ProviderRegistry
                     'documentation_url' => 'https://basitkargo.com/api',
                 ],
             ],
-            'payment_gateway' => [
-                'stripe' => [
+            IntegrationType::PAYMENT_GATEWAY->value => [
+                IntegrationProvider::STRIPE->value => [
                     'name' => 'Stripe',
                     'description' => 'Accept payments globally with Stripe',
                     'icon' => 'heroicon-o-credit-card',
@@ -140,7 +150,7 @@ class ProviderRegistry
                     ],
                     'documentation_url' => 'https://stripe.com/docs/api',
                 ],
-                'iyzico' => [
+                IntegrationProvider::IYZICO->value => [
                     'name' => 'Iyzico',
                     'description' => 'Turkish payment gateway for local payment methods',
                     'icon' => 'heroicon-o-banknotes',
@@ -169,8 +179,8 @@ class ProviderRegistry
                     'documentation_url' => 'https://dev.iyzipay.com/',
                 ],
             ],
-            'invoice_provider' => [
-                'trendyol_efatura' => [
+            IntegrationType::INVOICE_PROVIDER->value => [
+                IntegrationProvider::TRENDYOL_EFATURA->value => [
                     'name' => 'Trendyol E-Fatura',
                     'description' => 'Generate legal Turkish e-invoices compliant with tax regulations',
                     'icon' => 'heroicon-o-document-text',
@@ -208,13 +218,18 @@ class ProviderRegistry
         ];
     }
 
-    public static function getProvider(string $type, string $provider): ?array
+    public static function getProvider(IntegrationType|string $type, IntegrationProvider|string $provider): ?array
     {
-        return self::getProviders()[$type][$provider] ?? null;
+        $typeValue = $type instanceof IntegrationType ? $type->value : $type;
+        $providerValue = $provider instanceof IntegrationProvider ? $provider->value : $provider;
+
+        return self::getProviders()[$typeValue][$providerValue] ?? null;
     }
 
-    public static function getProvidersByType(string $type): array
+    public static function getProvidersByType(IntegrationType|string $type): array
     {
-        return self::getProviders()[$type] ?? [];
+        $typeValue = $type instanceof IntegrationType ? $type->value : $type;
+
+        return self::getProviders()[$typeValue] ?? [];
     }
 }

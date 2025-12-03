@@ -8,11 +8,16 @@ use App\Models\Order\Order;
 use App\Models\Order\OrderReturn;
 use App\Models\Order\ReturnItem;
 use App\Services\Integrations\Concerns\BaseReturnsMapper;
+use App\Services\Shipping\ShippingCostService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class ClaimsMapper extends BaseReturnsMapper
 {
+    public function __construct(
+        protected ShippingCostService $shippingCostService
+    ) {}
+
     protected function getChannel(): OrderChannel
     {
         return OrderChannel::TRENDYOL;
@@ -65,6 +70,9 @@ class ClaimsMapper extends BaseReturnsMapper
                 }
             }
 
+            // Calculate return shipping costs
+            $returnShippingCosts = $this->calculateReturnShippingCosts($claim, $order);
+
             // Create or update return
             $return = OrderReturn::updateOrCreate(
                 [
@@ -86,12 +94,16 @@ class ClaimsMapper extends BaseReturnsMapper
                     'return_shipping_carrier' => $claim['cargoProviderName'] ?? null,
                     'return_tracking_number' => $claim['cargoTrackingNumber'] ?? null,
                     'return_tracking_url' => $claim['cargoTrackingLink'] ?? null,
+                    'return_shipping_desi' => $claim['cargoDeci'] ?? $order->shipping_desi,
+                    'carrier' => $returnShippingCosts['carrier'],
+                    'return_shipping_cost_excluding_vat' => $returnShippingCosts['return_shipping_cost_excluding_vat'],
+                    'return_shipping_vat_rate' => $returnShippingCosts['return_shipping_vat_rate'],
+                    'return_shipping_vat_amount' => $returnShippingCosts['return_shipping_vat_amount'],
+                    'return_shipping_rate_id' => $returnShippingCosts['return_shipping_rate_id'],
                     'order_shipment_package_id' => $claim['orderShipmentPackageId'] ?? null,
                     'order_outbound_package_id' => $claim['orderOutboundPackageId'] ?? null,
-                    // Copy shipping costs from order (Trendyol charges back same shipping cost)
+                    // Store original order's shipping cost for comparison
                     'original_shipping_cost' => $order->shipping_amount?->getAmount() ?? 0,
-                    'return_shipping_cost' => $order->shipping_amount?->getAmount() ?? 0,
-                    'return_shipping_desi' => $order->shipping_desi,
                     'currency' => $order->currency,
                     'platform_data' => $claim,
                 ]
@@ -230,5 +242,72 @@ class ClaimsMapper extends BaseReturnsMapper
         }
 
         return null;
+    }
+
+    /**
+     * Calculate return shipping costs from Trendyol claim data
+     */
+    protected function calculateReturnShippingCosts(array $claim, Order $order): array
+    {
+        $carrierName = $claim['cargoProviderName'] ?? null;
+        $desi = $claim['cargoDeci'] ?? $order->shipping_desi;
+
+        $shippingData = [
+            'carrier' => null,
+            'return_shipping_cost_excluding_vat' => null,
+            'return_shipping_vat_rate' => 20.00,
+            'return_shipping_vat_amount' => null,
+            'return_shipping_rate_id' => null,
+        ];
+
+        // Only calculate if we have both carrier name and desi
+        if (! $carrierName || ! $desi) {
+            // Fallback: use original order shipping costs if available
+            if ($order->carrier && $order->shipping_desi) {
+                $shippingData['carrier'] = $order->carrier;
+                $shippingData['return_shipping_cost_excluding_vat'] = $order->shipping_cost_excluding_vat?->getAmount() ?? 0;
+                $shippingData['return_shipping_vat_rate'] = $order->shipping_vat_rate ?? 20.00;
+                $shippingData['return_shipping_vat_amount'] = $order->shipping_vat_amount?->getAmount() ?? 0;
+                $shippingData['return_shipping_rate_id'] = $order->shipping_rate_id;
+            }
+
+            return $shippingData;
+        }
+
+        // Parse carrier name to enum
+        $carrier = $this->shippingCostService->parseCarrier($carrierName);
+
+        if (! $carrier) {
+            activity()
+                ->withProperties([
+                    'carrier_name' => $carrierName,
+                    'claim_id' => $claim['id'] ?? null,
+                ])
+                ->log('trendyol_return_carrier_not_recognized');
+
+            // Fallback to order's carrier/costs
+            if ($order->carrier && $order->shipping_desi) {
+                $shippingData['return_shipping_cost_excluding_vat'] = $order->shipping_cost_excluding_vat?->getAmount() ?? 0;
+                $shippingData['return_shipping_vat_rate'] = $order->shipping_vat_rate ?? 20.00;
+                $shippingData['return_shipping_vat_amount'] = $order->shipping_vat_amount?->getAmount() ?? 0;
+                $shippingData['return_shipping_rate_id'] = $order->shipping_rate_id;
+            }
+
+            return $shippingData;
+        }
+
+        $shippingData['carrier'] = $carrier;
+
+        // Calculate shipping cost
+        $costCalculation = $this->shippingCostService->calculateCost($carrier, (float) $desi);
+
+        if ($costCalculation) {
+            $shippingData['return_shipping_cost_excluding_vat'] = $costCalculation['cost_excluding_vat'];
+            $shippingData['return_shipping_vat_rate'] = $costCalculation['vat_rate'];
+            $shippingData['return_shipping_vat_amount'] = $costCalculation['vat_amount'];
+            $shippingData['return_shipping_rate_id'] = $costCalculation['rate_id'];
+        }
+
+        return $shippingData;
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Enums\Integration\IntegrationProvider;
+use App\Enums\Integration\IntegrationType;
 use App\Models\Integration\Integration;
 use App\Services\Integrations\SalesChannels\Trendyol\Mappers\OrderMapper;
 use Illuminate\Bus\Queueable;
@@ -46,8 +48,8 @@ class ProcessTrendyolWebhook extends ProcessWebhookJob implements ShouldQueue
         }
 
         // Search for integration with matching API key
-        $integration = Integration::where('type', 'sales_channel')
-            ->where('provider', 'trendyol')
+        $integration = Integration::where('type', IntegrationType::SALES_CHANNEL)
+            ->where('provider', IntegrationProvider::TRENDYOL)
             ->where('is_active', true)
             ->get()
             ->first(function ($integration) use ($providedApiKey) {

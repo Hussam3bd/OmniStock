@@ -2,6 +2,8 @@
 
 namespace App\Models\Integration;
 
+use App\Enums\Integration\IntegrationProvider;
+use App\Enums\Integration\IntegrationType;
 use App\Models\Accounting\Account;
 use App\Models\Inventory\Location;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,6 +28,8 @@ class Integration extends Model
     protected function casts(): array
     {
         return [
+            'type' => IntegrationType::class,
+            'provider' => IntegrationProvider::class,
             'is_active' => 'boolean',
             'settings' => 'array',
             'config' => 'array',

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Integration\Integrations\Schemas;
 
+use App\Enums\Integration\IntegrationProvider;
+use App\Enums\Integration\IntegrationType;
 use App\Services\Integrations\ProviderRegistry;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -26,12 +28,7 @@ class IntegrationForm
                 Select::make('type')
                     ->label(__('Integration Type'))
                     ->required()
-                    ->options([
-                        'sales_channel' => __('Sales Channel'),
-                        'shipping_provider' => __('Shipping Provider'),
-                        'payment_gateway' => __('Payment Gateway'),
-                        'invoice_provider' => __('Invoice Provider'),
-                    ])
+                    ->options(IntegrationType::class)
                     ->reactive()
                     ->columnSpan(1),
 
@@ -39,23 +36,18 @@ class IntegrationForm
                     ->label(__('Provider'))
                     ->required()
                     ->options(function (callable $get) {
-                        return match ($get('type')) {
-                            'sales_channel' => [
-                                'shopify' => 'Shopify',
-                                'trendyol' => 'Trendyol',
-                            ],
-                            'shipping_provider' => [
-                                'basit_kargo' => 'Basit Kargo',
-                            ],
-                            'payment_gateway' => [
-                                'stripe' => 'Stripe',
-                                'iyzico' => 'Iyzico',
-                            ],
-                            'invoice_provider' => [
-                                'trendyol_efatura' => 'Trendyol E-Fatura',
-                            ],
-                            default => [],
-                        };
+                        $type = $get('type');
+                        if (! $type) {
+                            return [];
+                        }
+
+                        // Handle both string and enum values
+                        $typeEnum = $type instanceof IntegrationType ? $type : IntegrationType::from($type);
+                        $providers = IntegrationProvider::forType($typeEnum);
+
+                        return collect($providers)->mapWithKeys(function (IntegrationProvider $provider) {
+                            return [$provider->value => $provider->getLabel()];
+                        })->toArray();
                     })
                     ->reactive()
                     ->columnSpan(1),
@@ -74,14 +66,18 @@ class IntegrationForm
             ]);
     }
 
-    protected static function getProviderDescription(string $type, string $provider): string
+    protected static function getProviderDescription(IntegrationType|string|null $type, IntegrationProvider|string|null $provider): string
     {
+        if (! $type || ! $provider) {
+            return '';
+        }
+
         $providerInfo = ProviderRegistry::getProvider($type, $provider);
 
         return $providerInfo['description'] ?? '';
     }
 
-    protected static function getProviderFields(?string $type, ?string $provider): array
+    protected static function getProviderFields(IntegrationType|string|null $type, IntegrationProvider|string|null $provider): array
     {
         if (! $type || ! $provider) {
             return [];

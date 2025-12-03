@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\Integration\IntegrationProvider;
 use App\Models\Integration\Integration;
 use App\Services\Integrations\SalesChannels\Trendyol\Mappers\ClaimsMapper;
 use Illuminate\Console\Command;
@@ -17,7 +18,7 @@ class SyncTrendyolClaims extends Command
 
     public function handle(ClaimsMapper $mapper): int
     {
-        $integration = Integration::where('provider', 'trendyol')->first();
+        $integration = Integration::where('provider', IntegrationProvider::TRENDYOL)->first();
 
         if (! $integration) {
             $this->error('No Trendyol integration found');

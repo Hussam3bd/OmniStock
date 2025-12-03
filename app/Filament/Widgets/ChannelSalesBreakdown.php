@@ -92,9 +92,15 @@ class ChannelSalesBreakdown extends TableWidget
                     ->sortable(query: fn ($query, $direction) => $query),
 
                 Tables\Columns\TextColumn::make('shipping_cost')
-                    ->label(__('Shipping'))
+                    ->label(__('Outbound Shipping'))
                     ->money('TRY')
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('return_shipping_cost')
+                    ->label(__('Return Shipping'))
+                    ->money('TRY')
+                    ->sortable()
+                    ->color('warning'),
 
                 Tables\Columns\TextColumn::make('commission_amount')
                     ->label(__('Commission'))
@@ -140,6 +146,17 @@ class ChannelSalesBreakdown extends TableWidget
                 ->where('status', '!=', ReturnStatus::Cancelled)
                 ->sum('total_refund_amount') / 100;
 
+            // Calculate return shipping costs (exclude cancelled returns)
+            $returnShippingCost = OrderReturn::where('channel', $channelValue)
+                ->where('status', '!=', ReturnStatus::Cancelled)
+                ->sum('return_shipping_cost_excluding_vat') / 100;
+
+            $returnShippingVat = OrderReturn::where('channel', $channelValue)
+                ->where('status', '!=', ReturnStatus::Cancelled)
+                ->sum('return_shipping_vat_amount') / 100;
+
+            $totalReturnShippingCost = $returnShippingCost + $returnShippingVat;
+
             // For Shopify: calculate pending payments
             $pendingPaymentCount = 0;
             $pendingPaymentAmount = 0;
@@ -155,9 +172,16 @@ class ChannelSalesBreakdown extends TableWidget
             // For Shopify: calculate shipping/commission/profit only from collected payments (PAID, PARTIALLY_PAID)
             // For other channels: use completed orders
             if ($channelValue === OrderChannel::SHOPIFY->value) {
-                $shippingCost = Order::where('channel', $channelValue)
+                // Calculate actual shipping costs paid to carriers (not what customer paid)
+                $shippingCostExVat = Order::where('channel', $channelValue)
                     ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
-                    ->sum('shipping_amount') / 100;
+                    ->sum('shipping_cost_excluding_vat') / 100;
+
+                $shippingVat = Order::where('channel', $channelValue)
+                    ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                    ->sum('shipping_vat_amount') / 100;
+
+                $shippingCost = $shippingCostExVat + $shippingVat;
 
                 $commissionAmount = Order::where('channel', $channelValue)
                     ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
@@ -168,17 +192,26 @@ class ChannelSalesBreakdown extends TableWidget
                     ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
                     ->sum('total_amount') / 100;
 
-                $netProfit = $collectedAmount - $shippingCost - $commissionAmount;
+                // Net Profit = Revenue - Outbound Shipping - Commission - Refunds - Return Shipping
+                $netProfit = $collectedAmount - $shippingCost - $commissionAmount - $returnsAmount - $totalReturnShippingCost;
             } else {
-                $shippingCost = Order::where('channel', $channelValue)
+                // Calculate actual shipping costs paid to carriers (not what customer paid)
+                $shippingCostExVat = Order::where('channel', $channelValue)
                     ->where('order_status', OrderStatus::COMPLETED)
-                    ->sum('shipping_amount') / 100;
+                    ->sum('shipping_cost_excluding_vat') / 100;
+
+                $shippingVat = Order::where('channel', $channelValue)
+                    ->where('order_status', OrderStatus::COMPLETED)
+                    ->sum('shipping_vat_amount') / 100;
+
+                $shippingCost = $shippingCostExVat + $shippingVat;
 
                 $commissionAmount = Order::where('channel', $channelValue)
                     ->where('order_status', OrderStatus::COMPLETED)
                     ->sum('total_commission') / 100;
 
-                $netProfit = $totalSalesAmount - $shippingCost - $commissionAmount;
+                // Net Profit = Revenue - Outbound Shipping - Commission - Refunds - Return Shipping
+                $netProfit = $totalSalesAmount - $shippingCost - $commissionAmount - $returnsAmount - $totalReturnShippingCost;
             }
 
             // Rates
@@ -200,6 +233,7 @@ class ChannelSalesBreakdown extends TableWidget
                     'returns_amount' => $returnsAmount,
                     'return_rate' => $returnRate,
                     'shipping_cost' => $shippingCost,
+                    'return_shipping_cost' => $totalReturnShippingCost,
                     'commission_amount' => $commissionAmount,
                     'net_profit' => $netProfit,
                 ];

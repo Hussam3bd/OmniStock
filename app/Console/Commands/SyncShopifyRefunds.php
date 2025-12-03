@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\Integration\IntegrationProvider;
 use App\Enums\Order\OrderChannel;
 use App\Jobs\SyncShopifyReturns;
 use App\Models\Integration\Integration;
@@ -49,7 +50,7 @@ class SyncShopifyRefunds extends Command
 
     protected function getIntegrations()
     {
-        $query = Integration::where('provider', 'shopify')
+        $query = Integration::where('provider', IntegrationProvider::SHOPIFY)
             ->where('is_active', true);
 
         if ($integrationId = $this->option('integration')) {
