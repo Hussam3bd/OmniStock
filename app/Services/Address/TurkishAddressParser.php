@@ -24,10 +24,16 @@ class TurkishAddressParser
         // Normalize address text
         $text = $this->normalizeAddress($addressText);
 
+        // Extract in order: province -> district -> neighborhood
+        // Each level needs the previous level for context
+        $province = $this->extractProvince($text);
+        $district = $this->extractDistrict($text, $province);
+        $neighborhood = $this->extractNeighborhood($text, $district);
+
         return [
-            'province' => $this->extractProvince($text),
-            'district' => $this->extractDistrict($text),
-            'neighborhood' => $this->extractNeighborhood($text),
+            'province' => $province,
+            'district' => $district,
+            'neighborhood' => $neighborhood,
             'postal_code' => $this->extractPostalCode($text),
             'building_number' => $this->extractBuildingNumber($text),
             'floor' => $this->extractFloor($text),
@@ -144,18 +150,13 @@ class TurkishAddressParser
             if (preg_match($pattern, $text, $matches)) {
                 $neighborhoodName = trim($matches[1]);
 
-                // If district provided, search within that district
+                // Only search within district if district is provided
+                // Do NOT search globally to avoid wrong matches
                 if ($district) {
                     $neighborhood = $this->findNeighborhoodByName($neighborhoodName, $district);
                     if ($neighborhood) {
                         return $neighborhood;
                     }
-                }
-
-                // Otherwise, search globally (less accurate)
-                $neighborhood = $this->findNeighborhoodByNameGlobal($neighborhoodName);
-                if ($neighborhood) {
-                    return $neighborhood;
                 }
             }
         }
@@ -341,12 +342,17 @@ class TurkishAddressParser
 
     /**
      * Extract building number from address text
-     * Patterns: "No: 5", "No 5", "No:5"
+     * Patterns: "No: 5", "No 5", "No:5", "C2 block", "A1 blok"
      */
     protected function extractBuildingNumber(string $text): ?string
     {
         // Pattern: No: X or No X
         if (preg_match('/\bNo:?\s*(\d+[A-Za-z]?)\b/iu', $text, $matches)) {
+            return $matches[1];
+        }
+
+        // Pattern: C2 block, A1 blok
+        if (preg_match('/\b([A-Z]\d+)\s+(?:block|blok)\b/i', $text, $matches)) {
             return $matches[1];
         }
 
@@ -374,12 +380,17 @@ class TurkishAddressParser
 
     /**
      * Extract apartment number from address text
-     * Patterns: "D5", "D: 5", "D 5", "Daire: 5", "daire 5"
+     * Patterns: "D5", "D: 5", "D 5", "Daire: 5", "daire 5", "29 daire"
      */
     protected function extractApartment(string $text): ?string
     {
-        // Pattern: Daire: X or daire X
+        // Pattern: Daire: X or daire X (daire before number)
         if (preg_match('/\bDaire:?\s*(\d+[A-Za-z]?)\b/iu', $text, $matches)) {
+            return $matches[1];
+        }
+
+        // Pattern: 29 daire (number before daire)
+        if (preg_match('/\b(\d+[A-Za-z]?)\s+daire\b/iu', $text, $matches)) {
             return $matches[1];
         }
 
