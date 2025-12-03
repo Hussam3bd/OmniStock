@@ -88,6 +88,10 @@ class ClaimsMapper extends BaseReturnsMapper
                     'return_tracking_url' => $claim['cargoTrackingLink'] ?? null,
                     'order_shipment_package_id' => $claim['orderShipmentPackageId'] ?? null,
                     'order_outbound_package_id' => $claim['orderOutboundPackageId'] ?? null,
+                    // Copy shipping costs from order (Trendyol charges back same shipping cost)
+                    'original_shipping_cost' => $order->shipping_amount?->getAmount() ?? 0,
+                    'return_shipping_cost' => $order->shipping_amount?->getAmount() ?? 0,
+                    'return_shipping_desi' => $order->shipping_desi,
                     'currency' => $order->currency,
                     'platform_data' => $claim,
                 ]
@@ -95,6 +99,11 @@ class ClaimsMapper extends BaseReturnsMapper
 
             // Sync return items
             $this->syncReturnItems($return, $claim['items'] ?? [], $order);
+
+            // Calculate total refund amount from return items
+            $return->refresh();
+            $totalRefundAmount = $return->items->sum(fn ($item) => $item->refund_amount?->getAmount() ?? 0);
+            $return->update(['total_refund_amount' => $totalRefundAmount]);
 
             // Update order return status
             $return->refresh();
@@ -147,6 +156,9 @@ class ClaimsMapper extends BaseReturnsMapper
                     })
                     ->first();
 
+                // Calculate refund amount from order item (accounts for discounts)
+                $refundAmount = $orderItem?->unit_price?->getAmount() ?? 0;
+
                 // Create return item
                 ReturnItem::updateOrCreate(
                     [
@@ -161,7 +173,7 @@ class ClaimsMapper extends BaseReturnsMapper
                         'note' => $claimItem['note'] ?? null,
                         'received_condition' => $this->mapCondition($claimItem),
                         'inspection_note' => $claimItem['note'] ?? null,
-                        'refund_amount' => $orderLine['price'] ?? 0,
+                        'refund_amount' => $refundAmount,
                         'platform_data' => $claimItem,
                     ]
                 );

@@ -140,19 +140,28 @@ class ShopifyAdapter implements SalesChannelAdapter
             $params['created_at_min'] = $since->toIso8601String();
         }
 
-        $pageInfo = null;
+        $nextPageUrl = null;
 
         do {
-            $headers = [];
-
-            if ($pageInfo) {
-                // Use Shopify's cursor-based pagination
-                $headers['link'] = $pageInfo;
+            // Use next page URL if we have it, otherwise use base endpoint
+            if ($nextPageUrl) {
+                $response = Http::withHeaders([
+                    'X-Shopify-Access-Token' => $this->integration->settings['access_token'],
+                    'Content-Type' => 'application/json',
+                ])->get($nextPageUrl);
+            } else {
+                $response = $this->makeRequest('get', '/orders.json', $params);
             }
 
-            $response = $this->makeRequest('get', '/orders.json', $params);
-
             if (! $response->successful()) {
+                activity()
+                    ->performedOn($this->integration)
+                    ->withProperties([
+                        'error' => $response->body(),
+                        'status' => $response->status(),
+                        'page' => $allOrders->count() / 250,
+                    ])
+                    ->log('shopify_fetch_orders_page_failed');
                 break;
             }
 
@@ -164,21 +173,38 @@ class ShopifyAdapter implements SalesChannelAdapter
 
             $allOrders = $allOrders->merge($orders);
 
-            // Check for Link header with pagination info
+            // Parse Link header for next page URL
             $linkHeader = $response->header('Link');
-            if ($linkHeader && str_contains($linkHeader, 'rel="next"')) {
-                $pageInfo = $linkHeader;
-            } else {
-                $pageInfo = null;
-            }
+            $nextPageUrl = $this->parseNextPageUrl($linkHeader);
 
             // Safety limit
             if ($allOrders->count() > 10000) {
+                activity()
+                    ->performedOn($this->integration)
+                    ->withProperties([
+                        'orders_fetched' => $allOrders->count(),
+                    ])
+                    ->log('shopify_fetch_orders_safety_limit_reached');
                 break;
             }
-        } while ($pageInfo);
+        } while ($nextPageUrl);
 
         return $allOrders;
+    }
+
+    /**
+     * Parse Shopify's Link header to get the next page URL
+     */
+    protected function parseNextPageUrl(?string $linkHeader): ?string
+    {
+        if (! $linkHeader) {
+            return null;
+        }
+
+        // Shopify's Link header format: <https://...page_info=xxx>; rel="next"
+        preg_match('/<([^>]+)>;\s*rel="next"/', $linkHeader, $matches);
+
+        return $matches[1] ?? null;
     }
 
     public function fetchOrder(string $externalId): ?array

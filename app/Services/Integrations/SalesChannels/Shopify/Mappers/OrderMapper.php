@@ -50,7 +50,7 @@ class OrderMapper extends BaseOrderMapper
                 $order = $this->createOrder($customer, $shopifyOrder);
             }
 
-            $this->syncOrderItems($order, $shopifyOrder['line_items'] ?? []);
+            $this->syncOrderItems($order, $shopifyOrder['line_items'] ?? [], $shopifyOrder['refunds'] ?? []);
 
             // Recalculate totals
             $order->refresh();
@@ -99,11 +99,12 @@ class OrderMapper extends BaseOrderMapper
     protected function createOrder(Customer $customer, array $shopifyOrder): Order
     {
         $currency = $shopifyOrder['currency'] ?? 'USD';
-        $subtotal = $this->convertToMinorUnits((float) ($shopifyOrder['subtotal_price'] ?? 0), $currency);
-        $taxAmount = $this->convertToMinorUnits((float) ($shopifyOrder['total_tax'] ?? 0), $currency);
+        // Use current_subtotal_price and current_total_price to account for order edits/refunds
+        $subtotal = $this->convertToMinorUnits((float) ($shopifyOrder['current_subtotal_price'] ?? $shopifyOrder['subtotal_price'] ?? 0), $currency);
+        $taxAmount = $this->convertToMinorUnits((float) ($shopifyOrder['current_total_tax'] ?? $shopifyOrder['total_tax'] ?? 0), $currency);
         $shippingAmount = $this->convertToMinorUnits((float) ($shopifyOrder['total_shipping_price_set']['shop_money']['amount'] ?? $shopifyOrder['shipping_lines'][0]['price'] ?? 0), $currency);
-        $discountAmount = $this->convertToMinorUnits((float) ($shopifyOrder['total_discounts'] ?? 0), $currency);
-        $totalAmount = $this->convertToMinorUnits((float) ($shopifyOrder['total_price'] ?? 0), $currency);
+        $discountAmount = $this->convertToMinorUnits((float) ($shopifyOrder['current_total_discounts'] ?? $shopifyOrder['total_discounts'] ?? 0), $currency);
+        $totalAmount = $this->convertToMinorUnits((float) ($shopifyOrder['current_total_price'] ?? $shopifyOrder['total_price'] ?? 0), $currency);
 
         $orderStatus = $this->mapOrderStatus($shopifyOrder);
         $paymentStatus = $this->mapPaymentStatus($shopifyOrder);
@@ -233,11 +234,12 @@ class OrderMapper extends BaseOrderMapper
     protected function updateOrder(Order $order, array $shopifyOrder): void
     {
         $currency = $shopifyOrder['currency'] ?? 'USD';
-        $subtotal = $this->convertToMinorUnits((float) ($shopifyOrder['subtotal_price'] ?? 0), $currency);
-        $taxAmount = $this->convertToMinorUnits((float) ($shopifyOrder['total_tax'] ?? 0), $currency);
+        // Use current_subtotal_price and current_total_price to account for order edits/refunds
+        $subtotal = $this->convertToMinorUnits((float) ($shopifyOrder['current_subtotal_price'] ?? $shopifyOrder['subtotal_price'] ?? 0), $currency);
+        $taxAmount = $this->convertToMinorUnits((float) ($shopifyOrder['current_total_tax'] ?? $shopifyOrder['total_tax'] ?? 0), $currency);
         $shippingAmount = $this->convertToMinorUnits((float) ($shopifyOrder['total_shipping_price_set']['shop_money']['amount'] ?? $shopifyOrder['shipping_lines'][0]['price'] ?? 0), $currency);
-        $discountAmount = $this->convertToMinorUnits((float) ($shopifyOrder['total_discounts'] ?? 0), $currency);
-        $totalAmount = $this->convertToMinorUnits((float) ($shopifyOrder['total_price'] ?? 0), $currency);
+        $discountAmount = $this->convertToMinorUnits((float) ($shopifyOrder['current_total_discounts'] ?? $shopifyOrder['total_discounts'] ?? 0), $currency);
+        $totalAmount = $this->convertToMinorUnits((float) ($shopifyOrder['current_total_price'] ?? $shopifyOrder['total_price'] ?? 0), $currency);
 
         $newOrderStatus = $this->mapOrderStatus($shopifyOrder);
         $newPaymentStatus = $this->mapPaymentStatus($shopifyOrder);
@@ -322,9 +324,24 @@ class OrderMapper extends BaseOrderMapper
         }
     }
 
-    protected function syncOrderItems(Order $order, array $lineItems): void
+    protected function syncOrderItems(Order $order, array $lineItems, array $refunds = []): void
     {
+        // Get list of cancelled line item IDs (restock_type = 'cancel')
+        $cancelledLineItemIds = $this->getCancelledLineItemIds($refunds);
+
         foreach ($lineItems as $lineItem) {
+            $lineItemId = $lineItem['id'] ?? null;
+
+            // Skip line items that have been cancelled (order edits)
+            if ($lineItemId && in_array($lineItemId, $cancelledLineItemIds)) {
+                // Delete the item if it exists
+                $variant = $this->findVariantByShopifyVariantId($lineItem['variant_id'] ?? null);
+                if ($variant) {
+                    $order->items()->where('product_variant_id', $variant->id)->delete();
+                }
+
+                continue;
+            }
             $variant = $this->findVariantByShopifyVariantId($lineItem['variant_id'] ?? null);
 
             if (! $variant) {
@@ -373,6 +390,22 @@ class OrderMapper extends BaseOrderMapper
                 ]
             );
         }
+    }
+
+    protected function getCancelledLineItemIds(array $refunds): array
+    {
+        $cancelledIds = [];
+
+        foreach ($refunds as $refund) {
+            foreach ($refund['refund_line_items'] ?? [] as $refundLineItem) {
+                // restock_type = 'cancel' means item was removed from order (not returned)
+                if (($refundLineItem['restock_type'] ?? null) === 'cancel') {
+                    $cancelledIds[] = $refundLineItem['line_item_id'];
+                }
+            }
+        }
+
+        return $cancelledIds;
     }
 
     protected function findVariantByShopifyVariantId(?string $shopifyVariantId): ?ProductVariant

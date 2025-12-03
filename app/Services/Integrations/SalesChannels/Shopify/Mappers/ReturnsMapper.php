@@ -39,6 +39,85 @@ class ReturnsMapper extends BaseReturnsMapper
                 return null;
             }
 
+            // Skip cancelled orders - these are not returns
+            if ($order->order_status === \App\Enums\Order\OrderStatus::CANCELLED) {
+                activity()
+                    ->withProperties([
+                        'shopify_refund_id' => $shopifyRefund['id'] ?? null,
+                        'order_number' => $order->order_number,
+                        'reason' => 'order_cancelled',
+                    ])
+                    ->log('shopify_refund_skipped');
+
+                return null;
+            }
+
+            // Skip if this is a void transaction (order cancellation, not a return)
+            if ($this->isVoidTransaction($shopifyRefund)) {
+                activity()
+                    ->withProperties([
+                        'shopify_refund_id' => $shopifyRefund['id'] ?? null,
+                        'order_number' => $order->order_number,
+                        'reason' => 'void_transaction',
+                    ])
+                    ->log('shopify_refund_skipped');
+
+                return null;
+            }
+
+            // Skip refunds for orders that were never paid
+            if (in_array($order->payment_status, [\App\Enums\Order\PaymentStatus::FAILED, \App\Enums\Order\PaymentStatus::VOIDED])) {
+                activity()
+                    ->withProperties([
+                        'shopify_refund_id' => $shopifyRefund['id'] ?? null,
+                        'order_number' => $order->order_number,
+                        'payment_status' => $order->payment_status->value,
+                        'reason' => 'payment_not_completed',
+                    ])
+                    ->log('shopify_refund_skipped');
+
+                return null;
+            }
+
+            // Skip if no actual refund line items (price adjustment or fee refund)
+            if (empty($shopifyRefund['refund_line_items'])) {
+                activity()
+                    ->withProperties([
+                        'shopify_refund_id' => $shopifyRefund['id'] ?? null,
+                        'order_number' => $order->order_number,
+                        'reason' => 'no_refund_line_items',
+                    ])
+                    ->log('shopify_refund_skipped');
+
+                return null;
+            }
+
+            // Skip order edits/modifications (restock_type = 'cancel' means item removed, not returned)
+            if ($this->isOrderEdit($shopifyRefund)) {
+                activity()
+                    ->withProperties([
+                        'shopify_refund_id' => $shopifyRefund['id'] ?? null,
+                        'order_number' => $order->order_number,
+                        'reason' => 'order_edit_not_return',
+                    ])
+                    ->log('shopify_refund_skipped');
+
+                return null;
+            }
+
+            // Skip if no refund transactions (no money actually refunded)
+            if ($this->hasNoRefundTransactions($shopifyRefund)) {
+                activity()
+                    ->withProperties([
+                        'shopify_refund_id' => $shopifyRefund['id'] ?? null,
+                        'order_number' => $order->order_number,
+                        'reason' => 'no_refund_transactions',
+                    ])
+                    ->log('shopify_refund_skipped');
+
+                return null;
+            }
+
             // Check if return already exists
             $existingMapping = PlatformMapping::where('platform', $this->getChannel()->value)
                 ->where('platform_id', (string) $shopifyRefund['id'])
@@ -350,5 +429,59 @@ class ReturnsMapper extends BaseReturnsMapper
             str_contains(strtolower($gateway), 'cash') => 'cash',
             default => 'original_payment_method',
         };
+    }
+
+    /**
+     * Check if this refund is a void transaction (order cancellation)
+     */
+    protected function isVoidTransaction(array $shopifyRefund): bool
+    {
+        foreach ($shopifyRefund['transactions'] ?? [] as $transaction) {
+            if (($transaction['kind'] ?? null) === 'void') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if this is an order edit (item removed/modified, not a return)
+     * In Shopify, restock_type = 'cancel' means item was removed from order
+     */
+    protected function isOrderEdit(array $shopifyRefund): bool
+    {
+        foreach ($shopifyRefund['refund_line_items'] ?? [] as $lineItem) {
+            $restockType = $lineItem['restock_type'] ?? null;
+
+            // If any item has restock_type 'cancel', it's an order edit
+            if ($restockType === 'cancel') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if there are no actual refund transactions
+     * If transactions array is empty or has no 'refund' kind, no money was refunded
+     */
+    protected function hasNoRefundTransactions(array $shopifyRefund): bool
+    {
+        $transactions = $shopifyRefund['transactions'] ?? [];
+
+        if (empty($transactions)) {
+            return true;
+        }
+
+        // Check if there's at least one refund transaction
+        foreach ($transactions as $transaction) {
+            if (($transaction['kind'] ?? null) === 'refund') {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
