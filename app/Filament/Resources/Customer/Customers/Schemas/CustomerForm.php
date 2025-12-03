@@ -18,7 +18,9 @@ class CustomerForm
                 Select::make('channel')
                     ->options(OrderChannel::class)
                     ->required()
-                    ->default(OrderChannel::PORTAL),
+                    ->default(OrderChannel::PORTAL)
+                    ->disabled()
+                    ->dehydrated(),
                 TextInput::make('first_name')
                     ->required(),
                 TextInput::make('last_name'),
