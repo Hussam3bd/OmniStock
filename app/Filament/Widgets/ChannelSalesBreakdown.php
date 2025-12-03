@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Enums\Order\OrderChannel;
 use App\Enums\Order\OrderStatus;
+use App\Enums\Order\PaymentStatus;
 use App\Enums\Order\ReturnStatus;
 use App\Models\Order\Order;
 use App\Models\Order\OrderReturn;
@@ -39,6 +40,24 @@ class ChannelSalesBreakdown extends TableWidget
                     ->label(__('Sales Amount'))
                     ->money('TRY')
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('pending_payment')
+                    ->label(__('Pending Payment'))
+                    ->html()
+                    ->state(function (array $record): string {
+                        if (! isset($record['pending_payment_count']) || $record['pending_payment_count'] === 0) {
+                            return '-';
+                        }
+
+                        $count = number_format($record['pending_payment_count']);
+                        $amount = '₺'.number_format($record['pending_payment_amount'], 2);
+
+                        return "<div class='space-y-1'>
+                            <div class='font-semibold text-warning-600 dark:text-warning-400'>{$amount}</div>
+                            <div class='text-sm text-gray-600 dark:text-gray-400'>{$count} orders</div>
+                        </div>";
+                    })
+                    ->sortable(query: fn ($query, $direction) => $query),
 
                 Tables\Columns\TextColumn::make('cancellations')
                     ->label(__('Cancellations'))
@@ -121,17 +140,46 @@ class ChannelSalesBreakdown extends TableWidget
                 ->where('status', '!=', ReturnStatus::Cancelled)
                 ->sum('total_refund_amount') / 100;
 
-            // Shipping and commission (completed orders only)
-            $shippingCost = Order::where('channel', $channelValue)
-                ->where('order_status', OrderStatus::COMPLETED)
-                ->sum('shipping_amount') / 100;
+            // For Shopify: calculate pending payments
+            $pendingPaymentCount = 0;
+            $pendingPaymentAmount = 0;
+            if ($channelValue === OrderChannel::SHOPIFY->value) {
+                $pendingPaymentCount = Order::where('channel', $channelValue)
+                    ->where('payment_status', PaymentStatus::PENDING)
+                    ->count();
+                $pendingPaymentAmount = Order::where('channel', $channelValue)
+                    ->where('payment_status', PaymentStatus::PENDING)
+                    ->sum('total_amount') / 100;
+            }
 
-            $commissionAmount = Order::where('channel', $channelValue)
-                ->where('order_status', OrderStatus::COMPLETED)
-                ->sum('total_commission') / 100;
+            // For Shopify: calculate shipping/commission/profit only from collected payments (PAID, PARTIALLY_PAID)
+            // For other channels: use completed orders
+            if ($channelValue === OrderChannel::SHOPIFY->value) {
+                $shippingCost = Order::where('channel', $channelValue)
+                    ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                    ->sum('shipping_amount') / 100;
 
-            // Net profit
-            $netProfit = $totalSalesAmount - $shippingCost - $commissionAmount;
+                $commissionAmount = Order::where('channel', $channelValue)
+                    ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                    ->sum('total_commission') / 100;
+
+                // Collected payment amount (only paid orders)
+                $collectedAmount = Order::where('channel', $channelValue)
+                    ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                    ->sum('total_amount') / 100;
+
+                $netProfit = $collectedAmount - $shippingCost - $commissionAmount;
+            } else {
+                $shippingCost = Order::where('channel', $channelValue)
+                    ->where('order_status', OrderStatus::COMPLETED)
+                    ->sum('shipping_amount') / 100;
+
+                $commissionAmount = Order::where('channel', $channelValue)
+                    ->where('order_status', OrderStatus::COMPLETED)
+                    ->sum('total_commission') / 100;
+
+                $netProfit = $totalSalesAmount - $shippingCost - $commissionAmount;
+            }
 
             // Rates
             $cancellationRate = $totalSalesCount > 0 ? round(($cancelledCount / $totalSalesCount) * 100, 2) : 0;
@@ -143,6 +191,8 @@ class ChannelSalesBreakdown extends TableWidget
                     'channel' => $channel->getLabel(),
                     'total_sales_count' => $totalSalesCount,
                     'total_sales_amount' => $totalSalesAmount,
+                    'pending_payment_count' => $pendingPaymentCount,
+                    'pending_payment_amount' => $pendingPaymentAmount,
                     'cancelled_count' => $cancelledCount,
                     'cancelled_amount' => $cancelledAmount,
                     'cancellation_rate' => $cancellationRate,
