@@ -139,17 +139,11 @@ class OrderInfolist
 
                 Schemas\Components\Section::make(__('Shipping Information'))
                     ->schema([
-                        Infolists\Components\TextEntry::make('carrier')
-                            ->label(__('Carrier (System)'))
+                        Infolists\Components\TextEntry::make('shipping_carrier')
+                            ->label(__('Carrier'))
                             ->badge()
                             ->icon('heroicon-o-truck')
-                            ->placeholder(__('Not detected'))
-                            ->visible(fn ($record) => $record->carrier),
-
-                        Infolists\Components\TextEntry::make('shipping_carrier')
-                            ->label(__('Carrier (Original)'))
-                            ->placeholder(__('Not available'))
-                            ->visible(fn ($record) => $record->shipping_carrier && ! $record->carrier),
+                            ->placeholder(__('Not detected')),
 
                         Infolists\Components\TextEntry::make('shipping_desi')
                             ->label(__('Desi (Volumetric Weight)'))

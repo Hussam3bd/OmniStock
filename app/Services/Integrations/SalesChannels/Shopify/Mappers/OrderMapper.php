@@ -57,8 +57,17 @@ class OrderMapper extends BaseOrderMapper
             // Recalculate totals
             $order->refresh();
 
+            // Auto-detect carrier from shipping line if available
+            if (! $order->shipping_carrier && isset($shopifyOrder['shipping_lines'][0]['code'])) {
+                $carrierCode = $shopifyOrder['shipping_lines'][0]['code'];
+                $carrier = \App\Enums\Shipping\ShippingCarrier::fromString($carrierCode);
+                if ($carrier) {
+                    $order->update(['shipping_carrier' => $carrier->value]);
+                }
+            }
+
             // Sync shipping costs from BasitKargo if order has tracking number
-            if ($order->shipping_tracking_number && ! $order->carrier) {
+            if ($order->shipping_tracking_number && ! $order->shipping_carrier) {
                 try {
                     $this->shippingCostSyncService->syncShippingCostFromBasitKargo($order);
                 } catch (\Exception $e) {

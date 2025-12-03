@@ -12,15 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('returns', function (Blueprint $table) {
-            // Add VAT breakdown fields after carrier
-            $table->decimal('return_shipping_vat_rate', 5, 2)->default(20.00)->after('carrier')->comment('VAT rate percentage for return shipping');
+            // Add VAT breakdown fields after return_shipping_desi
+            $table->decimal('return_shipping_vat_rate', 5, 2)->default(20.00)->after('return_shipping_desi')->comment('VAT rate percentage for return shipping');
             $table->bigInteger('return_shipping_vat_amount')->nullable()->after('return_shipping_vat_rate')->comment('VAT amount in minor units (cents)');
 
             // Add reference to shipping rate used (audit trail)
             $table->foreignId('return_shipping_rate_id')->nullable()->constrained('shipping_rates')->nullOnDelete()->after('return_shipping_vat_amount')->comment('Reference to rate table used for calculation');
-
-            // Add index for carrier queries
-            $table->index('carrier');
         });
     }
 
@@ -31,7 +28,6 @@ return new class extends Migration
     {
         Schema::table('returns', function (Blueprint $table) {
             $table->dropForeign(['return_shipping_rate_id']);
-            $table->dropIndex(['carrier']);
             $table->dropColumn([
                 'return_shipping_vat_rate',
                 'return_shipping_vat_amount',

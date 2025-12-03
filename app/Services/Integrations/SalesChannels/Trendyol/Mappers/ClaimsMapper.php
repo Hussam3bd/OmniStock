@@ -263,8 +263,8 @@ class ClaimsMapper extends BaseReturnsMapper
         // Only calculate if we have both carrier name and desi
         if (! $carrierName || ! $desi) {
             // Fallback: use original order shipping costs if available
-            if ($order->carrier && $order->shipping_desi) {
-                $shippingData['carrier'] = $order->carrier;
+            if ($order->shipping_carrier && $order->shipping_desi) {
+                $shippingData['carrier'] = $order->shipping_carrier;
                 $shippingData['return_shipping_cost_excluding_vat'] = $order->shipping_cost_excluding_vat?->getAmount() ?? 0;
                 $shippingData['return_shipping_vat_rate'] = $order->shipping_vat_rate ?? 20.00;
                 $shippingData['return_shipping_vat_amount'] = $order->shipping_vat_amount?->getAmount() ?? 0;
@@ -286,7 +286,7 @@ class ClaimsMapper extends BaseReturnsMapper
                 ->log('trendyol_return_carrier_not_recognized');
 
             // Fallback to order's carrier/costs
-            if ($order->carrier && $order->shipping_desi) {
+            if ($order->shipping_carrier && $order->shipping_desi) {
                 $shippingData['return_shipping_cost_excluding_vat'] = $order->shipping_cost_excluding_vat?->getAmount() ?? 0;
                 $shippingData['return_shipping_vat_rate'] = $order->shipping_vat_rate ?? 20.00;
                 $shippingData['return_shipping_vat_amount'] = $order->shipping_vat_amount?->getAmount() ?? 0;

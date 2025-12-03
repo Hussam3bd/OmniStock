@@ -12,7 +12,6 @@ use App\Models\Address\Address;
 use App\Models\Customer\Customer;
 use App\Models\Inventory\InventoryMovement;
 use App\Models\Platform\PlatformMapping;
-use App\Models\Shipping\ShippingRate;
 use Cknow\Money\Casts\MoneyIntegerCast;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -52,7 +51,6 @@ class Order extends Model
         'order_date',
         'shipping_carrier',
         'shipping_desi',
-        'carrier',
         'shipping_cost_excluding_vat',
         'shipping_vat_rate',
         'shipping_vat_amount',
@@ -81,7 +79,7 @@ class Order extends Model
             'invoice_date' => 'date',
             'order_date' => 'datetime',
             'shipping_desi' => 'decimal:2',
-            'carrier' => ShippingCarrier::class,
+            'shipping_carrier' => ShippingCarrier::class,
             'shipping_cost_excluding_vat' => MoneyIntegerCast::class,
             'shipping_vat_rate' => 'decimal:2',
             'shipping_vat_amount' => MoneyIntegerCast::class,

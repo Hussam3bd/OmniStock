@@ -27,7 +27,7 @@ class ShippingCostSyncService
         }
 
         // Skip if order already has calculated shipping costs
-        if ($order->shipping_cost_excluding_vat && $order->carrier) {
+        if ($order->shipping_cost_excluding_vat && $order->shipping_carrier) {
             return false;
         }
 
@@ -73,7 +73,7 @@ class ShippingCostSyncService
 
             // Update order with shipping cost data
             $order->update([
-                'carrier' => $carrier?->value,
+                'shipping_carrier' => $carrier?->value,
                 'shipping_desi' => $costData['desi'],
                 'shipping_cost_excluding_vat' => $costData['price_excluding_vat'],
                 'shipping_vat_rate' => $costData['vat_rate'],
@@ -269,7 +269,7 @@ class ShippingCostSyncService
         }
 
         // Skip if already has costs
-        if ($order->shipping_cost_excluding_vat && $order->carrier) {
+        if ($order->shipping_cost_excluding_vat && $order->shipping_carrier) {
             return [
                 'order_id' => $order->id,
                 'synced' => false,
@@ -315,7 +315,7 @@ class ShippingCostSyncService
 
         // Update order
         $order->update([
-            'carrier' => $carrier?->value,
+            'shipping_carrier' => $carrier?->value,
             'shipping_desi' => $desi,
             'shipping_cost_excluding_vat' => $priceExcludingVat,
             'shipping_vat_rate' => $vatRate,

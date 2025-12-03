@@ -217,9 +217,8 @@ class OrderMapper extends BaseOrderMapper
             'order_date' => isset($trendyolPackage['orderDate'])
                 ? Carbon::createFromTimestampMs($trendyolPackage['orderDate'])
                 : now(),
-            'shipping_carrier' => $trendyolPackage['cargoProviderName'] ?? null,
+            'shipping_carrier' => $shippingCosts['carrier'] ?? \App\Enums\Shipping\ShippingCarrier::fromString($trendyolPackage['cargoProviderName'] ?? '')?->value,
             'shipping_desi' => $trendyolPackage['cargoDeci'] ?? null,
-            'carrier' => $shippingCosts['carrier'],
             'shipping_cost_excluding_vat' => $shippingCosts['shipping_cost_excluding_vat'],
             'shipping_vat_rate' => $shippingCosts['shipping_vat_rate'],
             'shipping_vat_amount' => $shippingCosts['shipping_vat_amount'],
@@ -309,9 +308,8 @@ class OrderMapper extends BaseOrderMapper
             'discount_amount' => $totalDiscount,
             'total_amount' => $totalPrice,
             'invoice_url' => $trendyolPackage['invoiceLink'] ?? $order->invoice_url,
-            'shipping_carrier' => $trendyolPackage['cargoProviderName'] ?? null,
+            'shipping_carrier' => $shippingCosts['carrier'] ?? \App\Enums\Shipping\ShippingCarrier::fromString($trendyolPackage['cargoProviderName'] ?? '')?->value,
             'shipping_desi' => $trendyolPackage['cargoDeci'] ?? null,
-            'carrier' => $shippingCosts['carrier'],
             'shipping_amount' => $shippingCosts['shipping_cost_excluding_vat'] && $shippingCosts['shipping_vat_amount']
                 ? $shippingCosts['shipping_cost_excluding_vat'] + $shippingCosts['shipping_vat_amount']
                 : $order->shipping_amount,
