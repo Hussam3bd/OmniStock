@@ -114,8 +114,10 @@ class OrderInfolist
                             ->visible(fn ($record) => $record->shipping_vat_amount),
 
                         Infolists\Components\TextEntry::make('shipping_amount')
-                            ->label(__('Shipping Total'))
-                            ->money(fn ($record) => $record->currency),
+                            ->label(__('Shipping Fee (Customer)'))
+                            ->helperText(__('Amount charged to customer for shipping'))
+                            ->money(fn ($record) => $record->currency)
+                            ->visible(fn ($record) => $record->shipping_amount && $record->shipping_amount->getAmount() > 0),
 
                         Infolists\Components\TextEntry::make('discount_amount')
                             ->label(__('Discount'))

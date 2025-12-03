@@ -18,6 +18,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -212,11 +213,18 @@ class IntegrationsTable
                     ->icon(Heroicon::OutlinedArrowPath)
                     ->color('warning')
                     ->visible(fn (Integration $record) => in_array($record->provider, [IntegrationProvider::TRENDYOL, IntegrationProvider::SHOPIFY]) && $record->is_active)
-                    ->requiresConfirmation()
+                    ->form([
+                        DatePicker::make('since_date')
+                            ->label(__('Sync orders since'))
+                            ->helperText(__('Select the start date to sync orders from. Leave empty to sync last 7 days.'))
+                            ->default(now()->subDays(7))
+                            ->maxDate(now())
+                            ->native(false),
+                    ])
                     ->modalHeading(__('Sync Orders'))
-                    ->modalDescription(__('This will fetch and sync recent orders from :provider. The process will run in the background.', ['provider' => fn (Integration $record) => $record->provider->getLabel()]))
+                    ->modalDescription(__('This will fetch and sync orders from :provider. The process will run in the background.', ['provider' => fn (Integration $record) => $record->provider->getLabel()]))
                     ->modalSubmitActionLabel(__('Start Sync'))
-                    ->action(function (Integration $record) {
+                    ->action(function (Integration $record, array $data) {
                         try {
                             $adapter = match ($record->provider) {
                                 IntegrationProvider::TRENDYOL => new TrendyolAdapter($record),
@@ -228,8 +236,11 @@ class IntegrationsTable
                                 throw new \Exception('Unsupported provider');
                             }
 
+                            // Get the date from form data, default to 7 days ago if not set
+                            $sinceDate = $data['since_date'] ? \Carbon\Carbon::parse($data['since_date']) : now()->subDays(7);
+
                             // Fetch all orders (just metadata, not full sync yet)
-                            $orders = $adapter->fetchAllOrders(now()->subDays(30));
+                            $orders = $adapter->fetchAllOrders($sinceDate);
                             $totalOrders = count($orders);
 
                             if ($totalOrders === 0) {
@@ -301,9 +312,10 @@ class IntegrationsTable
 
                             Notification::make()
                                 ->title(__('Order sync started'))
-                                ->body(__('Syncing :count orders from :provider in the background. You will be notified when complete.', [
+                                ->body(__('Syncing :count orders from :provider (since :date) in the background. You will be notified when complete.', [
                                     'count' => $totalOrders,
                                     'provider' => $record->provider->getLabel(),
+                                    'date' => $sinceDate->format('Y-m-d'),
                                 ]))
                                 ->success()
                                 ->send();

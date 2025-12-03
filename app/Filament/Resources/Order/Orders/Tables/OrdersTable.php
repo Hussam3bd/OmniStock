@@ -104,10 +104,11 @@ class OrdersTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('shipping_amount')
-                    ->label('Shipping Total')
+                    ->label('Shipping Fee (Customer)')
                     ->money(fn ($record) => $record->currency)
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable()
+                    ->tooltip('Amount charged to customer (₺0 for Trendyol)'),
                 TextColumn::make('total_commission')
                     ->label('Commission')
                     ->money(fn ($record) => $record->currency)

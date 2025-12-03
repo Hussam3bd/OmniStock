@@ -206,9 +206,7 @@ class OrderMapper extends BaseOrderMapper
             'fulfillment_status' => $fulfillmentStatus,
             'subtotal' => $grossAmount,
             'tax_amount' => 0,
-            'shipping_amount' => $shippingCosts['shipping_cost_excluding_vat'] && $shippingCosts['shipping_vat_amount']
-                ? $shippingCosts['shipping_cost_excluding_vat'] + $shippingCosts['shipping_vat_amount']
-                : 0,
+            'shipping_amount' => 0, // Trendyol: free shipping to customer
             'discount_amount' => $totalDiscount,
             'total_amount' => $totalPrice,
             'total_commission' => 0, // Will be calculated from items
@@ -313,9 +311,7 @@ class OrderMapper extends BaseOrderMapper
             'invoice_url' => $trendyolPackage['invoiceLink'] ?? $order->invoice_url,
             'shipping_carrier' => $shippingCosts['carrier'] ?? \App\Enums\Shipping\ShippingCarrier::fromString($trendyolPackage['cargoProviderName'] ?? '')?->value,
             'shipping_desi' => $trendyolPackage['cargoDeci'] ?? null,
-            'shipping_amount' => $shippingCosts['shipping_cost_excluding_vat'] && $shippingCosts['shipping_vat_amount']
-                ? $shippingCosts['shipping_cost_excluding_vat'] + $shippingCosts['shipping_vat_amount']
-                : $order->shipping_amount,
+            'shipping_amount' => 0, // Trendyol: free shipping to customer
             'shipping_cost_excluding_vat' => $shippingCosts['shipping_cost_excluding_vat'],
             'shipping_vat_rate' => $shippingCosts['shipping_vat_rate'],
             'shipping_vat_amount' => $shippingCosts['shipping_vat_amount'],
