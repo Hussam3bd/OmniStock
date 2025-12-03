@@ -32,5 +32,10 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        $this->command->info('Database seeding completed successfully.');
+        $this->command->info('Please run:');
+        $this->command->info('php artisan address:seed-turkish');
+        $this->command->info('php artisan exchange-rates:update');
     }
 }
