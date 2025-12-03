@@ -6,6 +6,7 @@ use App\Enums\Order\FulfillmentStatus;
 use App\Enums\Order\OrderChannel;
 use App\Enums\Order\OrderStatus;
 use App\Enums\Order\PaymentStatus;
+use App\Enums\Shipping\ShippingCarrier;
 use App\Models\Customer\Customer;
 use App\Models\Order\Order;
 use App\Models\Platform\PlatformMapping;
@@ -60,7 +61,7 @@ class OrderMapper extends BaseOrderMapper
             // Auto-detect carrier from shipping line if available
             if (! $order->shipping_carrier && isset($shopifyOrder['shipping_lines'][0]['code'])) {
                 $carrierCode = $shopifyOrder['shipping_lines'][0]['code'];
-                $carrier = \App\Enums\Shipping\ShippingCarrier::fromString($carrierCode);
+                $carrier = ShippingCarrier::fromString($carrierCode);
                 if ($carrier) {
                     $order->update(['shipping_carrier' => $carrier->value]);
                 }
@@ -232,7 +233,7 @@ class OrderMapper extends BaseOrderMapper
             'order_date' => isset($shopifyOrder['created_at'])
                 ? Carbon::parse($shopifyOrder['created_at'])
                 : now(),
-            'shipping_carrier' => $firstFulfillment['tracking_company'] ?? null,
+            'shipping_carrier' => isset($firstFulfillment['tracking_company']) ? ShippingCarrier::fromString($firstFulfillment['tracking_company'])?->value : null,
             'shipping_tracking_number' => $firstFulfillment['tracking_number'] ?? null,
             'shipping_tracking_url' => $firstFulfillment['tracking_url'] ?? null,
             'shipped_at' => $shippedAt,
@@ -317,7 +318,7 @@ class OrderMapper extends BaseOrderMapper
             'shipping_amount' => $shippingAmount,
             'discount_amount' => $discountAmount,
             'total_amount' => $totalAmount,
-            'shipping_carrier' => $firstFulfillment['tracking_company'] ?? $order->shipping_carrier,
+            'shipping_carrier' => isset($firstFulfillment['tracking_company']) ? ShippingCarrier::fromString($firstFulfillment['tracking_company'])?->value : $order->shipping_carrier?->value,
             'shipping_tracking_number' => $firstFulfillment['tracking_number'] ?? $order->shipping_tracking_number,
             'shipping_tracking_url' => $firstFulfillment['tracking_url'] ?? $order->shipping_tracking_url,
             'shipped_at' => $shippedAt ?? $order->shipped_at,

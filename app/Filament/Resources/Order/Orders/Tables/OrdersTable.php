@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Order\Orders\Tables;
 
+use App\Filament\Resources\Customer\Customers\CustomerResource;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -29,7 +30,7 @@ class OrdersTable
                         });
                     })
                     ->url(fn ($record) => $record->customer
-                        ? \App\Filament\Resources\Customer\Customers\CustomerResource::getUrl('edit', ['record' => $record->customer])
+                        ? CustomerResource::getUrl('edit', ['record' => $record->customer])
                         : null)
                     ->sortable(),
                 TextColumn::make('channel')
@@ -80,7 +81,7 @@ class OrdersTable
                     ->money(fn ($record) => $record->currency)
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('carrier')
+                TextColumn::make('shipping_carrier')
                     ->label('Shipping Carrier')
                     ->badge()
                     ->sortable()
