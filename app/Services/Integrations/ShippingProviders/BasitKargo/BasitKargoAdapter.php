@@ -5,6 +5,7 @@ namespace App\Services\Integrations\ShippingProviders\BasitKargo;
 use App\Models\Integration\Integration;
 use App\Models\Order\Order;
 use App\Services\Integrations\Contracts\ShippingProviderAdapter;
+use App\Services\Integrations\ShippingProviders\BasitKargo\DataTransferObjects\ShipmentResponse;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
@@ -110,26 +111,25 @@ class BasitKargoAdapter implements ShippingProviderAdapter
     public function trackShipment(string $trackingNumber): array
     {
         try {
-            $response = $this->client()->get("/v2/order/handler-shipment-code/{$trackingNumber}");
+            $shipment = $this->getShipmentDetails($trackingNumber);
 
-            if (! $response->successful()) {
-                throw new \Exception("Failed to track shipment: {$trackingNumber}");
-            }
-
-            $data = $response->json();
-
-            // Extract shipping details
+            // Convert DTO to array for interface compatibility
             return [
-                'tracking_number' => $trackingNumber,
-                'carrier_code' => $data['handlerCode'] ?? null,
-                'carrier_name' => $this->getCarrierName($data['handlerCode'] ?? null),
-                'status' => $data['status'] ?? null,
-                'desi' => $data['desiKg'] ?? null,
-                'price' => isset($data['price']) ? $data['price'] * 100 : null, // Convert to minor units
+                'tracking_number' => $shipment->getTrackingNumber(),
+                'carrier_code' => $shipment->getCarrierCode(),
+                'carrier_name' => $shipment->getCarrierName(),
+                'status' => $shipment->status->value,
+                'status_label' => $shipment->status->getLabel(),
+                'desi' => $shipment->getDesi(),
+                'price' => (int) round($shipment->getTotalCost() * 100), // Convert to minor units
                 'currency' => 'TRY',
-                'created_at' => $data['createdAt'] ?? null,
-                'delivered_at' => $data['deliveredAt'] ?? null,
-                'raw_data' => $data,
+                'created_at' => $shipment->createdTime,
+                'delivered_at' => $shipment->getDeliveredTime(),
+                'is_delivered' => $shipment->isDelivered(),
+                'is_in_transit' => $shipment->isInTransit(),
+                'is_problematic' => $shipment->isProblematic(),
+                'is_returned' => $shipment->isReturned(),
+                'raw_data' => $shipment->rawData,
             ];
         } catch (\Exception $e) {
             activity()
@@ -142,6 +142,22 @@ class BasitKargoAdapter implements ShippingProviderAdapter
 
             throw $e;
         }
+    }
+
+    /**
+     * Get shipment details as DTO (internal use for type safety)
+     */
+    protected function getShipmentDetails(string $trackingNumber): ShipmentResponse
+    {
+        $response = $this->client()->get("/v2/order/handler-shipment-code/{$trackingNumber}");
+
+        if (! $response->successful()) {
+            throw new \Exception("Failed to track shipment: {$trackingNumber}");
+        }
+
+        $data = $response->json();
+
+        return ShipmentResponse::fromArray($data);
     }
 
     public function cancelShipment(string $shipmentId): bool
@@ -162,13 +178,17 @@ class BasitKargoAdapter implements ShippingProviderAdapter
     public function getShipmentCost(string $trackingNumber): ?array
     {
         try {
-            $shipment = $this->trackShipment($trackingNumber);
+            // Use DTO method directly for type safety
+            $shipment = $this->getShipmentDetails($trackingNumber);
 
-            if (! isset($shipment['price']) || ! isset($shipment['desi'])) {
+            // Get price from DTO (API returns price in TRY, not minor units)
+            $price = (int) round($shipment->getTotalCost() * 100); // Convert to minor units
+            $desi = $shipment->getDesi();
+
+            if (! $price || ! $desi) {
                 return null;
             }
 
-            $price = $shipment['price'];
             $vatRate = 20.00;
             $vatIncluded = $this->integration->settings['vat_included'] ?? true;
 
@@ -186,9 +206,9 @@ class BasitKargoAdapter implements ShippingProviderAdapter
             }
 
             return [
-                'carrier_code' => $shipment['carrier_code'],
-                'carrier_name' => $shipment['carrier_name'],
-                'desi' => $shipment['desi'],
+                'carrier_code' => $shipment->getCarrierCode(),
+                'carrier_name' => $shipment->getCarrierName(),
+                'desi' => $desi,
                 'price_excluding_vat' => $priceExcludingVat,
                 'vat_rate' => $vatRate,
                 'vat_amount' => $vatAmount,
