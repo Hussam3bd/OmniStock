@@ -19,7 +19,7 @@ class ShippingCostSyncService
     /**
      * Sync shipping costs for an order from BasitKargo
      */
-    public function syncShippingCostFromBasitKargo(Order $order): bool
+    public function syncShippingCostFromBasitKargo(Order $order, bool $force = false): bool
     {
         // Skip if order doesn't have tracking number
         if (! $order->shipping_tracking_number) {
@@ -27,7 +27,7 @@ class ShippingCostSyncService
         }
 
         // Skip if order already has calculated shipping costs
-        if ($order->shipping_cost_excluding_vat && $order->shipping_carrier) {
+        if (! $force && ($order->shipping_cost_excluding_vat && $order->shipping_carrier)) {
             return false;
         }
 
