@@ -2,9 +2,12 @@
 
 namespace App\Filament\Resources\Order\Orders\Pages;
 
+use App\Filament\Actions\Order\ResyncOrderAction;
+use App\Filament\Actions\Order\ResyncShippingCostAction;
 use App\Filament\Resources\Order\Orders\Infolists\OrderInfolist;
 use App\Filament\Resources\Order\Orders\OrderResource;
 use App\Filament\Resources\Order\Orders\RelationManagers\ReturnsRelationManager;
+use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Schema;
 
@@ -20,7 +23,10 @@ class ViewOrder extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            //
+            EditAction::make()
+                ->visible(fn () => ! $this->record->isExternal()),
+            ResyncOrderAction::make(),
+            ResyncShippingCostAction::make(),
         ];
     }
 
