@@ -4,6 +4,7 @@ namespace App\Services\Integrations\SalesChannels\Trendyol\Mappers;
 
 use App\Enums\Order\OrderChannel;
 use App\Enums\Order\ReturnStatus;
+use App\Enums\Shipping\ShippingCarrier;
 use App\Models\Order\Order;
 use App\Models\Order\OrderReturn;
 use App\Models\Order\ReturnItem;
@@ -91,7 +92,7 @@ class ClaimsMapper extends BaseReturnsMapper
                     'reason_name' => $firstClaimItem['customerClaimItemReason']['name'] ?? null,
                     'customer_note' => $firstClaimItem['customerNote'] ?? null,
                     'internal_note' => $firstClaimItem['note'] ?? null,
-                    'return_shipping_carrier' => $claim['cargoProviderName'] ?? null,
+                    'return_shipping_carrier' => isset($claim['cargoProviderName']) ? ShippingCarrier::fromString($claim['cargoProviderName'])?->value : null,
                     'return_tracking_number' => $claim['cargoTrackingNumber'] ?? null,
                     'return_tracking_url' => $claim['cargoTrackingLink'] ?? null,
                     'return_shipping_desi' => $claim['cargoDeci'] ?? $order->shipping_desi,
