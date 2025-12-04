@@ -3,8 +3,10 @@
 namespace App\Filament\Resources\Integration\Integrations\Pages;
 
 use App\Filament\Resources\Integration\Integrations\IntegrationResource;
+use App\Models\Order\Order;
 use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
 use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
+use App\Services\Payment\PaymentCostSyncService;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Infolists\Components\Section;
@@ -66,6 +68,75 @@ class EditIntegration extends EditRecord
                     } catch (\Exception $e) {
                         Notification::make()
                             ->title(__('Error registering webhooks'))
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->send();
+                    }
+                });
+        }
+
+        // Add sync payment fees action for Iyzico integration
+        if ($this->record->provider === 'iyzico' && $this->record->is_active) {
+            $actions[] = Action::make('sync_payment_fees')
+                ->label(__('Sync Payment Fees'))
+                ->icon(Heroicon::OutlinedBanknotes)
+                ->color('info')
+                ->requiresConfirmation()
+                ->modalHeading(__('Sync Payment Fees for All Orders'))
+                ->modalDescription(function () {
+                    $ordersCount = Order::where('payment_gateway', 'LIKE', '%iyzico%')
+                        ->whereNotNull('payment_transaction_id')
+                        ->count();
+
+                    return __('This will sync payment gateway fees from Iyzico for :count orders with payment transaction IDs. This may take a few moments.', [
+                        'count' => $ordersCount,
+                    ]);
+                })
+                ->action(function () {
+                    try {
+                        $service = app(PaymentCostSyncService::class);
+
+                        // Get all orders with Iyzico payment gateway
+                        $orders = Order::where('payment_gateway', 'LIKE', '%iyzico%')
+                            ->whereNotNull('payment_transaction_id')
+                            ->get();
+
+                        $successCount = 0;
+                        $failedCount = 0;
+                        $skippedCount = 0;
+
+                        foreach ($orders as $order) {
+                            try {
+                                $synced = $service->syncPaymentCosts($order);
+                                if ($synced) {
+                                    $successCount++;
+                                } else {
+                                    $skippedCount++;
+                                }
+                            } catch (\Exception $e) {
+                                $failedCount++;
+                                activity()
+                                    ->performedOn($order)
+                                    ->withProperties([
+                                        'error' => $e->getMessage(),
+                                        'order_id' => $order->id,
+                                    ])
+                                    ->log('bulk_payment_fee_sync_error');
+                            }
+                        }
+
+                        Notification::make()
+                            ->title(__('Payment Fees Synced'))
+                            ->body(__('Successfully synced :success orders. Skipped: :skipped. Failed: :failed.', [
+                                'success' => $successCount,
+                                'skipped' => $skippedCount,
+                                'failed' => $failedCount,
+                            ]))
+                            ->success()
+                            ->send();
+                    } catch (\Exception $e) {
+                        Notification::make()
+                            ->title(__('Error Syncing Payment Fees'))
                             ->body($e->getMessage())
                             ->danger()
                             ->send();
