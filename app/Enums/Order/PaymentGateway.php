@@ -14,23 +14,8 @@ enum PaymentGateway: string implements HasColor, HasLabel
     case BANK_DEPOSIT = 'bank_deposit';
 
     /**
-     * Try to create from a string, returns null if not a valid enum case
-     * This allows storing unknown gateway names from external sources
-     */
-    public static function tryFrom(string $value): ?self
-    {
-        return match (strtolower($value)) {
-            'iyzico' => self::IYZICO,
-            'stripe' => self::STRIPE,
-            'manual' => self::MANUAL,
-            'cod', 'cash on delivery (cod)' => self::COD,
-            'bank_deposit', 'bank deposit' => self::BANK_DEPOSIT,
-            default => null,
-        };
-    }
-
-    /**
      * Parse gateway name from external sources (flexible matching)
+     * Returns null for unknown gateways - they'll be stored as raw strings
      */
     public static function parse(?string $value): ?self
     {
@@ -40,7 +25,7 @@ enum PaymentGateway: string implements HasColor, HasLabel
 
         $normalized = strtolower(trim($value));
 
-        // Direct match
+        // Try exact match first (uses built-in tryFrom)
         if ($enum = self::tryFrom($normalized)) {
             return $enum;
         }

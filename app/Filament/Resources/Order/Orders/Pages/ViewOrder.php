@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Order\Orders\Pages;
 
 use App\Filament\Actions\Order\ResyncOrderAction;
+use App\Filament\Actions\Order\ResyncPaymentCostAction;
 use App\Filament\Actions\Order\ResyncShippingCostAction;
 use App\Filament\Resources\Order\Orders\Infolists\OrderInfolist;
 use App\Filament\Resources\Order\Orders\OrderResource;
@@ -27,6 +28,7 @@ class ViewOrder extends ViewRecord
                 ->visible(fn () => ! $this->record->isExternal()),
             ResyncOrderAction::make(),
             ResyncShippingCostAction::make(),
+            ResyncPaymentCostAction::make(),
         ];
     }
 
