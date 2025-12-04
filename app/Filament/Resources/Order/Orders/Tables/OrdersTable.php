@@ -99,21 +99,17 @@ class OrdersTable
                     ->badge()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('shipping_cost_excluding_vat')
-                    ->label('Shipping (excl. VAT)')
+                TextColumn::make('total_shipping_cost')
+                    ->label('Shipping Cost')
                     ->money(fn ($record) => $record->currency)
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('shipping_vat_amount')
-                    ->label('Shipping VAT')
-                    ->money(fn ($record) => $record->currency)
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable()
+                    ->tooltip('Total shipping cost including VAT (paid to carrier)'),
                 TextColumn::make('shipping_amount')
                     ->label('Shipping Fee (Customer)')
                     ->money(fn ($record) => $record->currency)
                     ->sortable()
-                    ->toggleable()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->tooltip('Amount charged to customer (₺0 for Trendyol)'),
                 TextColumn::make('total_commission')
                     ->label('Commission')

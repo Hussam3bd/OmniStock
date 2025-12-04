@@ -13,6 +13,8 @@ use App\Models\Customer\Customer;
 use App\Models\Inventory\InventoryMovement;
 use App\Models\Platform\PlatformMapping;
 use Cknow\Money\Casts\MoneyIntegerCast;
+use Cknow\Money\Money;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -121,15 +123,23 @@ class Order extends Model
     /**
      * Get total shipping cost including VAT (what we pay to carrier)
      */
-    public function getTotalShippingCostAttribute(): ?\Cknow\Money\Money
+    protected function totalShippingCost(): Attribute
     {
-        if (! $this->shipping_cost_excluding_vat) {
-            return null;
-        }
+        return Attribute::make(
+            get: function (): ?Money {
+                if (! $this->shipping_cost_excluding_vat) {
+                    return null;
+                }
 
-        $totalCost = $this->shipping_cost_excluding_vat->getAmount() + ($this->shipping_vat_amount?->getAmount() ?? 0);
+                $cost = $this->shipping_cost_excluding_vat;
 
-        return new \Cknow\Money\Money($totalCost, new \Money\Currency($this->currency ?? 'TRY'));
+                if ($this->shipping_vat_amount) {
+                    $cost = $cost->add($this->shipping_vat_amount);
+                }
+
+                return $cost;
+            }
+        );
     }
 
     /**
@@ -137,33 +147,34 @@ class Order extends Model
      * For Shopify: Revenue includes shipping fee from customer
      * For Trendyol: Revenue is product price only (free shipping to customer)
      */
-    public function getGrossProfitAttribute(): ?\Cknow\Money\Money
+    protected function grossProfit(): Attribute
     {
-        if (! $this->total_amount) {
-            return null;
-        }
+        return Attribute::make(
+            get: function (): ?Money {
+                if (! $this->total_amount) {
+                    return null;
+                }
 
-        $revenue = $this->total_amount->getAmount();
-        $costs = 0;
+                $profit = $this->total_amount;
 
-        // COGS (Cost of Goods Sold)
-        if ($this->total_product_cost) {
-            $costs += $this->total_product_cost->getAmount();
-        }
+                // Subtract COGS (Cost of Goods Sold)
+                if ($this->total_product_cost) {
+                    $profit = $profit->subtract($this->total_product_cost);
+                }
 
-        // Shipping costs (what we pay to carrier)
-        if ($this->total_shipping_cost) {
-            $costs += $this->total_shipping_cost->getAmount();
-        }
+                // Subtract shipping costs (what we pay to carrier)
+                if ($this->total_shipping_cost) {
+                    $profit = $profit->subtract($this->total_shipping_cost);
+                }
 
-        // Platform commission
-        if ($this->total_commission) {
-            $costs += $this->total_commission->getAmount();
-        }
+                // Subtract platform commission
+                if ($this->total_commission) {
+                    $profit = $profit->subtract($this->total_commission);
+                }
 
-        $profit = $revenue - $costs;
-
-        return new \Cknow\Money\Money($profit, new \Money\Currency($this->currency ?? 'TRY'));
+                return $profit;
+            }
+        );
     }
 
     public function customer(): BelongsTo
