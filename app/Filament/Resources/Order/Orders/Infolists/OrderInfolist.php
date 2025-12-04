@@ -108,6 +108,14 @@ class OrderInfolist
                             ->color('danger')
                             ->weight('semibold')
                             ->visible(fn ($record) => $record->total_payment_gateway_cost && $record->total_payment_gateway_cost->getAmount() > 0),
+
+                        Infolists\Components\TextEntry::make('payment_payout_amount')
+                            ->label(__('Net Payout'))
+                            ->helperText(__('Amount you receive after gateway fees'))
+                            ->money(fn ($record) => $record->currency)
+                            ->color('success')
+                            ->weight('bold')
+                            ->visible(fn ($record) => $record->payment_payout_amount && $record->payment_payout_amount->getAmount() > 0),
                     ])
                     ->columns(2)
                     ->visible(fn ($record) => $record->payment_method || $record->payment_gateway),

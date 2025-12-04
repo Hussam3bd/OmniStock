@@ -101,7 +101,15 @@ class PaymentCostSyncService
         $currency = $transaction['currency'] ?? 'TRY';
         $iyzicoCommissionFee = $this->convertToMinorUnits($transaction['iyzico_commission_fee'], $currency);
         $iyzicoCommissionRateAmount = $this->convertToMinorUnits($transaction['iyzico_commission_rate_amount'], $currency);
-        $merchantPayoutAmount = $this->convertToMinorUnits($transaction['merchant_payout_amount'], $currency);
+
+        // Calculate actual merchant payout
+        // For direct merchants: paidPrice - totalIyzicoFees
+        // For marketplace: use merchant_payout_amount from API (when sub-merchants are involved)
+        $paidPrice = $this->convertToMinorUnits($transaction['paid_price'], $currency);
+        $totalIyzicoFees = $iyzicoCommissionFee + $iyzicoCommissionRateAmount;
+        $merchantPayoutAmount = $transaction['merchant_payout_amount'] > 0
+            ? $this->convertToMinorUnits($transaction['merchant_payout_amount'], $currency)
+            : $paidPrice - $totalIyzicoFees;
 
         // Update order with payment costs
         $order->update([
