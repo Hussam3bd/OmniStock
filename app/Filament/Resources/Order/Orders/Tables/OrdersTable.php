@@ -115,7 +115,14 @@ class OrdersTable
                     ->label('Commission')
                     ->money(fn ($record) => $record->currency)
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->tooltip('Platform commission (e.g., Trendyol commission)'),
+                TextColumn::make('total_payment_gateway_cost')
+                    ->label('Payment Fee')
+                    ->money(fn ($record) => $record->currency)
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->tooltip('Payment gateway fees (Iyzico, Stripe, etc.)'),
                 TextColumn::make('total_amount')
                     ->label('Total')
                     ->money(fn ($record) => $record->currency)
@@ -131,7 +138,7 @@ class OrdersTable
                         $record->gross_profit->getAmount() < 0 => 'danger',
                         default => 'gray',
                     })
-                    ->tooltip('Revenue - Product Cost - Shipping Cost - Commission'),
+                    ->tooltip('Revenue - Product Cost - Shipping Cost - Commission - Payment Fees'),
                 TextColumn::make('order_date')
                     ->dateTime()
                     ->sortable(),
@@ -194,14 +201,14 @@ class OrdersTable
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->whereHas('items', function ($q) {
                         $q->whereNotNull('unit_cost');
-                    })->whereRaw('total_amount > (COALESCE(total_product_cost, 0) + COALESCE(shipping_cost_excluding_vat, 0) + COALESCE(shipping_vat_amount, 0) + COALESCE(total_commission, 0))')),
+                    })->whereRaw('total_amount > (COALESCE(total_product_cost, 0) + COALESCE(shipping_cost_excluding_vat, 0) + COALESCE(shipping_vat_amount, 0) + COALESCE(total_commission, 0) + COALESCE(payment_gateway_fee, 0) + COALESCE(payment_gateway_commission_amount, 0))')),
 
                 Filter::make('loss_making')
                     ->label(__('Loss-Making Orders'))
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->whereHas('items', function ($q) {
                         $q->whereNotNull('unit_cost');
-                    })->whereRaw('total_amount < (COALESCE(total_product_cost, 0) + COALESCE(shipping_cost_excluding_vat, 0) + COALESCE(shipping_vat_amount, 0) + COALESCE(total_commission, 0))')),
+                    })->whereRaw('total_amount < (COALESCE(total_product_cost, 0) + COALESCE(shipping_cost_excluding_vat, 0) + COALESCE(shipping_vat_amount, 0) + COALESCE(total_commission, 0) + COALESCE(payment_gateway_fee, 0) + COALESCE(payment_gateway_commission_amount, 0))')),
 
                 Filter::make('order_date')
                     ->schema([

@@ -87,8 +87,27 @@ class OrderInfolist
                             ->label(__('Transaction ID'))
                             ->copyable()
                             ->placeholder(__('Not available'))
-                            ->visible(fn ($record) => $record->payment_transaction_id)
-                            ->columnSpanFull(),
+                            ->visible(fn ($record) => $record->payment_transaction_id),
+
+                        Infolists\Components\TextEntry::make('payment_gateway_fee')
+                            ->label(__('Gateway Fee'))
+                            ->helperText(__('Fixed fee charged by payment gateway'))
+                            ->money(fn ($record) => $record->currency)
+                            ->visible(fn ($record) => $record->payment_gateway_fee && $record->payment_gateway_fee->getAmount() > 0),
+
+                        Infolists\Components\TextEntry::make('payment_gateway_commission_amount')
+                            ->label(__('Gateway Commission'))
+                            ->helperText(__('Rate-based commission charged by gateway'))
+                            ->money(fn ($record) => $record->currency)
+                            ->visible(fn ($record) => $record->payment_gateway_commission_amount && $record->payment_gateway_commission_amount->getAmount() > 0),
+
+                        Infolists\Components\TextEntry::make('total_payment_gateway_cost')
+                            ->label(__('Total Payment Fees'))
+                            ->helperText(__('Total payment gateway fees'))
+                            ->money(fn ($record) => $record->currency)
+                            ->color('danger')
+                            ->weight('semibold')
+                            ->visible(fn ($record) => $record->total_payment_gateway_cost && $record->total_payment_gateway_cost->getAmount() > 0),
                     ])
                     ->columns(2)
                     ->visible(fn ($record) => $record->payment_method || $record->payment_gateway),
@@ -167,9 +186,16 @@ class OrderInfolist
                             ->color('danger')
                             ->visible(fn ($record) => $record->total_commission && $record->total_commission->getAmount() > 0),
 
+                        Infolists\Components\TextEntry::make('total_payment_gateway_cost')
+                            ->label(__('Payment Gateway Fees'))
+                            ->helperText(__('Fees paid to payment processor (Iyzico, Stripe, etc.)'))
+                            ->money(fn ($record) => $record->currency)
+                            ->color('danger')
+                            ->visible(fn ($record) => $record->total_payment_gateway_cost && $record->total_payment_gateway_cost->getAmount() > 0),
+
                         Infolists\Components\TextEntry::make('gross_profit')
                             ->label(__('Gross Profit'))
-                            ->helperText(__('Revenue - All Costs'))
+                            ->helperText(__('Revenue - Product Cost - Shipping - Commission - Payment Fees'))
                             ->money(fn ($record) => $record->currency)
                             ->weight('bold')
                             ->size('lg')
