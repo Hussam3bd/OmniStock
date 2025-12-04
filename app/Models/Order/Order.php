@@ -37,6 +37,10 @@ class Order extends Model
         'payment_method',
         'payment_gateway',
         'payment_transaction_id',
+        'payment_gateway_fee',
+        'payment_gateway_commission_rate',
+        'payment_gateway_commission_amount',
+        'payment_payout_amount',
         'fulfillment_status',
         'return_status',
         'subtotal',
@@ -80,6 +84,10 @@ class Order extends Model
             'total_amount' => MoneyIntegerCast::class,
             'total_product_cost' => MoneyIntegerCast::class,
             'total_commission' => MoneyIntegerCast::class,
+            'payment_gateway_fee' => MoneyIntegerCast::class,
+            'payment_gateway_commission_amount' => MoneyIntegerCast::class,
+            'payment_payout_amount' => MoneyIntegerCast::class,
+            'payment_gateway_commission_rate' => 'decimal:4',
             'invoice_date' => 'date',
             'order_date' => 'datetime',
             'shipping_desi' => 'decimal:2',
@@ -143,7 +151,31 @@ class Order extends Model
     }
 
     /**
-     * Calculate gross profit: Revenue - COGS - Shipping Costs - Commission
+     * Get total payment gateway cost (fixed fee + commission)
+     */
+    protected function totalPaymentGatewayCost(): Attribute
+    {
+        return Attribute::make(
+            get: function (): ?Money {
+                $cost = null;
+
+                if ($this->payment_gateway_fee) {
+                    $cost = $this->payment_gateway_fee;
+                }
+
+                if ($this->payment_gateway_commission_amount) {
+                    $cost = $cost
+                        ? $cost->add($this->payment_gateway_commission_amount)
+                        : $this->payment_gateway_commission_amount;
+                }
+
+                return $cost;
+            }
+        );
+    }
+
+    /**
+     * Calculate gross profit: Revenue - COGS - Shipping Costs - Platform Commission - Payment Gateway Fees
      * For Shopify: Revenue includes shipping fee from customer
      * For Trendyol: Revenue is product price only (free shipping to customer)
      */
@@ -167,9 +199,14 @@ class Order extends Model
                     $profit = $profit->subtract($this->total_shipping_cost);
                 }
 
-                // Subtract platform commission
+                // Subtract platform commission (e.g., Trendyol commission)
                 if ($this->total_commission) {
                     $profit = $profit->subtract($this->total_commission);
+                }
+
+                // Subtract payment gateway fees (e.g., Iyzico, Stripe fees)
+                if ($this->total_payment_gateway_cost) {
+                    $profit = $profit->subtract($this->total_payment_gateway_cost);
                 }
 
                 return $profit;
