@@ -111,7 +111,7 @@ class OrderMapper extends BaseOrderMapper
 
         $orderStatus = $this->mapOrderStatus($trendyolPackage['status'] ?? '');
         $paymentStatus = $this->mapPaymentStatus($trendyolPackage);
-        $fulfillmentStatus = $this->mapFulfillmentStatus($trendyolPackage['status'] ?? '');
+        $fulfillmentStatus = $this->mapFulfillmentStatus($trendyolPackage);
 
         // Create addresses
         $shippingAddressId = null;
@@ -256,7 +256,7 @@ class OrderMapper extends BaseOrderMapper
 
         $newOrderStatus = $this->mapOrderStatus($trendyolPackage['status'] ?? '');
         $newPaymentStatus = $this->mapPaymentStatus($trendyolPackage);
-        $newFulfillmentStatus = $this->mapFulfillmentStatus($trendyolPackage['status'] ?? '');
+        $newFulfillmentStatus = $this->mapFulfillmentStatus($trendyolPackage);
 
         // Track status changes
         $statusChanges = [];
@@ -605,12 +605,19 @@ class OrderMapper extends BaseOrderMapper
         };
     }
 
-    protected function mapFulfillmentStatus(string $trendyolStatus): FulfillmentStatus
+    protected function mapFulfillmentStatus(array $trendyolPackage): FulfillmentStatus
     {
-        return match (strtoupper($trendyolStatus)) {
+        // Prioritize shipmentPackageStatus as it's more accurate for fulfillment
+        $packageStatus = $trendyolPackage['shipmentPackageStatus'] ?? null;
+        $orderStatus = $trendyolPackage['status'] ?? '';
+
+        // Use package status if available, otherwise fall back to order status
+        $status = $packageStatus ?? $orderStatus;
+
+        return match (strtoupper($status)) {
             'CREATED', 'AWAITING', 'VERIFIED' => FulfillmentStatus::UNFULFILLED,
             'PICKING', 'PICKED' => FulfillmentStatus::AWAITING_SHIPMENT,
-            'INVOICED' => FulfillmentStatus::AWAITING_SHIPMENT,
+            'INVOICED', 'READYTOSHIP' => FulfillmentStatus::AWAITING_SHIPMENT,
             'SHIPPED', 'AT_COLLECTION_POINT' => FulfillmentStatus::IN_TRANSIT,
             'DELIVERED' => FulfillmentStatus::DELIVERED,
             'CANCELLED', 'CANCEL_PENDING', 'RETURNED', 'UNPACKED', 'UNDELIVERED', 'UNSUPPLIED' => FulfillmentStatus::CANCELLED,
