@@ -6,6 +6,7 @@ use App\Enums\Integration\IntegrationProvider;
 use App\Enums\Integration\IntegrationType;
 use App\Models\Integration\Integration;
 use App\Services\Integrations\SalesChannels\Shopify\Mappers\OrderMapper;
+use App\Services\Integrations\SalesChannels\Shopify\Mappers\ReturnsMapper;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -81,6 +82,7 @@ class ProcessShopifyWebhook extends ProcessWebhookJob implements ShouldQueue
             // Route to appropriate handler based on topic
             match (true) {
                 str_starts_with($topic, 'orders/') => $this->handleOrderWebhook($integration, $topic, $payload),
+                str_starts_with($topic, 'refunds/') => $this->handleRefundWebhook($integration, $topic, $payload),
                 str_starts_with($topic, 'products/') => $this->handleProductWebhook($integration, $topic, $payload),
                 default => activity()
                     ->performedOn($integration)
@@ -120,6 +122,52 @@ class ProcessShopifyWebhook extends ProcessWebhookJob implements ShouldQueue
                 'topic' => $topic,
             ])
             ->log('shopify_webhook_processed');
+    }
+
+    protected function handleRefundWebhook(Integration $integration, string $topic, array $payload): void
+    {
+        $mapper = app(ReturnsMapper::class);
+
+        try {
+            $return = $mapper->mapReturn($payload);
+
+            if ($return) {
+                activity()
+                    ->performedOn($return)
+                    ->withProperties([
+                        'integration_id' => $integration->id,
+                        'integration_name' => $integration->name,
+                        'shopify_refund_id' => $payload['id'] ?? null,
+                        'order_id' => $return->order_id,
+                        'topic' => $topic,
+                    ])
+                    ->log('shopify_refund_webhook_processed');
+            } else {
+                // Return was skipped (e.g., cancelled order, void transaction)
+                activity()
+                    ->performedOn($integration)
+                    ->withProperties([
+                        'shopify_refund_id' => $payload['id'] ?? null,
+                        'shopify_order_id' => $payload['order_id'] ?? null,
+                        'topic' => $topic,
+                        'reason' => 'skipped_by_mapper',
+                    ])
+                    ->log('shopify_refund_webhook_skipped');
+            }
+        } catch (\Exception $e) {
+            activity()
+                ->performedOn($integration)
+                ->withProperties([
+                    'error' => $e->getMessage(),
+                    'shopify_refund_id' => $payload['id'] ?? null,
+                    'shopify_order_id' => $payload['order_id'] ?? null,
+                    'topic' => $topic,
+                    'trace' => $e->getTraceAsString(),
+                ])
+                ->log('shopify_refund_webhook_failed');
+
+            throw $e;
+        }
     }
 
     protected function handleProductWebhook(Integration $integration, string $topic, array $payload): void
