@@ -24,32 +24,34 @@ class ProductMapper extends BaseProductMapper
     /**
      * Map a Shopify product to our system.
      */
-    public function mapProduct(array $shopifyProduct): Product
+    public function mapProduct(array $shopifyProduct, bool $syncImages = false, bool $syncInventory = false): Product
     {
-        return DB::transaction(function () use ($shopifyProduct) {
-            // Extract product-level data
-            $productId = $shopifyProduct['id'] ?? null;
-            $productTitle = $shopifyProduct['title'] ?? 'Unknown Product';
-            $vendor = $shopifyProduct['vendor'] ?? null;
-            $productType = $shopifyProduct['product_type'] ?? null;
+        // Extract product-level data
+        $productId = $shopifyProduct['id'] ?? null;
+        $productTitle = $shopifyProduct['title'] ?? 'Unknown Product';
+        $vendor = $shopifyProduct['vendor'] ?? null;
+        $productType = $shopifyProduct['product_type'] ?? null;
 
-            // Find or create product using Shopify product ID
-            $product = $this->findOrCreateProductById($productId, $productTitle, $vendor, $productType, $shopifyProduct);
-
-            // Sync images
-            if (isset($shopifyProduct['images']) && ! empty($shopifyProduct['images'])) {
-                $this->syncProductImages($product, $shopifyProduct['images']);
-            }
-
-            // Sync variants
-            if (isset($shopifyProduct['variants']) && ! empty($shopifyProduct['variants'])) {
-                foreach ($shopifyProduct['variants'] as $shopifyVariant) {
-                    $this->syncVariant($product, $shopifyVariant, $shopifyProduct);
-                }
-            }
-
-            return $product->fresh('variants');
+        // Find or create product (with minimal transaction)
+        $product = DB::transaction(function () use ($productId, $productTitle, $vendor, $productType, $shopifyProduct) {
+            return $this->findOrCreateProductById($productId, $productTitle, $vendor, $productType, $shopifyProduct);
         });
+
+        // Sync images outside transaction (can take time, doesn't need locks)
+        if ($syncImages && isset($shopifyProduct['images']) && ! empty($shopifyProduct['images'])) {
+            $this->syncProductImages($product, $shopifyProduct['images']);
+        }
+
+        // Sync variants one by one to reduce lock time
+        if (isset($shopifyProduct['variants']) && ! empty($shopifyProduct['variants'])) {
+            foreach ($shopifyProduct['variants'] as $shopifyVariant) {
+                DB::transaction(function () use ($product, $shopifyVariant, $shopifyProduct, $syncInventory) {
+                    $this->syncVariant($product, $shopifyVariant, $shopifyProduct, $syncInventory);
+                });
+            }
+        }
+
+        return $product->fresh('variants');
     }
 
     /**
@@ -89,19 +91,25 @@ class ProductMapper extends BaseProductMapper
             }
         }
 
-        // Try to match by SKU or title
+        // Try to match by SKU or barcode
         $matchedProduct = $this->findMatchingProduct($shopifyProduct);
 
         if ($matchedProduct) {
-            // Create platform mapping for matched product
-            PlatformMapping::create([
-                'platform' => $this->getChannel()->value,
-                'entity_type' => Product::class,
-                'entity_id' => $matchedProduct->id,
-                'platform_id' => (string) $productId,
-                'platform_data' => $shopifyProduct,
-                'last_synced_at' => now(),
-            ]);
+            // Create or update platform mapping for matched product
+            if ($productId) {
+                PlatformMapping::updateOrCreate(
+                    [
+                        'platform' => $this->getChannel()->value,
+                        'entity_type' => Product::class,
+                        'platform_id' => (string) $productId,
+                    ],
+                    [
+                        'entity_id' => $matchedProduct->id,
+                        'platform_data' => $shopifyProduct,
+                        'last_synced_at' => now(),
+                    ]
+                );
+            }
 
             activity()
                 ->performedOn($matchedProduct)
@@ -124,16 +132,20 @@ class ProductMapper extends BaseProductMapper
             'status' => $this->mapProductStatus($shopifyProduct),
         ]);
 
-        // Create platform mapping for new product
+        // Create or update platform mapping for new product
         if ($productId) {
-            PlatformMapping::create([
-                'platform' => $this->getChannel()->value,
-                'entity_type' => Product::class,
-                'entity_id' => $product->id,
-                'platform_id' => (string) $productId,
-                'platform_data' => $shopifyProduct,
-                'last_synced_at' => now(),
-            ]);
+            PlatformMapping::updateOrCreate(
+                [
+                    'platform' => $this->getChannel()->value,
+                    'entity_type' => Product::class,
+                    'platform_id' => (string) $productId,
+                ],
+                [
+                    'entity_id' => $product->id,
+                    'platform_data' => $shopifyProduct,
+                    'last_synced_at' => now(),
+                ]
+            );
         }
 
         activity()
@@ -148,11 +160,11 @@ class ProductMapper extends BaseProductMapper
     }
 
     /**
-     * Find matching product by barcode, SKU, or title.
+     * Find matching product by barcode or SKU (exact matching only).
      */
     protected function findMatchingProduct(array $shopifyProduct): ?Product
     {
-        // Try to match by variant barcode first, then SKU
+        // Try to match by variant barcode first, then SKU (cross-platform matching)
         $variants = $shopifyProduct['variants'] ?? [];
 
         foreach ($variants as $variant) {
@@ -177,20 +189,14 @@ class ProductMapper extends BaseProductMapper
             }
         }
 
-        // Try to match by title (fuzzy matching)
-        $title = $shopifyProduct['title'] ?? null;
-
-        if ($title) {
-            return Product::where('title', 'like', '%'.$title.'%')->first();
-        }
-
+        // No fuzzy title matching - creates too many duplicates
         return null;
     }
 
     /**
      * Sync a single variant.
      */
-    protected function syncVariant(Product $product, array $shopifyVariant, array $shopifyProduct): void
+    protected function syncVariant(Product $product, array $shopifyVariant, array $shopifyProduct, bool $syncInventory = false): void
     {
         $variantId = $shopifyVariant['id'] ?? null;
         $sku = $shopifyVariant['sku'] ?? null;
@@ -224,6 +230,14 @@ class ProductMapper extends BaseProductMapper
             ? $this->convertToMinorUnits((float) $shopifyVariant['compare_at_price'])
             : null;
 
+        // Extract cost from Shopify if available (some plans/apps provide this)
+        $costPrice = null;
+        if (isset($shopifyVariant['cost'])) {
+            $costPrice = $this->convertToMinorUnits((float) $shopifyVariant['cost']);
+        } elseif (isset($shopifyVariant['inventory_cost'])) {
+            $costPrice = $this->convertToMinorUnits((float) $shopifyVariant['inventory_cost']);
+        }
+
         $variantData = [
             'product_id' => $product->id,
             'sku' => $sku ?? ($barcode ?? 'SKU-'.uniqid()),
@@ -231,22 +245,42 @@ class ProductMapper extends BaseProductMapper
             'title' => $shopifyVariant['title'] ?? $product->title,
             'price' => $price,
             'compare_at_price' => $compareAtPrice,
-            'cost_price' => null, // Shopify doesn't provide cost in basic API
-            'inventory_quantity' => $shopifyVariant['inventory_quantity'] ?? 0,
             'weight' => $shopifyVariant['weight'] ?? null,
             'weight_unit' => $shopifyVariant['weight_unit'] ?? null,
             'requires_shipping' => $shopifyVariant['requires_shipping'] ?? true,
             'taxable' => $shopifyVariant['taxable'] ?? true,
         ];
 
+        // Only update cost_price if Shopify provides it
+        if ($costPrice !== null) {
+            $variantData['cost_price'] = $costPrice;
+        }
+
         if ($variant) {
+            // Updating existing variant: only sync inventory if enabled
+            if ($syncInventory) {
+                $variantData['inventory_quantity'] = $shopifyVariant['inventory_quantity'] ?? 0;
+            }
             $variant->update($variantData);
         } else {
+            // Creating new variant: set inventory to 0 by default, or platform value if syncing
+            $variantData['inventory_quantity'] = $syncInventory
+                ? ($shopifyVariant['inventory_quantity'] ?? 0)
+                : 0;
             $variant = ProductVariant::create($variantData);
         }
 
         // Create or update platform mapping
         if ($variantId) {
+            // Delete any existing mapping for this entity on this platform (with different platform_id)
+            // This prevents unique constraint violations when a variant is matched to different platform variants
+            PlatformMapping::where('platform', $this->getChannel()->value)
+                ->where('entity_type', ProductVariant::class)
+                ->where('entity_id', $variant->id)
+                ->where('platform_id', '!=', (string) $variantId)
+                ->delete();
+
+            // Now safely create or update the mapping
             PlatformMapping::updateOrCreate(
                 [
                     'platform' => $this->getChannel()->value,

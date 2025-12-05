@@ -23,7 +23,9 @@ class SyncTrendyolProducts implements ShouldQueue
      */
     public function __construct(
         public Integration $integration,
-        public array $productData
+        public array $productData,
+        public bool $syncImages = false,
+        public bool $syncInventory = false
     ) {}
 
     /**
@@ -37,7 +39,7 @@ class SyncTrendyolProducts implements ShouldQueue
         }
 
         try {
-            $mapper->mapProduct($this->productData);
+            $mapper->mapProduct($this->productData, $this->syncImages, $this->syncInventory);
         } catch (\Exception $e) {
             // Log error but don't fail the entire batch
             activity()

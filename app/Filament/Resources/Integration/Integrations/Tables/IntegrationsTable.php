@@ -18,6 +18,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
@@ -104,11 +105,22 @@ class IntegrationsTable
                     ->icon(Heroicon::OutlinedArrowPath)
                     ->color('info')
                     ->visible(fn (Integration $record) => in_array($record->provider, [IntegrationProvider::TRENDYOL, IntegrationProvider::SHOPIFY]) && $record->is_active)
-                    ->requiresConfirmation()
+                    ->fillForm([
+                        'sync_images' => false,
+                        'sync_inventory' => false,
+                    ])
+                    ->schema([
+                        Checkbox::make('sync_images')
+                            ->label(__('Sync Product Images'))
+                            ->helperText(__('Import product images from the platform. Leave unchecked to keep existing images.')),
+                        Checkbox::make('sync_inventory')
+                            ->label(__('Sync Inventory/Stock'))
+                            ->helperText(__('Import stock quantities from the platform. Leave unchecked to keep your app as the source of truth for inventory.')),
+                    ])
                     ->modalHeading(__('Sync Products'))
-                    ->modalDescription(__('This will fetch and sync all products from :provider to your store. The process will run in the background.', ['provider' => fn (Integration $record) => $record->provider->getLabel()]))
+                    ->modalDescription(__('This will fetch and sync all products from :provider to your store. By default, images and inventory are NOT synced - your app remains the source of truth.', ['provider' => fn (Integration $record) => $record->provider->getLabel()]))
                     ->modalSubmitActionLabel(__('Start Sync'))
-                    ->action(function (Integration $record) {
+                    ->action(function (Integration $record, array $data) {
                         try {
                             $adapter = match ($record->provider) {
                                 IntegrationProvider::TRENDYOL => new TrendyolAdapter($record),
@@ -134,11 +146,15 @@ class IntegrationsTable
                                 return;
                             }
 
-                            // Create jobs for each product
-                            $jobs = collect($products)->map(function ($product) use ($record) {
+                            // Get sync options from form
+                            $syncImages = $data['sync_images'] ?? false;
+                            $syncInventory = $data['sync_inventory'] ?? false;
+
+                            // Create jobs for each product with sync options
+                            $jobs = collect($products)->map(function ($product) use ($record, $syncImages, $syncInventory) {
                                 return match ($record->provider) {
-                                    IntegrationProvider::SHOPIFY => new SyncShopifyProducts($record, $product),
-                                    IntegrationProvider::TRENDYOL => new SyncTrendyolProducts($record, $product),
+                                    IntegrationProvider::SHOPIFY => new SyncShopifyProducts($record, $product, $syncImages, $syncInventory),
+                                    IntegrationProvider::TRENDYOL => new SyncTrendyolProducts($record, $product, $syncImages, $syncInventory),
                                 };
                             })->toArray();
 

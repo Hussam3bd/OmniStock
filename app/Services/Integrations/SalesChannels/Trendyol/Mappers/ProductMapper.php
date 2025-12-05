@@ -24,28 +24,30 @@ class ProductMapper extends BaseProductMapper
     /**
      * Map a Trendyol product to our system.
      */
-    public function mapProduct(array $trendyolProduct): Product
+    public function mapProduct(array $trendyolProduct, bool $syncImages = false, bool $syncInventory = false): Product
     {
-        return DB::transaction(function () use ($trendyolProduct) {
-            // Extract product-level data
-            $productMainId = $trendyolProduct['productMainId'] ?? null;
-            $productTitle = $trendyolProduct['title'] ?? 'Unknown Product';
-            $brand = $trendyolProduct['brand'] ?? null;
-            $categoryName = $trendyolProduct['categoryName'] ?? null;
+        // Extract product-level data
+        $productMainId = $trendyolProduct['productMainId'] ?? null;
+        $productTitle = $trendyolProduct['title'] ?? 'Unknown Product';
+        $brand = $trendyolProduct['brand'] ?? null;
+        $categoryName = $trendyolProduct['categoryName'] ?? null;
 
-            // Find or create product using productMainId
-            $product = $this->findOrCreateProductByMainId($productMainId, $productTitle, $brand);
-
-            // Sync images (only once per product, not per variant)
-            if (isset($trendyolProduct['images']) && $product->getMedia('images')->isEmpty()) {
-                $this->syncProductImages($product, $trendyolProduct['images']);
-            }
-
-            // Sync this variant (in Products API, each response item is one variant)
-            $this->syncVariant($product, $trendyolProduct);
-
-            return $product->fresh('variants');
+        // Find or create product (with minimal transaction)
+        $product = DB::transaction(function () use ($productMainId, $productTitle, $brand, $trendyolProduct) {
+            return $this->findOrCreateProductByMainId($productMainId, $productTitle, $brand, $trendyolProduct);
         });
+
+        // Sync images outside transaction (can take time, doesn't need locks)
+        if ($syncImages && isset($trendyolProduct['images']) && $product->getMedia('images')->isEmpty()) {
+            $this->syncProductImages($product, $trendyolProduct['images']);
+        }
+
+        // Sync variant with its own transaction to reduce lock time
+        DB::transaction(function () use ($product, $trendyolProduct, $syncInventory) {
+            $this->syncVariant($product, $trendyolProduct, $syncInventory);
+        });
+
+        return $product->fresh('variants');
     }
 
     /**
@@ -54,9 +56,10 @@ class ProductMapper extends BaseProductMapper
     protected function findOrCreateProductByMainId(
         ?string $productMainId,
         string $title,
-        ?string $brand
+        ?string $brand,
+        array $item
     ): Product {
-        // Try to find by model_code (productMainId)
+        // Try to find by model_code (productMainId) first
         if ($productMainId) {
             $product = Product::where('model_code', $productMainId)->first();
 
@@ -77,6 +80,24 @@ class ProductMapper extends BaseProductMapper
             }
         }
 
+        // Try to match by barcode/SKU (cross-platform matching)
+        $barcode = $item['barcode'] ?? null;
+        $sku = $item['stockCode'] ?? $item['merchantSku'] ?? null;
+
+        if ($barcode) {
+            $existingVariant = ProductVariant::where('barcode', $barcode)->first();
+            if ($existingVariant) {
+                return $existingVariant->product;
+            }
+        }
+
+        if ($sku) {
+            $existingVariant = ProductVariant::where('sku', $sku)->first();
+            if ($existingVariant) {
+                return $existingVariant->product;
+            }
+        }
+
         // Create new product
         $product = Product::create([
             'model_code' => $productMainId,
@@ -87,16 +108,20 @@ class ProductMapper extends BaseProductMapper
             'status' => 'active',
         ]);
 
-        // Create platform mapping for new product (only once per productMainId)
+        // Create or update platform mapping for new product
         if ($productMainId) {
-            PlatformMapping::create([
-                'platform' => $this->getChannel()->value,
-                'entity_type' => Product::class,
-                'entity_id' => $product->id,
-                'platform_id' => (string) $productMainId,
-                'platform_data' => ['title' => $title, 'brand' => $brand],
-                'last_synced_at' => now(),
-            ]);
+            PlatformMapping::updateOrCreate(
+                [
+                    'platform' => $this->getChannel()->value,
+                    'entity_type' => Product::class,
+                    'platform_id' => (string) $productMainId,
+                ],
+                [
+                    'entity_id' => $product->id,
+                    'platform_data' => ['title' => $title, 'brand' => $brand],
+                    'last_synced_at' => now(),
+                ]
+            );
         }
 
         return $product;
@@ -105,7 +130,7 @@ class ProductMapper extends BaseProductMapper
     /**
      * Sync a single variant.
      */
-    protected function syncVariant(Product $product, array $item): void
+    protected function syncVariant(Product $product, array $item, bool $syncInventory = false): void
     {
         $barcode = $item['barcode'] ?? null;
         $sku = $item['stockCode'] ?? $item['merchantSku'] ?? $barcode;
@@ -127,42 +152,48 @@ class ProductMapper extends BaseProductMapper
             'barcode' => $barcode,
             'title' => $item['title'] ?? $product->title,
             'price' => $this->convertToMinorUnits($item['salePrice'] ?? 0),
-            'cost_price' => $this->convertToMinorUnits($item['listPrice'] ?? 0),
-            'inventory_quantity' => $item['quantity'] ?? 0,
+            // Don't sync cost_price from Trendyol - use Shopify cost instead
             'requires_shipping' => true,
             'taxable' => true,
         ];
 
         if ($variant) {
+            // Updating existing variant: only sync inventory if enabled
+            if ($syncInventory) {
+                $variantData['inventory_quantity'] = $item['quantity'] ?? 0;
+            }
             $variant->update($variantData);
         } else {
+            // Creating new variant: set inventory to 0 by default, or platform value if syncing
+            $variantData['inventory_quantity'] = $syncInventory
+                ? ($item['quantity'] ?? 0)
+                : 0;
             $variant = ProductVariant::create($variantData);
         }
 
-        // Only create/update platform mapping if it doesn't exist or needs updating
+        // Create or update platform mapping if barcode exists
         if ($barcode) {
-            $mapping = PlatformMapping::where('platform', $this->getChannel()->value)
+            // Delete any existing mapping for this entity on this platform (with different platform_id)
+            // This prevents unique constraint violations when a variant is matched to different platform variants
+            PlatformMapping::where('platform', $this->getChannel()->value)
                 ->where('entity_type', ProductVariant::class)
-                ->where('platform_id', (string) $barcode)
-                ->first();
+                ->where('entity_id', $variant->id)
+                ->where('platform_id', '!=', (string) $barcode)
+                ->delete();
 
-            if (! $mapping) {
-                PlatformMapping::create([
+            // Now safely create or update the mapping
+            PlatformMapping::updateOrCreate(
+                [
                     'platform' => $this->getChannel()->value,
                     'entity_type' => ProductVariant::class,
-                    'entity_id' => $variant->id,
                     'platform_id' => (string) $barcode,
-                    'platform_data' => $item,
-                    'last_synced_at' => now(),
-                ]);
-            } elseif ($mapping->entity_id !== $variant->id) {
-                // Only update if entity_id changed
-                $mapping->update([
+                ],
+                [
                     'entity_id' => $variant->id,
                     'platform_data' => $item,
                     'last_synced_at' => now(),
-                ]);
-            }
+                ]
+            );
         }
 
         // Enable on this channel
