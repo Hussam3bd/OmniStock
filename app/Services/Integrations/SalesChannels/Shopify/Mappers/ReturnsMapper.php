@@ -65,8 +65,12 @@ class ReturnsMapper extends BaseReturnsMapper
                 return null;
             }
 
-            // Skip refunds for orders that were never paid
-            if (in_array($order->payment_status, [\App\Enums\Order\PaymentStatus::FAILED, \App\Enums\Order\PaymentStatus::VOIDED])) {
+            // For COD orders, allow refunds even with failed payment status
+            // COD orders that are rejected at delivery will have failed payment
+            $isCOD = strtolower($order->payment_method ?? '') === 'cod';
+
+            // Skip refunds for orders that were never paid (except COD)
+            if (! $isCOD && in_array($order->payment_status, [\App\Enums\Order\PaymentStatus::FAILED, \App\Enums\Order\PaymentStatus::VOIDED])) {
                 activity()
                     ->withProperties([
                         'shopify_refund_id' => $shopifyRefund['id'] ?? null,
@@ -105,8 +109,9 @@ class ReturnsMapper extends BaseReturnsMapper
                 return null;
             }
 
-            // Skip if no refund transactions (no money actually refunded)
-            if ($this->hasNoRefundTransactions($shopifyRefund)) {
+            // For COD orders, allow refunds even without transactions (rejected deliveries)
+            // Skip if no refund transactions (no money actually refunded) - except for COD
+            if (! $isCOD && $this->hasNoRefundTransactions($shopifyRefund)) {
                 activity()
                     ->withProperties([
                         'shopify_refund_id' => $shopifyRefund['id'] ?? null,
@@ -126,18 +131,35 @@ class ReturnsMapper extends BaseReturnsMapper
 
             if ($existingMapping && $existingMapping->entity) {
                 $return = $existingMapping->entity;
-                $this->updateReturn($return, $shopifyRefund, $order);
+                $this->updateReturn($return, $shopifyRefund, $order, $isCOD);
             } else {
                 // Clean up orphaned mapping
                 if ($existingMapping) {
                     $existingMapping->delete();
                 }
 
-                $return = $this->createReturn($order, $shopifyRefund);
+                $return = $this->createReturn($order, $shopifyRefund, $isCOD);
             }
 
-            // Sync refund transactions
+            // Sync refund transactions (only if there are transactions)
             $this->syncRefundTransactions($return, $shopifyRefund, $order);
+
+            // Update order status for COD rejected deliveries
+            if ($isCOD && $this->hasNoRefundTransactions($shopifyRefund)) {
+                $order->update(['order_status' => \App\Enums\Order\OrderStatus::REJECTED]);
+
+                activity()
+                    ->performedOn($order)
+                    ->withProperties([
+                        'return_id' => $return->id,
+                        'order_number' => $order->order_number,
+                        'reason' => 'cod_delivery_rejected',
+                    ])
+                    ->log('order_status_updated_to_rejected');
+
+                // Update shipping costs breakdown from BasitKargo using centralized service
+                $this->syncShippingCostsForRejectedDelivery($order, $return);
+            }
 
             return $return->fresh();
         });
@@ -157,7 +179,7 @@ class ReturnsMapper extends BaseReturnsMapper
         return $mapping?->entity;
     }
 
-    protected function createReturn(Order $order, array $shopifyRefund): OrderReturn
+    protected function createReturn(Order $order, array $shopifyRefund, bool $isCOD = false): OrderReturn
     {
         $currency = $order->currency;
 
@@ -167,11 +189,31 @@ class ReturnsMapper extends BaseReturnsMapper
             $totalRefundAmount += (float) ($lineItem['subtotal'] ?? 0);
         }
 
+        // For COD rejected deliveries with no transactions, check if items were restocked
+        $isRejectedDelivery = $isCOD && $this->hasNoRefundTransactions($shopifyRefund);
+
         // Determine status
-        $status = $this->mapRefundStatus($shopifyRefund);
+        if ($isRejectedDelivery && ($shopifyRefund['restock'] ?? false)) {
+            // COD rejected delivery with items restocked = Completed
+            $status = ReturnStatus::Completed;
+        } else {
+            $status = $this->mapRefundStatus($shopifyRefund);
+        }
 
         // Get note
         $note = $shopifyRefund['note'] ?? null;
+        if ($isRejectedDelivery && ! $note) {
+            $note = 'COD delivery rejected by customer';
+        }
+
+        // Calculate original shipping cost from order (total cost including VAT)
+        $originalShippingCost = $order->total_shipping_cost?->getAmount() ?? 0;
+
+        // Calculate shipping refund amount (if any)
+        $shippingRefundAmount = 0;
+        foreach ($shopifyRefund['refund_shipping_lines'] ?? [] as $shippingLine) {
+            $shippingRefundAmount += (float) ($shippingLine['subtotal_amount_set']['shop_money']['amount'] ?? 0);
+        }
 
         $return = OrderReturn::create([
             'order_id' => $order->id,
@@ -187,13 +229,20 @@ class ReturnsMapper extends BaseReturnsMapper
             'completed_at' => $status === ReturnStatus::Completed && isset($shopifyRefund['processed_at'])
                 ? Carbon::parse($shopifyRefund['processed_at'])
                 : null,
-            'reason_code' => null,
+            'received_at' => ($isRejectedDelivery && isset($shopifyRefund['processed_at']))
+                ? Carbon::parse($shopifyRefund['processed_at'])
+                : null,
+            'reason_code' => $isRejectedDelivery ? 'cod_rejected' : null,
             'reason_name' => $note ?? 'Shopify Refund',
             'customer_note' => $note,
-            'internal_note' => null,
+            'internal_note' => $isRejectedDelivery ? 'COD delivery rejected - items returned by shipping company' : null,
             'total_refund_amount' => $this->convertToMinorUnits($totalRefundAmount, $currency),
-            'original_shipping_cost' => 0,
-            'return_shipping_cost' => 0,
+            'original_shipping_cost' => $originalShippingCost,
+            'return_shipping_cost_excluding_vat' => $originalShippingCost, // Loss = outbound shipping cost (will be updated by BasitKargo sync)
+            // For COD rejected deliveries, same shipment came back - copy tracking details
+            'return_shipping_carrier' => $isRejectedDelivery ? $order->shipping_carrier : null,
+            'return_tracking_number' => $isRejectedDelivery ? $order->shipping_tracking_number : null,
+            'return_tracking_url' => $isRejectedDelivery ? $order->shipping_tracking_url : null,
             'restocking_fee' => $this->convertToMinorUnits((float) ($shopifyRefund['restock'] ?? 0), $currency),
             'currency' => $currency,
             'platform_data' => $shopifyRefund,
@@ -215,7 +264,7 @@ class ReturnsMapper extends BaseReturnsMapper
         return $return;
     }
 
-    protected function updateReturn(OrderReturn $return, array $shopifyRefund, Order $order): void
+    protected function updateReturn(OrderReturn $return, array $shopifyRefund, Order $order, bool $isCOD = false): void
     {
         $currency = $order->currency;
 
@@ -225,10 +274,23 @@ class ReturnsMapper extends BaseReturnsMapper
             $totalRefundAmount += (float) ($lineItem['subtotal'] ?? 0);
         }
 
-        $status = $this->mapRefundStatus($shopifyRefund);
-        $note = $shopifyRefund['note'] ?? null;
+        // For COD rejected deliveries with no transactions, check if items were restocked
+        $isRejectedDelivery = $isCOD && $this->hasNoRefundTransactions($shopifyRefund);
 
-        $return->update([
+        // Determine status
+        if ($isRejectedDelivery && ($shopifyRefund['restock'] ?? false)) {
+            // COD rejected delivery with items restocked = Completed
+            $status = ReturnStatus::Completed;
+        } else {
+            $status = $this->mapRefundStatus($shopifyRefund);
+        }
+
+        $note = $shopifyRefund['note'] ?? null;
+        if ($isRejectedDelivery && ! $note) {
+            $note = 'COD delivery rejected by customer';
+        }
+
+        $updateData = [
             'status' => $status,
             'approved_at' => isset($shopifyRefund['processed_at'])
                 ? Carbon::parse($shopifyRefund['processed_at'])
@@ -241,7 +303,30 @@ class ReturnsMapper extends BaseReturnsMapper
             'total_refund_amount' => $this->convertToMinorUnits($totalRefundAmount, $currency),
             'restocking_fee' => $this->convertToMinorUnits((float) ($shopifyRefund['restock'] ?? 0), $currency),
             'platform_data' => $shopifyRefund,
-        ]);
+        ];
+
+        // Add COD-specific fields
+        if ($isRejectedDelivery) {
+            $updateData['received_at'] = isset($shopifyRefund['processed_at'])
+                ? Carbon::parse($shopifyRefund['processed_at'])
+                : $return->received_at;
+            $updateData['reason_code'] = 'cod_rejected';
+            $updateData['internal_note'] = 'COD delivery rejected - items returned by shipping company';
+
+            // Calculate original shipping cost from order if not already set
+            if (! $return->original_shipping_cost || $return->original_shipping_cost === 0) {
+                $originalShippingCost = $order->total_shipping_cost?->getAmount() ?? 0;
+                $updateData['original_shipping_cost'] = $originalShippingCost;
+                $updateData['return_shipping_cost_excluding_vat'] = $originalShippingCost;
+            }
+
+            // For COD rejected deliveries, same shipment came back - copy tracking details
+            $updateData['return_shipping_carrier'] = $order->shipping_carrier;
+            $updateData['return_tracking_number'] = $order->shipping_tracking_number;
+            $updateData['return_tracking_url'] = $order->shipping_tracking_url;
+        }
+
+        $return->update($updateData);
 
         // Update platform mapping
         $return->platformMappings()
@@ -483,5 +568,42 @@ class ReturnsMapper extends BaseReturnsMapper
         }
 
         return true;
+    }
+
+    /**
+     * Sync shipping costs for rejected delivery using centralized service
+     * This uses ShippingCostSyncService to avoid duplicate logic
+     */
+    protected function syncShippingCostsForRejectedDelivery(Order $order, OrderReturn $return): void
+    {
+        // Check if order has tracking number
+        if (! $order->shipping_tracking_number) {
+            return;
+        }
+
+        try {
+            // Get BasitKargo integration
+            $integration = \App\Models\Integration\Integration::where('provider', 'basit_kargo')
+                ->where('is_active', true)
+                ->first();
+
+            if (! $integration) {
+                return;
+            }
+
+            // Use centralized service for shipping cost sync
+            $service = app(\App\Services\Shipping\ShippingCostSyncService::class);
+            $service->syncShippingCostWithBreakdown($order, $integration, force: true, return: $return);
+        } catch (\Exception $e) {
+            // Log error but don't fail the entire sync
+            activity()
+                ->performedOn($order)
+                ->withProperties([
+                    'order_number' => $order->order_number,
+                    'tracking_number' => $order->shipping_tracking_number,
+                    'error' => $e->getMessage(),
+                ])
+                ->log('basitkargo_shipping_costs_update_failed');
+        }
     }
 }

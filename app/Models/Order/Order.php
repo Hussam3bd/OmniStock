@@ -175,9 +175,29 @@ class Order extends Model
     }
 
     /**
+     * Get effective product cost (COGS)
+     * For rejected orders where products came back, return 0
+     */
+    protected function effectiveProductCost(): Attribute
+    {
+        return Attribute::make(
+            get: function (): ?Money {
+                // If order is rejected (COD delivery refused), product came back = no cost
+                if ($this->order_status === OrderStatus::REJECTED && $this->total_product_cost) {
+                    // Return zero in the same currency
+                    return $this->total_product_cost->subtract($this->total_product_cost);
+                }
+
+                return $this->total_product_cost;
+            }
+        );
+    }
+
+    /**
      * Calculate gross profit: Revenue - COGS - Shipping Costs - Platform Commission - Payment Gateway Fees
      * For Shopify: Revenue includes shipping fee from customer
      * For Trendyol: Revenue is product price only (free shipping to customer)
+     * For rejected orders: COGS = 0 (product came back), only shipping loss applies
      */
     protected function grossProfit(): Attribute
     {
@@ -189,9 +209,9 @@ class Order extends Model
 
                 $profit = $this->total_amount;
 
-                // Subtract COGS (Cost of Goods Sold)
-                if ($this->total_product_cost) {
-                    $profit = $profit->subtract($this->total_product_cost);
+                // Subtract COGS (Cost of Goods Sold) - uses effective cost (0 for rejected orders)
+                if ($this->effective_product_cost) {
+                    $profit = $profit->subtract($this->effective_product_cost);
                 }
 
                 // Subtract shipping costs (what we pay to carrier)

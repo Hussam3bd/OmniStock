@@ -173,11 +173,13 @@ class OrderInfolist
                             ->helperText(__('Total amount customer paid'))
                             ->money(fn ($record) => $record->currency),
 
-                        Infolists\Components\TextEntry::make('total_product_cost')
+                        Infolists\Components\TextEntry::make('effective_product_cost')
                             ->label(__('Product Cost (COGS)'))
-                            ->helperText(__('Cost of goods sold'))
+                            ->helperText(fn ($record) => $record->order_status === \App\Enums\Order\OrderStatus::REJECTED
+                                ? __('Product returned - no cost')
+                                : __('Cost of goods sold'))
                             ->money(fn ($record) => $record->currency)
-                            ->color('danger')
+                            ->color(fn ($record) => $record->order_status === \App\Enums\Order\OrderStatus::REJECTED ? 'success' : 'danger')
                             ->visible(fn ($record) => $record->total_product_cost),
 
                         Infolists\Components\TextEntry::make('total_shipping_cost')

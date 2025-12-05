@@ -14,6 +14,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
     case ON_HOLD = 'on_hold';
     case COMPLETED = 'completed';
     case CANCELLED = 'cancelled';
+    case REJECTED = 'rejected';
     case REFUNDED = 'refunded';
     case PARTIALLY_REFUNDED = 'partially_refunded';
     case FAILED = 'failed';
@@ -27,6 +28,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
             self::ON_HOLD => __('On Hold'),
             self::COMPLETED => __('Completed'),
             self::CANCELLED => __('Cancelled'),
+            self::REJECTED => __('Rejected'),
             self::REFUNDED => __('Refunded'),
             self::PARTIALLY_REFUNDED => __('Partially Refunded'),
             self::FAILED => __('Failed'),
@@ -42,6 +44,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
             self::ON_HOLD => 'gray',
             self::COMPLETED => 'success',
             self::CANCELLED => 'danger',
+            self::REJECTED => 'danger',
             self::REFUNDED => 'warning',
             self::PARTIALLY_REFUNDED => 'warning',
             self::FAILED => 'danger',
@@ -57,6 +60,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
             self::ON_HOLD => 'heroicon-o-pause-circle',
             self::COMPLETED => 'heroicon-o-check-badge',
             self::CANCELLED => 'heroicon-o-x-circle',
+            self::REJECTED => 'heroicon-o-hand-thumb-down',
             self::REFUNDED => 'heroicon-o-arrow-uturn-left',
             self::PARTIALLY_REFUNDED => 'heroicon-o-arrow-uturn-left',
             self::FAILED => 'heroicon-o-exclamation-triangle',
@@ -72,6 +76,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
             self::ON_HOLD => __('Order temporarily suspended'),
             self::COMPLETED => __('Order successfully completed and delivered'),
             self::CANCELLED => __('Order cancelled'),
+            self::REJECTED => __('Order rejected by customer at delivery'),
             self::REFUNDED => __('Order refunded to customer'),
             self::PARTIALLY_REFUNDED => __('Order partially refunded to customer'),
             self::FAILED => __('Order failed to process'),

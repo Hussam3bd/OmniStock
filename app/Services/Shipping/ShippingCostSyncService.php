@@ -18,6 +18,7 @@ class ShippingCostSyncService
 
     /**
      * Sync shipping costs for an order from BasitKargo
+     * Handles both normal orders and COD rejected deliveries with proper cost breakdown
      */
     public function syncShippingCostFromBasitKargo(Order $order, bool $force = false): bool
     {
@@ -46,53 +47,8 @@ class ShippingCostSyncService
         }
 
         try {
-            // Create adapter
-            $adapter = new BasitKargoAdapter($integration);
-
-            // Fetch shipment cost
-            $costData = $adapter->getShipmentCost($order->shipping_tracking_number);
-
-            if (! $costData) {
-                activity()
-                    ->performedOn($order)
-                    ->withProperties([
-                        'tracking_number' => $order->shipping_tracking_number,
-                    ])
-                    ->log('basitkargo_cost_not_found');
-
-                return false;
-            }
-
-            // Parse carrier to enum
-            $carrier = $this->shippingCostService->parseCarrier($costData['carrier_name']);
-
-            // If carrier couldn't be parsed, try to map BasitKargo code directly
-            if (! $carrier && $costData['carrier_code']) {
-                $carrier = $this->mapBasitKargoCodeToCarrier($costData['carrier_code']);
-            }
-
-            // Update order with shipping cost data
-            $order->update([
-                'shipping_carrier' => $carrier?->value,
-                'shipping_desi' => $costData['desi'],
-                'shipping_cost_excluding_vat' => $costData['price_excluding_vat'],
-                'shipping_vat_rate' => $costData['vat_rate'],
-                'shipping_vat_amount' => $costData['vat_amount'],
-                // Note: We don't update shipping_amount as it's what the customer paid
-                // shipping_cost_excluding_vat is what we actually paid to the carrier
-            ]);
-
-            activity()
-                ->performedOn($order)
-                ->withProperties([
-                    'tracking_number' => $order->shipping_tracking_number,
-                    'carrier' => $carrier?->value,
-                    'cost' => $costData['price_excluding_vat'],
-                    'desi' => $costData['desi'],
-                ])
-                ->log('basitkargo_shipping_cost_synced');
-
-            return true;
+            // Use the centralized method to sync with proper breakdown logic
+            return $this->syncShippingCostWithBreakdown($order, $integration, $force);
         } catch (\Exception $e) {
             activity()
                 ->performedOn($order)
@@ -104,6 +60,114 @@ class ShippingCostSyncService
 
             return false;
         }
+    }
+
+    /**
+     * Sync shipping costs with proper breakdown for rejected deliveries
+     * This is the centralized method used by both manual resync and automatic sync
+     */
+    public function syncShippingCostWithBreakdown(Order $order, Integration $integration, bool $force = false, ?\App\Models\Order\OrderReturn $return = null): bool
+    {
+        // Create adapter
+        $adapter = new BasitKargoAdapter($integration);
+
+        // Fetch full shipment details (not just cost summary)
+        $shipmentData = $adapter->trackShipment($order->shipping_tracking_number);
+
+        if (! $shipmentData) {
+            activity()
+                ->performedOn($order)
+                ->withProperties([
+                    'tracking_number' => $order->shipping_tracking_number,
+                ])
+                ->log('basitkargo_shipment_not_found');
+
+            return false;
+        }
+
+        // Extract price info
+        $priceInfo = $shipmentData['raw_data']['priceInfo'] ?? null;
+        if (! $priceInfo) {
+            return false;
+        }
+
+        $outboundCost = (float) ($priceInfo['shipmentFee'] ?? 0); // Kargo Ücreti (outbound only)
+        $totalCost = (float) ($priceInfo['totalCost'] ?? 0); // Total (outbound + return if rejected)
+        $returnCost = $totalCost - $outboundCost; // Kargo İade Ücreti (return only)
+        $isReturned = $shipmentData['is_returned'] ?? false;
+
+        // Determine if this is a COD rejected delivery
+        $isRejectedDelivery = $isReturned && $order->order_status === \App\Enums\Order\OrderStatus::REJECTED;
+
+        // For rejected deliveries, use outbound cost only
+        // For normal orders, use total cost
+        $orderShippingCost = $isRejectedDelivery ? $outboundCost : $totalCost;
+
+        // Convert to minor units
+        $orderShippingCostMinor = (int) round($orderShippingCost * 100);
+        $returnCostMinor = (int) round($returnCost * 100);
+
+        // VAT calculation
+        $vatIncluded = $integration->settings['vat_included'] ?? true;
+        $vatRate = 20.00;
+
+        if ($vatIncluded) {
+            // Price includes VAT - extract it
+            $priceExcludingVat = (int) round($orderShippingCostMinor / 1.20);
+            $vatAmount = $orderShippingCostMinor - $priceExcludingVat;
+        } else {
+            // Price excludes VAT - add it
+            $priceExcludingVat = $orderShippingCostMinor;
+            $vatAmount = (int) round($orderShippingCostMinor * 0.20);
+        }
+
+        // Parse carrier
+        $carrier = null;
+        $carrierCode = $shipmentData['carrier_code'] ?? null;
+        if ($carrierCode) {
+            $carrier = $this->mapBasitKargoCodeToCarrier($carrierCode);
+        }
+
+        // Extract desi
+        $desi = $shipmentData['desi'] ?? null;
+
+        // Update order with shipping cost data
+        $order->update([
+            'shipping_carrier' => $carrier?->value ?? $order->shipping_carrier,
+            'shipping_desi' => $desi ?? $order->shipping_desi,
+            'shipping_cost_excluding_vat' => $priceExcludingVat,
+            'shipping_vat_rate' => $vatRate,
+            'shipping_vat_amount' => $vatAmount,
+            'shipping_amount' => $orderShippingCostMinor,
+        ]);
+
+        // If there's a return and it's rejected, update return shipping details
+        if ($return && $isRejectedDelivery) {
+            $return->update([
+                'original_shipping_cost' => $orderShippingCostMinor,
+                'return_shipping_cost_excluding_vat' => $returnCostMinor,
+                // For COD rejected, same shipment came back - copy tracking details
+                'return_shipping_carrier' => $carrier?->value ?? $order->shipping_carrier,
+                'return_tracking_number' => $order->shipping_tracking_number,
+                'return_tracking_url' => $order->shipping_tracking_url,
+            ]);
+        }
+
+        activity()
+            ->performedOn($order)
+            ->withProperties([
+                'tracking_number' => $order->shipping_tracking_number,
+                'carrier' => $carrier?->value,
+                'is_rejected_delivery' => $isRejectedDelivery,
+                'outbound_cost' => $outboundCost,
+                'return_cost' => $returnCost,
+                'total_cost' => $totalCost,
+                'order_shipping_cost' => $orderShippingCost,
+                'desi' => $desi,
+            ])
+            ->log('basitkargo_shipping_cost_synced_with_breakdown');
+
+        return true;
     }
 
     /**

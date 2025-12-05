@@ -4,9 +4,9 @@ namespace App\Filament\Resources\Integration\Integrations\Tables;
 
 use App\Enums\Integration\IntegrationProvider;
 use App\Enums\Order\OrderChannel;
+use App\Jobs\FetchAndSyncShopifyRefunds;
 use App\Jobs\SyncShopifyOrders;
 use App\Jobs\SyncShopifyProducts;
-use App\Jobs\SyncShopifyReturns;
 use App\Jobs\SyncTrendyolClaims;
 use App\Jobs\SyncTrendyolOrders;
 use App\Jobs\SyncTrendyolProducts;
@@ -339,8 +339,6 @@ class IntegrationsTable
                     ->modalSubmitActionLabel(__('Start Sync'))
                     ->action(function (Integration $record) {
                         try {
-                            $adapter = new ShopifyAdapter($record);
-
                             // Get all Shopify order IDs from platform mappings
                             $orderIds = PlatformMapping::where('platform', OrderChannel::SHOPIFY->value)
                                 ->where('entity_type', \App\Models\Order\Order::class)
@@ -356,34 +354,11 @@ class IntegrationsTable
                                 return;
                             }
 
-                            // Fetch all refunds for these orders
-                            $allRefunds = collect();
+                            $totalOrders = count($orderIds);
 
-                            foreach ($orderIds as $orderId) {
-                                $refunds = $adapter->fetchOrderRefunds($orderId);
-
-                                foreach ($refunds as $refund) {
-                                    // Add order_id to refund data for mapping
-                                    $refund['order_id'] = $orderId;
-                                    $allRefunds->push($refund);
-                                }
-                            }
-
-                            $totalRefunds = count($allRefunds);
-
-                            if ($totalRefunds === 0) {
-                                Notification::make()
-                                    ->title(__('No refunds found'))
-                                    ->body(__('No refunds to sync from Shopify'))
-                                    ->warning()
-                                    ->send();
-
-                                return;
-                            }
-
-                            // Create jobs for each refund
-                            $jobs = $allRefunds->map(function ($refund) use ($record) {
-                                return new SyncShopifyReturns($record, $refund);
+                            // Create jobs for each order (each job will fetch and sync its refunds)
+                            $jobs = $orderIds->map(function ($orderId) use ($record) {
+                                return new FetchAndSyncShopifyRefunds($record, $orderId);
                             })->toArray();
 
                             // Get current user for notifications
@@ -391,15 +366,15 @@ class IntegrationsTable
 
                             // Dispatch batch
                             $batch = Bus::batch($jobs)
-                                ->name("Sync {$totalRefunds} refunds from Shopify")
+                                ->name("Sync refunds from {$totalOrders} Shopify orders")
                                 ->allowFailures()
                                 ->onQueue('default')
-                                ->then(function (Batch $batch) use ($user, $totalRefunds) {
+                                ->then(function (Batch $batch) use ($user, $totalOrders) {
                                     // All jobs completed successfully
                                     Notification::make()
                                         ->title(__('Refund sync completed'))
-                                        ->body(__('Successfully synced all :count refunds from Shopify', [
-                                            'count' => $totalRefunds,
+                                        ->body(__('Successfully synced refunds from all :count Shopify orders', [
+                                            'count' => $totalOrders,
                                         ]))
                                         ->success()
                                         ->sendToDatabase($user);
@@ -414,16 +389,16 @@ class IntegrationsTable
                                         ->danger()
                                         ->sendToDatabase($user);
                                 })
-                                ->finally(function (Batch $batch) use ($user, $totalRefunds) {
+                                ->finally(function (Batch $batch) use ($user, $totalOrders) {
                                     // Always runs, even with failures
                                     if ($batch->failedJobs > 0) {
                                         $successCount = $batch->totalJobs - $batch->failedJobs;
 
                                         Notification::make()
                                             ->title(__('Refund sync completed with errors'))
-                                            ->body(__('Synced :success of :total refunds from Shopify. :failed failed.', [
+                                            ->body(__('Synced refunds from :success of :total Shopify orders. :failed failed.', [
                                                 'success' => $successCount,
-                                                'total' => $totalRefunds,
+                                                'total' => $totalOrders,
                                                 'failed' => $batch->failedJobs,
                                             ]))
                                             ->warning()
@@ -434,8 +409,8 @@ class IntegrationsTable
 
                             Notification::make()
                                 ->title(__('Refund sync started'))
-                                ->body(__('Syncing :count refunds from Shopify in the background. You will be notified when complete.', [
-                                    'count' => $totalRefunds,
+                                ->body(__('Syncing refunds from :count Shopify orders in the background. You will be notified when complete.', [
+                                    'count' => $totalOrders,
                                 ]))
                                 ->success()
                                 ->send();

@@ -2,19 +2,22 @@
 
 namespace App\Filament\Resources\Integration\Integrations\Pages;
 
+use App\Enums\Integration\IntegrationProvider;
 use App\Filament\Resources\Integration\Integrations\IntegrationResource;
+use App\Jobs\SyncPaymentFees;
 use App\Models\Order\Order;
 use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
 use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
-use App\Services\Payment\PaymentCostSyncService;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Filament\Schemas\Components\Section;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Bus\Batch;
+use Illuminate\Support\Facades\Bus;
 
 class EditIntegration extends EditRecord
 {
@@ -76,7 +79,7 @@ class EditIntegration extends EditRecord
         }
 
         // Add sync payment fees action for Iyzico integration
-        if ($this->record->provider === 'iyzico' && $this->record->is_active) {
+        if ($this->record->provider === IntegrationProvider::IYZICO && $this->record->is_active) {
             $actions[] = Action::make('sync_payment_fees')
                 ->label(__('Sync Payment Fees'))
                 ->icon(Heroicon::OutlinedBanknotes)
@@ -88,55 +91,91 @@ class EditIntegration extends EditRecord
                         ->whereNotNull('payment_transaction_id')
                         ->count();
 
-                    return __('This will sync payment gateway fees from Iyzico for :count orders with payment transaction IDs. This may take a few moments.', [
+                    return __('This will sync payment gateway fees from Iyzico for :count orders with payment transaction IDs. The process will run in the background.', [
                         'count' => $ordersCount,
                     ]);
                 })
+                ->modalSubmitActionLabel(__('Start Sync'))
                 ->action(function () {
                     try {
-                        $service = app(PaymentCostSyncService::class);
-
                         // Get all orders with Iyzico payment gateway
                         $orders = Order::where('payment_gateway', 'LIKE', '%iyzico%')
                             ->whereNotNull('payment_transaction_id')
                             ->get();
 
-                        $successCount = 0;
-                        $failedCount = 0;
-                        $skippedCount = 0;
+                        $totalOrders = count($orders);
 
-                        foreach ($orders as $order) {
-                            try {
-                                $synced = $service->syncPaymentCosts($order);
-                                if ($synced) {
-                                    $successCount++;
-                                } else {
-                                    $skippedCount++;
-                                }
-                            } catch (\Exception $e) {
-                                $failedCount++;
-                                activity()
-                                    ->performedOn($order)
-                                    ->withProperties([
-                                        'error' => $e->getMessage(),
-                                        'order_id' => $order->id,
-                                    ])
-                                    ->log('bulk_payment_fee_sync_error');
-                            }
+                        if ($totalOrders === 0) {
+                            Notification::make()
+                                ->title(__('No orders found'))
+                                ->body(__('No Iyzico orders with payment transaction IDs to sync'))
+                                ->warning()
+                                ->send();
+
+                            return;
                         }
 
+                        // Create jobs for each order
+                        $jobs = $orders->map(function ($order) {
+                            return new SyncPaymentFees($order);
+                        })->toArray();
+
+                        // Get current user for notifications
+                        $user = auth()->user();
+
+                        // Dispatch batch
+                        Bus::batch($jobs)
+                            ->name("Sync {$totalOrders} payment fees from Iyzico")
+                            ->allowFailures()
+                            ->onQueue('default')
+                            ->then(function (Batch $batch) use ($user, $totalOrders) {
+                                // All jobs completed successfully
+                                Notification::make()
+                                    ->title(__('Payment fees sync completed'))
+                                    ->body(__('Successfully synced payment fees for all :count orders from Iyzico', [
+                                        'count' => $totalOrders,
+                                    ]))
+                                    ->success()
+                                    ->sendToDatabase($user);
+                            })
+                            ->catch(function (Batch $batch, \Throwable $e) use ($user) {
+                                // First batch job failure
+                                Notification::make()
+                                    ->title(__('Payment fees sync error'))
+                                    ->body(__('An error occurred during payment fees sync from Iyzico: :error', [
+                                        'error' => $e->getMessage(),
+                                    ]))
+                                    ->danger()
+                                    ->sendToDatabase($user);
+                            })
+                            ->finally(function (Batch $batch) use ($user, $totalOrders) {
+                                // Always runs, even with failures
+                                if ($batch->failedJobs > 0) {
+                                    $successCount = $batch->totalJobs - $batch->failedJobs;
+
+                                    Notification::make()
+                                        ->title(__('Payment fees sync completed with errors'))
+                                        ->body(__('Synced :success of :total orders from Iyzico. :failed failed.', [
+                                            'success' => $successCount,
+                                            'total' => $totalOrders,
+                                            'failed' => $batch->failedJobs,
+                                        ]))
+                                        ->warning()
+                                        ->sendToDatabase($user);
+                                }
+                            })
+                            ->dispatch();
+
                         Notification::make()
-                            ->title(__('Payment Fees Synced'))
-                            ->body(__('Successfully synced :success orders. Skipped: :skipped. Failed: :failed.', [
-                                'success' => $successCount,
-                                'skipped' => $skippedCount,
-                                'failed' => $failedCount,
+                            ->title(__('Payment fees sync started'))
+                            ->body(__('Syncing payment fees for :count orders from Iyzico in the background. You will be notified when complete.', [
+                                'count' => $totalOrders,
                             ]))
                             ->success()
                             ->send();
                     } catch (\Exception $e) {
                         Notification::make()
-                            ->title(__('Error Syncing Payment Fees'))
+                            ->title(__('Error starting payment fees sync'))
                             ->body($e->getMessage())
                             ->danger()
                             ->send();
