@@ -8,6 +8,7 @@ use App\Enums\Shipping\ShippingCarrier;
 use App\Models\Order\Order;
 use App\Models\Order\OrderReturn;
 use App\Models\Order\ReturnItem;
+use App\Models\Platform\PlatformMapping;
 use App\Services\Integrations\Concerns\BaseReturnsMapper;
 use App\Services\Shipping\ShippingCostService;
 use Carbon\Carbon;
@@ -161,13 +162,44 @@ class ClaimsMapper extends BaseReturnsMapper
             $claimItems = $item['claimItems'] ?? [];
 
             foreach ($claimItems as $claimItem) {
-                // Find matching order item by barcode or merchant SKU
-                $orderItem = $order->items()
-                    ->whereHas('productVariant', function ($query) use ($orderLine) {
-                        $query->where('barcode', $orderLine['barcode'] ?? '')
-                            ->orWhere('sku', $orderLine['merchantSku'] ?? '');
-                    })
-                    ->first();
+                // Find matching order item by platform mapping (most reliable)
+                $orderItem = null;
+
+                if (isset($orderLine['id'])) {
+                    $mapping = PlatformMapping::where('platform', $this->getChannel()->value)
+                        ->where('entity_type', 'App\Models\Order\OrderItem')
+                        ->where('platform_id', (string) $orderLine['id'])
+                        ->first();
+
+                    if ($mapping && $mapping->entity) {
+                        $orderItem = $mapping->entity;
+                    }
+                }
+
+                // Fallback: try to match by barcode or merchant SKU
+                if (! $orderItem) {
+                    $orderItem = $order->items()
+                        ->whereHas('productVariant', function ($query) use ($orderLine) {
+                            $query->where('barcode', $orderLine['barcode'] ?? '')
+                                ->orWhere('sku', $orderLine['merchantSku'] ?? '');
+                        })
+                        ->first();
+                }
+
+                // If still not found, log a warning and skip
+                if (! $orderItem) {
+                    activity()
+                        ->performedOn($return)
+                        ->withProperties([
+                            'order_line_id' => $orderLine['id'] ?? null,
+                            'barcode' => $orderLine['barcode'] ?? null,
+                            'merchant_sku' => $orderLine['merchantSku'] ?? null,
+                            'claim_item_id' => $claimItem['id'] ?? null,
+                        ])
+                        ->log('trendyol_claim_item_order_item_not_found');
+
+                    continue;
+                }
 
                 // Calculate refund amount from order item (accounts for discounts)
                 $refundAmount = $orderItem?->unit_price?->getAmount() ?? 0;
