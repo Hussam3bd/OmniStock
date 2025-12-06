@@ -46,6 +46,22 @@ class ShopifyAdapter implements SalesChannelAdapter
         ])->{$method}($url, $params);
     }
 
+    /**
+     * Make a GraphQL request to Shopify
+     */
+    protected function makeGraphQLRequest(string $query, array $variables = []): \Illuminate\Http\Client\Response
+    {
+        $url = $this->getBaseUrl().'/graphql.json';
+
+        return Http::withHeaders([
+            'X-Shopify-Access-Token' => $this->integration->settings['access_token'],
+            'Content-Type' => 'application/json',
+        ])->post($url, [
+            'query' => $query,
+            'variables' => $variables,
+        ]);
+    }
+
     public function authenticate(): bool
     {
         try {
@@ -418,6 +434,223 @@ class ShopifyAdapter implements SalesChannelAdapter
         return true;
     }
 
+    /**
+     * Fetch returns for orders with return requests
+     * Uses GraphQL to query orders with return_status:return_requested
+     */
+    public function fetchReturnRequests(): Collection
+    {
+        $query = <<<'GRAPHQL'
+        query($cursor: String) {
+          orders(first: 50, query: "return_status:return_requested", after: $cursor) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            edges {
+              node {
+                id
+                legacyResourceId
+                name
+                createdAt
+                returnStatus
+                returns(first: 10) {
+                  nodes {
+                    id
+                    name
+                    status
+                    createdAt
+                    requestApprovedAt
+                    closedAt
+                    totalQuantity
+                    order {
+                      id
+                    }
+                    returnLineItems(first: 50) {
+                      edges {
+                        node {
+                          id
+                          quantity
+                          returnReason
+                          returnReasonNote
+                          customerNote
+                          fulfillmentLineItem {
+                            lineItem {
+                              id
+                              name
+                              sku
+                              quantity
+                              variant {
+                                id
+                                legacyResourceId
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        GRAPHQL;
+
+        return $this->fetchPaginatedGraphQL($query);
+    }
+
+    /**
+     * Fetch return details by return ID
+     */
+    public function fetchReturnById(string $returnId): ?array
+    {
+        $query = <<<'GRAPHQL'
+        query($id: ID!) {
+          return(id: $id) {
+            id
+            name
+            status
+            createdAt
+            requestApprovedAt
+            closedAt
+            totalQuantity
+            order {
+              id
+              legacyResourceId
+              name
+            }
+            decline {
+              note
+              reason
+            }
+            returnLineItems(first: 50) {
+              edges {
+                node {
+                  id
+                  quantity
+                  returnReason
+                  returnReasonNote
+                  customerNote
+                  fulfillmentLineItem {
+                    lineItem {
+                      id
+                      name
+                      sku
+                      quantity
+                      variant {
+                        id
+                        legacyResourceId
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            refunds(first: 10) {
+              edges {
+                node {
+                  id
+                  legacyResourceId
+                  createdAt
+                }
+              }
+            }
+          }
+        }
+        GRAPHQL;
+
+        $response = $this->makeGraphQLRequest($query, ['id' => $returnId]);
+
+        if (! $response->successful()) {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'error' => $response->body(),
+                    'status' => $response->status(),
+                    'return_id' => $returnId,
+                ])
+                ->log('shopify_fetch_return_failed');
+
+            return null;
+        }
+
+        $data = $response->json();
+
+        if (isset($data['errors'])) {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'errors' => $data['errors'],
+                    'return_id' => $returnId,
+                ])
+                ->log('shopify_fetch_return_graphql_errors');
+
+            return null;
+        }
+
+        return $data['data']['return'] ?? null;
+    }
+
+    /**
+     * Helper to fetch paginated GraphQL results
+     */
+    protected function fetchPaginatedGraphQL(string $query, array $baseVariables = []): Collection
+    {
+        $allResults = collect();
+        $cursor = null;
+        $hasNextPage = true;
+
+        while ($hasNextPage) {
+            $variables = array_merge($baseVariables, ['cursor' => $cursor]);
+            $response = $this->makeGraphQLRequest($query, $variables);
+
+            if (! $response->successful()) {
+                activity()
+                    ->performedOn($this->integration)
+                    ->withProperties([
+                        'error' => $response->body(),
+                        'status' => $response->status(),
+                    ])
+                    ->log('shopify_graphql_request_failed');
+
+                break;
+            }
+
+            $data = $response->json();
+
+            if (isset($data['errors'])) {
+                activity()
+                    ->performedOn($this->integration)
+                    ->withProperties([
+                        'errors' => $data['errors'],
+                    ])
+                    ->log('shopify_graphql_errors');
+
+                break;
+            }
+
+            $orders = $data['data']['orders']['edges'] ?? [];
+            $pageInfo = $data['data']['orders']['pageInfo'] ?? [];
+
+            foreach ($orders as $edge) {
+                if (isset($edge['node'])) {
+                    $allResults->push($edge['node']);
+                }
+            }
+
+            $hasNextPage = $pageInfo['hasNextPage'] ?? false;
+            $cursor = $pageInfo['endCursor'] ?? null;
+
+            // Safety break to prevent infinite loops
+            if ($allResults->count() > 1000) {
+                break;
+            }
+        }
+
+        return $allResults;
+    }
+
     public function registerWebhooks(): bool
     {
         $webhookUrl = route('webhook-client-shopify');
@@ -441,6 +674,11 @@ class ShopifyAdapter implements SalesChannelAdapter
             'orders/fulfilled',
             'orders/paid',
             'refunds/create',
+            'returns/request',
+            'returns/approve',
+            'returns/decline',
+            'returns/close',
+            'returns/cancel',
         ];
 
         $webhooks = [];
