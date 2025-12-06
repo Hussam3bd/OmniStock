@@ -49,7 +49,7 @@ class PopulateReturnItemsFilamentAction extends Action
                                     return $orderItems->mapWithKeys(function ($item) {
                                         $productName = $item->productVariant?->product?->name ?? $item->product_name ?? 'Unknown Product';
                                         $variantName = $item->productVariant?->name ?? '';
-                                        $sku = $item->sku ?: 'No SKU';
+                                        $sku = $item->sku ?: $item->productVariant?->sku ?: 'No SKU';
 
                                         return [
                                             $item->id => "{$productName} {$variantName} - {$sku} (Max: {$item->quantity})",

@@ -3,6 +3,7 @@
 namespace App\Models\Product;
 
 use App\Models\Platform\PlatformMapping;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -47,5 +48,12 @@ class Product extends Model implements HasMedia
         $this->addMediaCollection('images')
             ->useFallbackUrl('/images/no-image.png')
             ->useFallbackPath(public_path('/images/no-image.png'));
+    }
+
+    public function name(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->title,
+        );
     }
 }
