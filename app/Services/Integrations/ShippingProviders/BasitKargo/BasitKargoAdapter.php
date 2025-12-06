@@ -4,7 +4,10 @@ namespace App\Services\Integrations\ShippingProviders\BasitKargo;
 
 use App\Models\Integration\Integration;
 use App\Models\Order\Order;
+use App\Models\Order\OrderReturn;
 use App\Services\Integrations\Contracts\ShippingProviderAdapter;
+use App\Services\Integrations\ShippingProviders\BasitKargo\DataTransferObjects\LabelResponse;
+use App\Services\Integrations\ShippingProviders\BasitKargo\DataTransferObjects\ReturnShipmentResponse;
 use App\Services\Integrations\ShippingProviders\BasitKargo\DataTransferObjects\ShipmentResponse;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
@@ -170,6 +173,104 @@ class BasitKargoAdapter implements ShippingProviderAdapter
     {
         // Implementation for printing label
         throw new \Exception('Not implemented yet');
+    }
+
+    /**
+     * Create a return shipment from original outbound shipment
+     */
+    public function createReturnShipment(OrderReturn $return): ReturnShipmentResponse
+    {
+        // Get the original outbound tracking number
+        $outboundTrackingNumber = $return->order->shipping_tracking_number;
+
+        if (! $outboundTrackingNumber) {
+            throw new \Exception('Order must have a shipping tracking number to create return shipment');
+        }
+
+        try {
+            // BasitKargo API: GET /v2/order/return/barcode/{barcode}
+            // Creates a return shipment from the original outbound shipment
+            $response = $this->client()->get("/v2/order/return/barcode/{$outboundTrackingNumber}");
+
+            if (! $response->successful()) {
+                throw new \Exception('Failed to create return shipment: '.$response->body());
+            }
+
+            $data = $response->json();
+
+            // Create response DTO
+            $returnShipment = ReturnShipmentResponse::fromArray($data);
+
+            // Log success
+            activity()
+                ->performedOn($return)
+                ->withProperties([
+                    'integration_id' => $this->integration->id,
+                    'outbound_tracking' => $outboundTrackingNumber,
+                    'return_tracking' => $returnShipment->trackingNumber,
+                    'shipment_id' => $returnShipment->shipmentId,
+                ])
+                ->log('basitkargo_return_shipment_created');
+
+            return $returnShipment;
+        } catch (\Exception $e) {
+            activity()
+                ->performedOn($return)
+                ->withProperties([
+                    'integration_id' => $this->integration->id,
+                    'outbound_tracking' => $outboundTrackingNumber,
+                    'error' => $e->getMessage(),
+                ])
+                ->log('basitkargo_return_shipment_failed');
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Get shipping label for a shipment
+     */
+    public function getReturnLabel(string $trackingNumber): LabelResponse
+    {
+        try {
+            // First, get the shipment details to get the internal ID
+            $shipment = $this->getShipmentDetails($trackingNumber);
+
+            // BasitKargo API: GET /label/svg/{id}
+            // Downloads the shipping label in SVG format
+            $response = $this->client()->get("/label/svg/{$shipment->id}");
+
+            if (! $response->successful()) {
+                throw new \Exception("Failed to get label for tracking {$trackingNumber}: ".$response->body());
+            }
+
+            $svgContent = $response->body();
+
+            // Create label response
+            $label = LabelResponse::fromSvg($svgContent, $trackingNumber);
+
+            // Log success
+            activity()
+                ->withProperties([
+                    'integration_id' => $this->integration->id,
+                    'tracking_number' => $trackingNumber,
+                    'shipment_id' => $shipment->id,
+                    'label_format' => 'svg',
+                ])
+                ->log('basitkargo_label_downloaded');
+
+            return $label;
+        } catch (\Exception $e) {
+            activity()
+                ->withProperties([
+                    'integration_id' => $this->integration->id,
+                    'tracking_number' => $trackingNumber,
+                    'error' => $e->getMessage(),
+                ])
+                ->log('basitkargo_label_download_failed');
+
+            throw $e;
+        }
     }
 
     /**
