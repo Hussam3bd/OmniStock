@@ -62,9 +62,6 @@ class ResyncPaymentCostAction extends Action
                                 'gateway' => $record->payment_gateway,
                             ]))
                             ->send();
-
-                        // Refresh the page to show updated data
-                        $this->redirect(request()->url());
                     } else {
                         Notification::make()
                             ->warning()

@@ -53,13 +53,17 @@ class ShopifyAdapter implements SalesChannelAdapter
     {
         $url = $this->getBaseUrl().'/graphql.json';
 
+        $payload = ['query' => $query];
+
+        // Only include variables if they're provided
+        if (! empty($variables)) {
+            $payload['variables'] = $variables;
+        }
+
         return Http::withHeaders([
             'X-Shopify-Access-Token' => $this->integration->settings['access_token'],
             'Content-Type' => 'application/json',
-        ])->post($url, [
-            'query' => $query,
-            'variables' => $variables,
-        ]);
+        ])->post($url, $payload);
     }
 
     public function authenticate(): bool
@@ -442,7 +446,7 @@ class ShopifyAdapter implements SalesChannelAdapter
     {
         $query = <<<'GRAPHQL'
         query($cursor: String) {
-          orders(first: 50, query: "return_status:return_requested", after: $cursor) {
+          orders(first: 50, query: "return_status:RETURN_REQUESTED", after: $cursor) {
             pageInfo {
               hasNextPage
               endCursor

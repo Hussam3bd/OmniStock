@@ -3,6 +3,8 @@
 namespace App\Services\Integrations\SalesChannels\Shopify\Mappers;
 
 use App\Enums\Order\OrderChannel;
+use App\Enums\Order\OrderStatus;
+use App\Enums\Order\PaymentStatus;
 use App\Enums\Order\ReturnStatus;
 use App\Models\Order\Order;
 use App\Models\Order\OrderReturn;
@@ -40,7 +42,7 @@ class ReturnsMapper extends BaseReturnsMapper
             }
 
             // Skip cancelled orders - these are not returns
-            if ($order->order_status === \App\Enums\Order\OrderStatus::CANCELLED) {
+            if ($order->order_status === OrderStatus::CANCELLED) {
                 activity()
                     ->withProperties([
                         'shopify_refund_id' => $shopifyRefund['id'] ?? null,
@@ -70,7 +72,7 @@ class ReturnsMapper extends BaseReturnsMapper
             $isCOD = strtolower($order->payment_method ?? '') === 'cod';
 
             // Skip refunds for orders that were never paid (except COD)
-            if (! $isCOD && in_array($order->payment_status, [\App\Enums\Order\PaymentStatus::FAILED, \App\Enums\Order\PaymentStatus::VOIDED])) {
+            if (! $isCOD && in_array($order->payment_status, [PaymentStatus::FAILED, PaymentStatus::VOIDED])) {
                 activity()
                     ->withProperties([
                         'shopify_refund_id' => $shopifyRefund['id'] ?? null,
@@ -146,7 +148,7 @@ class ReturnsMapper extends BaseReturnsMapper
 
             // Update order status for COD rejected deliveries
             if ($isCOD && $this->hasNoRefundTransactions($shopifyRefund)) {
-                $order->update(['order_status' => \App\Enums\Order\OrderStatus::REJECTED]);
+                $order->update(['order_status' => OrderStatus::REJECTED]);
 
                 activity()
                     ->performedOn($order)
