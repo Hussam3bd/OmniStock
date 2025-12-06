@@ -6,7 +6,9 @@ use App\Enums\Integration\IntegrationProvider;
 use App\Enums\Integration\IntegrationType;
 use App\Models\Integration\Integration;
 use App\Services\Integrations\SalesChannels\Shopify\Mappers\OrderMapper;
+use App\Services\Integrations\SalesChannels\Shopify\Mappers\ReturnRequestMapper;
 use App\Services\Integrations\SalesChannels\Shopify\Mappers\ReturnsMapper;
+use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -83,6 +85,7 @@ class ProcessShopifyWebhook extends ProcessWebhookJob implements ShouldQueue
             match (true) {
                 str_starts_with($topic, 'orders/') => $this->handleOrderWebhook($integration, $topic, $payload),
                 str_starts_with($topic, 'refunds/') => $this->handleRefundWebhook($integration, $topic, $payload),
+                str_starts_with($topic, 'returns/') => $this->handleReturnWebhook($integration, $topic, $payload),
                 str_starts_with($topic, 'products/') => $this->handleProductWebhook($integration, $topic, $payload),
                 default => activity()
                     ->performedOn($integration)
@@ -165,6 +168,83 @@ class ProcessShopifyWebhook extends ProcessWebhookJob implements ShouldQueue
                     'trace' => $e->getTraceAsString(),
                 ])
                 ->log('shopify_refund_webhook_failed');
+
+            throw $e;
+        }
+    }
+
+    protected function handleReturnWebhook(Integration $integration, string $topic, array $payload): void
+    {
+        // For Shopify returns, the payload is a Return object from GraphQL
+        // We need to fetch the full return details using the adapter
+        try {
+            $adapter = app(ShopifyAdapter::class, ['integration' => $integration]);
+            $mapper = app(ReturnRequestMapper::class);
+
+            // Extract return ID from payload
+            $returnId = $payload['admin_graphql_api_id'] ?? $payload['id'] ?? null;
+
+            if (! $returnId) {
+                activity()
+                    ->performedOn($integration)
+                    ->withProperties([
+                        'topic' => $topic,
+                        'payload' => $payload,
+                    ])
+                    ->log('shopify_return_webhook_no_id');
+
+                return;
+            }
+
+            // Fetch full return details from Shopify
+            $returnData = $adapter->fetchReturnById($returnId);
+
+            if (! $returnData) {
+                activity()
+                    ->performedOn($integration)
+                    ->withProperties([
+                        'topic' => $topic,
+                        'return_id' => $returnId,
+                    ])
+                    ->log('shopify_return_webhook_fetch_failed');
+
+                return;
+            }
+
+            // Map the return
+            $return = $mapper->mapReturn($returnData);
+
+            if ($return) {
+                activity()
+                    ->performedOn($return)
+                    ->withProperties([
+                        'integration_id' => $integration->id,
+                        'integration_name' => $integration->name,
+                        'shopify_return_id' => $returnId,
+                        'order_id' => $return->order_id,
+                        'topic' => $topic,
+                    ])
+                    ->log('shopify_return_webhook_processed');
+            } else {
+                activity()
+                    ->performedOn($integration)
+                    ->withProperties([
+                        'shopify_return_id' => $returnId,
+                        'topic' => $topic,
+                        'reason' => 'skipped_by_mapper',
+                    ])
+                    ->log('shopify_return_webhook_skipped');
+            }
+        } catch (\Exception $e) {
+            activity()
+                ->performedOn($integration)
+                ->withProperties([
+                    'error' => $e->getMessage(),
+                    'shopify_return_id' => $payload['admin_graphql_api_id'] ?? $payload['id'] ?? null,
+                    'topic' => $topic,
+                    'trace' => $e->getTraceAsString(),
+                ])
+                ->log('shopify_return_webhook_failed');
 
             throw $e;
         }
