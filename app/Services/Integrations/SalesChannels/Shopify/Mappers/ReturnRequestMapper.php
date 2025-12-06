@@ -145,9 +145,8 @@ class ReturnRequestMapper extends BaseReturnsMapper
             'last_synced_at' => now(),
         ]);
 
-        // Note: Line items cannot be synced automatically because Shopify API 2024-10+ removed
-        // the fulfillmentLineItem field from ReturnLineItemType. Items will need to be
-        // manually added via the admin UI or matched later when refund is created.
+        // Sync return items
+        $this->syncReturnItems($return, $shopifyReturn, $order);
 
         return $return;
     }
@@ -181,6 +180,65 @@ class ReturnRequestMapper extends BaseReturnsMapper
                 'platform_data' => $shopifyReturn,
                 'last_synced_at' => now(),
             ]);
+
+        // Sync return items
+        $this->syncReturnItems($return, $shopifyReturn, $order);
+    }
+
+    protected function syncReturnItems(OrderReturn $return, array $shopifyReturn, Order $order): void
+    {
+        // Use returnLineItemsV2 which includes the lineItem with variant information
+        foreach ($shopifyReturn['returnLineItemsV2']['edges'] ?? [] as $edge) {
+            $lineItem = $edge['node'] ?? null;
+
+            if (! $lineItem) {
+                continue;
+            }
+
+            // Get the variant ID from the lineItem
+            $variantGraphQLId = $lineItem['lineItem']['variant']['id'] ?? null;
+            $variantId = $lineItem['lineItem']['variant']['legacyResourceId'] ?? $this->extractIdFromGraphQL($variantGraphQLId);
+
+            if (! $variantId) {
+                continue;
+            }
+
+            // Find the variant in our system
+            $variant = PlatformMapping::where('platform', $this->getChannel()->value)
+                ->where('platform_id', (string) $variantId)
+                ->where('entity_type', \App\Models\Product\ProductVariant::class)
+                ->first()?->entity;
+
+            if (! $variant) {
+                continue;
+            }
+
+            // Find the order item with this variant
+            $orderItem = $order->items()->where('product_variant_id', $variant->id)->first();
+
+            if (! $orderItem) {
+                continue;
+            }
+
+            $quantity = (int) ($lineItem['quantity'] ?? 1);
+            $returnReason = $lineItem['returnReason'] ?? null;
+            $returnReasonNote = $lineItem['returnReasonNote'] ?? null;
+            $customerNote = $lineItem['customerNote'] ?? null;
+
+            $return->items()->updateOrCreate(
+                [
+                    'order_item_id' => $orderItem->id,
+                ],
+                [
+                    'quantity' => $quantity,
+                    'reason_name' => $returnReason ?? $returnReasonNote ?? 'Customer return request',
+                    'reason_code' => $returnReason,
+                    'customer_note' => $customerNote,
+                    'external_item_id' => $this->extractIdFromGraphQL($lineItem['id'] ?? ''),
+                    'platform_data' => $lineItem,
+                ]
+            );
+        }
     }
 
     protected function mapReturnStatus(string $shopifyStatus): ReturnStatus
@@ -199,7 +257,7 @@ class ReturnRequestMapper extends BaseReturnsMapper
     protected function getCustomerNote(array $shopifyReturn): ?string
     {
         // Try to get customer note from first return line item
-        foreach ($shopifyReturn['returnLineItems']['edges'] ?? [] as $edge) {
+        foreach ($shopifyReturn['returnLineItemsV2']['edges'] ?? [] as $edge) {
             $lineItem = $edge['node'] ?? null;
             $customerNote = $lineItem['customerNote'] ?? null;
 
@@ -214,7 +272,7 @@ class ReturnRequestMapper extends BaseReturnsMapper
     protected function getReturnReason(array $shopifyReturn): ?string
     {
         // Try to get return reason from first return line item
-        foreach ($shopifyReturn['returnLineItems']['edges'] ?? [] as $edge) {
+        foreach ($shopifyReturn['returnLineItemsV2']['edges'] ?? [] as $edge) {
             $lineItem = $edge['node'] ?? null;
             $returnReason = $lineItem['returnReason'] ?? null;
 

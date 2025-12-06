@@ -6,6 +6,7 @@ use App\Filament\Actions\Returns\ApproveReturnFilamentAction;
 use App\Filament\Actions\Returns\CompleteReturnFilamentAction;
 use App\Filament\Actions\Returns\GenerateReturnLabelFilamentAction;
 use App\Filament\Actions\Returns\MarkAsReceivedFilamentAction;
+use App\Filament\Actions\Returns\PopulateReturnItemsFilamentAction;
 use App\Filament\Actions\Returns\RejectReturnFilamentAction;
 use App\Filament\Actions\Returns\StartInspectionFilamentAction;
 use App\Filament\Resources\Order\OrderReturns\Infolists\OrderReturnInfolist;
@@ -25,6 +26,7 @@ class ViewOrderReturn extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            PopulateReturnItemsFilamentAction::make(),
             ApproveReturnFilamentAction::make(),
             RejectReturnFilamentAction::make(),
             GenerateReturnLabelFilamentAction::make(),

@@ -471,7 +471,7 @@ class ShopifyAdapter implements SalesChannelAdapter
                       id
                       legacyResourceId
                     }
-                    returnLineItems(first: 50) {
+                    returnLineItemsV2(first: 50) {
                       edges {
                         node {
                           id
@@ -479,6 +479,16 @@ class ShopifyAdapter implements SalesChannelAdapter
                           returnReason
                           returnReasonNote
                           customerNote
+                          lineItem {
+                            id
+                            title
+                            variantTitle
+                            sku
+                            variant {
+                              id
+                              legacyResourceId
+                            }
+                          }
                         }
                       }
                     }
