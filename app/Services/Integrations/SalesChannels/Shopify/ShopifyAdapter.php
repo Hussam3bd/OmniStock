@@ -469,6 +469,7 @@ class ShopifyAdapter implements SalesChannelAdapter
                     totalQuantity
                     order {
                       id
+                      legacyResourceId
                     }
                     returnLineItems(first: 50) {
                       edges {
@@ -478,18 +479,6 @@ class ShopifyAdapter implements SalesChannelAdapter
                           returnReason
                           returnReasonNote
                           customerNote
-                          fulfillmentLineItem {
-                            lineItem {
-                              id
-                              name
-                              sku
-                              quantity
-                              variant {
-                                id
-                                legacyResourceId
-                              }
-                            }
-                          }
                         }
                       }
                     }
