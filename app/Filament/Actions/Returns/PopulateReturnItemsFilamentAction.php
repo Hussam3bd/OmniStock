@@ -26,7 +26,7 @@ class PopulateReturnItemsFilamentAction extends Action
             ->visible(fn (OrderReturn $record) => $record->items()->count() === 0 && $record->order->items()->count() > 0)
             ->modalHeading(__('Add Items to Return'))
             ->modalDescription(function (OrderReturn $record) {
-                $shopifyLineItems = $record->platform_data['returnLineItems']['edges'] ?? [];
+                $shopifyLineItems = $record->platform_data['returnLineItems']['edges'] ?? $record->platform_data['returnLineItemsV2']['edges'] ?? [];
                 $itemCount = count($shopifyLineItems);
                 $totalQty = array_sum(array_map(fn ($edge) => $edge['node']['quantity'] ?? 0, $shopifyLineItems));
 
@@ -84,7 +84,7 @@ class PopulateReturnItemsFilamentAction extends Action
                         ])
                         ->columns(2)
                         ->defaultItems(function (OrderReturn $record) {
-                            $shopifyLineItems = $record->platform_data['returnLineItems']['edges'] ?? [];
+                            $shopifyLineItems = $record->platform_data['returnLineItems']['edges'] ?? $record->platform_data['returnLineItemsV2']['edges'] ?? [];
 
                             return max(count($shopifyLineItems), 1);
                         })
@@ -105,7 +105,7 @@ class PopulateReturnItemsFilamentAction extends Action
                         }
 
                         // Get reason from Shopify data for first item (best effort)
-                        $shopifyLineItems = $record->platform_data['returnLineItems']['edges'] ?? [];
+                        $shopifyLineItems = $record->platform_data['returnLineItems']['edges'] ?? $record->platform_data['returnLineItemsV2']['edges'] ?? [];
                         $reason = null;
                         $reasonCode = null;
                         $customerNote = null;

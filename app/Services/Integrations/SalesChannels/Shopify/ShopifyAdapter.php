@@ -440,13 +440,13 @@ class ShopifyAdapter implements SalesChannelAdapter
 
     /**
      * Fetch returns for orders with return requests
-     * Uses GraphQL to query orders with return_status:return_requested
+     * Uses GraphQL to query orders with any returns (excludes NO_RETURN)
      */
     public function fetchReturnRequests(): Collection
     {
         $query = <<<'GRAPHQL'
         query($cursor: String) {
-          orders(first: 50, query: "return_status:RETURN_REQUESTED", after: $cursor) {
+          orders(first: 50, query: "return_status:RETURN_REQUESTED OR return_status:IN_PROGRESS OR return_status:RETURNED OR return_status:INSPECTION_COMPLETE", after: $cursor) {
             pageInfo {
               hasNextPage
               endCursor
@@ -471,7 +471,7 @@ class ShopifyAdapter implements SalesChannelAdapter
                       id
                       legacyResourceId
                     }
-                    returnLineItemsV2(first: 50) {
+                    returnLineItems(first: 50) {
                       edges {
                         node {
                           id
@@ -479,16 +479,6 @@ class ShopifyAdapter implements SalesChannelAdapter
                           returnReason
                           returnReasonNote
                           customerNote
-                          lineItem {
-                            id
-                            title
-                            variantTitle
-                            sku
-                            variant {
-                              id
-                              legacyResourceId
-                            }
-                          }
                         }
                       }
                     }
@@ -605,7 +595,7 @@ class ShopifyAdapter implements SalesChannelAdapter
         $hasNextPage = true;
 
         while ($hasNextPage) {
-            $variables = array_merge($baseVariables, ['cursor' => $cursor]);
+            $variables = $cursor ? array_merge($baseVariables, ['cursor' => $cursor]) : $baseVariables;
             $response = $this->makeGraphQLRequest($query, $variables);
 
             if (! $response->successful()) {

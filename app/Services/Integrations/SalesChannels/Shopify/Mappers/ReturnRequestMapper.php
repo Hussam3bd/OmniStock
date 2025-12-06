@@ -145,8 +145,9 @@ class ReturnRequestMapper extends BaseReturnsMapper
             'last_synced_at' => now(),
         ]);
 
-        // Sync return items
-        $this->syncReturnItems($return, $shopifyReturn, $order);
+        // Note: returnLineItems from orders.returns query does not include lineItem/variant data
+        // Items will need to be manually mapped via PopulateReturnItemsFilamentAction
+        // or synced when webhook fetches individual return via fetchReturnById
 
         return $return;
     }
@@ -180,9 +181,6 @@ class ReturnRequestMapper extends BaseReturnsMapper
                 'platform_data' => $shopifyReturn,
                 'last_synced_at' => now(),
             ]);
-
-        // Sync return items
-        $this->syncReturnItems($return, $shopifyReturn, $order);
     }
 
     protected function syncReturnItems(OrderReturn $return, array $shopifyReturn, Order $order): void
@@ -257,7 +255,7 @@ class ReturnRequestMapper extends BaseReturnsMapper
     protected function getCustomerNote(array $shopifyReturn): ?string
     {
         // Try to get customer note from first return line item
-        foreach ($shopifyReturn['returnLineItemsV2']['edges'] ?? [] as $edge) {
+        foreach ($shopifyReturn['returnLineItems']['edges'] ?? [] as $edge) {
             $lineItem = $edge['node'] ?? null;
             $customerNote = $lineItem['customerNote'] ?? null;
 
@@ -272,7 +270,7 @@ class ReturnRequestMapper extends BaseReturnsMapper
     protected function getReturnReason(array $shopifyReturn): ?string
     {
         // Try to get return reason from first return line item
-        foreach ($shopifyReturn['returnLineItemsV2']['edges'] ?? [] as $edge) {
+        foreach ($shopifyReturn['returnLineItems']['edges'] ?? [] as $edge) {
             $lineItem = $edge['node'] ?? null;
             $returnReason = $lineItem['returnReason'] ?? null;
 
