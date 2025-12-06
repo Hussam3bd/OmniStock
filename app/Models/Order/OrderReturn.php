@@ -43,6 +43,9 @@ class OrderReturn extends Model implements HasMedia
         'return_tracking_number',
         'return_tracking_url',
         'return_label_url',
+        'return_shipping_aggregator_integration_id',
+        'return_shipping_aggregator_shipment_id',
+        'return_shipping_aggregator_data',
         'return_shipping_cost_excluding_vat',
         'return_shipping_desi',
         'return_shipping_vat_rate',
@@ -80,6 +83,7 @@ class OrderReturn extends Model implements HasMedia
             'total_refund_amount' => MoneyIntegerCast::class,
             'restocking_fee' => MoneyIntegerCast::class,
             'platform_data' => 'array',
+            'return_shipping_aggregator_data' => 'array',
         ];
     }
 
@@ -121,6 +125,11 @@ class OrderReturn extends Model implements HasMedia
     public function returnShippingRate(): BelongsTo
     {
         return $this->belongsTo(ShippingRate::class, 'return_shipping_rate_id');
+    }
+
+    public function returnShippingAggregatorIntegration(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Integration\Integration::class, 'return_shipping_aggregator_integration_id');
     }
 
     // Media collections

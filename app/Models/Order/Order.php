@@ -64,6 +64,9 @@ class Order extends Model
         'shipping_rate_id',
         'shipping_tracking_number',
         'shipping_tracking_url',
+        'shipping_aggregator_integration_id',
+        'shipping_aggregator_shipment_id',
+        'shipping_aggregator_data',
         'shipped_at',
         'delivered_at',
         'estimated_delivery_start',
@@ -99,6 +102,7 @@ class Order extends Model
             'delivered_at' => 'datetime',
             'estimated_delivery_start' => 'datetime',
             'estimated_delivery_end' => 'datetime',
+            'shipping_aggregator_data' => 'array',
         ];
     }
 
@@ -247,6 +251,11 @@ class Order extends Model
     public function billingAddress(): BelongsTo
     {
         return $this->belongsTo(Address::class, 'billing_address_id');
+    }
+
+    public function shippingAggregatorIntegration(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Integration\Integration::class, 'shipping_aggregator_integration_id');
     }
 
     public function items(): HasMany
