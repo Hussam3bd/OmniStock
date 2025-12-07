@@ -145,9 +145,8 @@ class ReturnRequestMapper extends BaseReturnsMapper
             'last_synced_at' => now(),
         ]);
 
-        // Note: returnLineItems from orders.returns query does not include lineItem/variant data
-        // Items will need to be manually mapped via PopulateReturnItemsFilamentAction
-        // or synced when webhook fetches individual return via fetchReturnById
+        // Sync return items using variant matching
+        $this->syncReturnItems($return, $shopifyReturn, $order);
 
         return $return;
     }
@@ -181,23 +180,34 @@ class ReturnRequestMapper extends BaseReturnsMapper
                 'platform_data' => $shopifyReturn,
                 'last_synced_at' => now(),
             ]);
+
+        // Sync return items using variant matching
+        $this->syncReturnItems($return, $shopifyReturn, $order);
     }
 
     protected function syncReturnItems(OrderReturn $return, array $shopifyReturn, Order $order): void
     {
-        // Use returnLineItemsV2 which includes the lineItem with variant information
-        foreach ($shopifyReturn['returnLineItemsV2']['edges'] ?? [] as $edge) {
+        // Use returnLineItems with fulfillmentLineItem for variant data
+        foreach ($shopifyReturn['returnLineItems']['edges'] ?? [] as $edge) {
             $lineItem = $edge['node'] ?? null;
 
             if (! $lineItem) {
                 continue;
             }
 
-            // Get the variant ID from the lineItem
-            $variantGraphQLId = $lineItem['lineItem']['variant']['id'] ?? null;
-            $variantId = $lineItem['lineItem']['variant']['legacyResourceId'] ?? $this->extractIdFromGraphQL($variantGraphQLId);
+            // Get the variant ID from fulfillmentLineItem.lineItem.variant
+            $variantGraphQLId = $lineItem['fulfillmentLineItem']['lineItem']['variant']['id'] ?? null;
+            $variantId = $lineItem['fulfillmentLineItem']['lineItem']['variant']['legacyResourceId'] ?? $this->extractIdFromGraphQL($variantGraphQLId);
 
             if (! $variantId) {
+                // No variant data - skip this item
+                activity()
+                    ->performedOn($return)
+                    ->withProperties([
+                        'line_item' => $lineItem,
+                    ])
+                    ->log('shopify_return_item_no_variant');
+
                 continue;
             }
 
@@ -208,6 +218,14 @@ class ReturnRequestMapper extends BaseReturnsMapper
                 ->first()?->entity;
 
             if (! $variant) {
+                activity()
+                    ->performedOn($return)
+                    ->withProperties([
+                        'shopify_variant_id' => $variantId,
+                        'line_item' => $lineItem,
+                    ])
+                    ->log('shopify_return_variant_not_found');
+
                 continue;
             }
 
@@ -215,6 +233,14 @@ class ReturnRequestMapper extends BaseReturnsMapper
             $orderItem = $order->items()->where('product_variant_id', $variant->id)->first();
 
             if (! $orderItem) {
+                activity()
+                    ->performedOn($return)
+                    ->withProperties([
+                        'variant_id' => $variant->id,
+                        'order_id' => $order->id,
+                    ])
+                    ->log('shopify_return_order_item_not_found');
+
                 continue;
             }
 

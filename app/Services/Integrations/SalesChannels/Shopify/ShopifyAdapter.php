@@ -474,11 +474,24 @@ class ShopifyAdapter implements SalesChannelAdapter
                     returnLineItems(first: 50) {
                       edges {
                         node {
-                          id
-                          quantity
-                          returnReason
-                          returnReasonNote
-                          customerNote
+                          ... on ReturnLineItem {
+                            id
+                            quantity
+                            returnReason
+                            returnReasonNote
+                            customerNote
+                            fulfillmentLineItem {
+                              lineItem {
+                                id
+                                sku
+                                name
+                                variant {
+                                  id
+                                  legacyResourceId
+                                }
+                              }
+                            }
+                          }
                         }
                       }
                     }
@@ -520,20 +533,22 @@ class ShopifyAdapter implements SalesChannelAdapter
             returnLineItems(first: 50) {
               edges {
                 node {
-                  id
-                  quantity
-                  returnReason
-                  returnReasonNote
-                  customerNote
-                  fulfillmentLineItem {
-                    lineItem {
-                      id
-                      name
-                      sku
-                      quantity
-                      variant {
+                  ... on ReturnLineItem {
+                    id
+                    quantity
+                    returnReason
+                    returnReasonNote
+                    customerNote
+                    fulfillmentLineItem {
+                      lineItem {
                         id
-                        legacyResourceId
+                        name
+                        sku
+                        quantity
+                        variant {
+                          id
+                          legacyResourceId
+                        }
                       }
                     }
                   }
