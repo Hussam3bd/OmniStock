@@ -357,6 +357,9 @@ class OrderMapper extends BaseOrderMapper
         // Get list of cancelled line item IDs (restock_type = 'cancel')
         $cancelledLineItemIds = $this->getCancelledLineItemIds($refunds);
 
+        // Track variant IDs that are currently in the Shopify order
+        $currentVariantIds = [];
+
         foreach ($lineItems as $lineItem) {
             $lineItemId = $lineItem['id'] ?? null;
 
@@ -383,6 +386,9 @@ class OrderMapper extends BaseOrderMapper
 
                 continue;
             }
+
+            // Track this variant as part of the current order
+            $currentVariantIds[] = $variant->id;
 
             $unitPrice = $this->convertToMinorUnits((float) ($lineItem['price'] ?? 0), $order->currency);
             $quantity = (int) ($lineItem['quantity'] ?? 1);
@@ -418,6 +424,24 @@ class OrderMapper extends BaseOrderMapper
                     'commission_rate' => 0,
                 ]
             );
+        }
+
+        // Delete any order items that are no longer in the Shopify order
+        // This handles order edits where items are removed or replaced
+        if (! empty($currentVariantIds)) {
+            $deletedCount = $order->items()
+                ->whereNotIn('product_variant_id', $currentVariantIds)
+                ->delete();
+
+            if ($deletedCount > 0) {
+                activity()
+                    ->performedOn($order)
+                    ->withProperties([
+                        'deleted_count' => $deletedCount,
+                        'current_variant_ids' => $currentVariantIds,
+                    ])
+                    ->log('shopify_order_items_removed');
+            }
         }
     }
 
