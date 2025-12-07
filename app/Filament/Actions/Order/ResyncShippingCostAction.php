@@ -50,9 +50,6 @@ class ResyncShippingCostAction extends Action
                                 'number' => $record->shipping_tracking_number,
                             ]))
                             ->send();
-
-                        // Refresh the page to show updated data
-                        $this->redirect(request()->url());
                     } else {
                         Notification::make()
                             ->warning()

@@ -3,6 +3,7 @@
 namespace App\Actions\Returns;
 
 use App\Enums\Integration\IntegrationProvider;
+use App\Enums\Order\OrderChannel;
 use App\Enums\Order\ReturnStatus;
 use App\Enums\Shipping\ShippingCarrier;
 use App\Models\Integration\Integration;
@@ -51,6 +52,22 @@ class GenerateReturnLabelAction extends BaseReturnAction
                 $this->saveLabelFile($return, $label);
             }
 
+            // Step 5: If return is from Shopify, attach label to Shopify
+            if ($return->channel === OrderChannel::SHOPIFY) {
+                try {
+                    $this->attachLabelToShopify($return, $returnShipment, $label);
+                } catch (\Exception $e) {
+                    // Log but don't fail - label was generated successfully
+                    activity()
+                        ->performedOn($return)
+                        ->withProperties([
+                            'error' => $e->getMessage(),
+                            'tracking_number' => $returnShipment->trackingNumber,
+                        ])
+                        ->log('shopify_label_attachment_failed_after_generation');
+                }
+            }
+
             // Log success
             $this->logAction($return, 'return_label_generated', [
                 'integration_id' => $integration->id,
@@ -82,6 +99,11 @@ class GenerateReturnLabelAction extends BaseReturnAction
 
         // Order must have outbound tracking number (required to create return shipment)
         if (! $return->order->shipping_tracking_number) {
+            return false;
+        }
+
+        // Prevent duplicate label generation - if label already exists, don't generate another
+        if ($return->label_generated_at && $return->return_tracking_number) {
             return false;
         }
 
@@ -178,5 +200,94 @@ class GenerateReturnLabelAction extends BaseReturnAction
                 ])
                 ->log('return_label_file_save_failed');
         }
+    }
+
+    /**
+     * Attach label to Shopify reverse delivery
+     * Tries BasitKargo's labelUrl first, then falls back to media library public URL
+     */
+    protected function attachLabelToShopify(
+        OrderReturn $return,
+        ReturnShipmentResponse $shipment,
+        LabelResponse $label
+    ): void {
+        // Get Shopify integration by provider (orders don't have a direct relationship to sales channel integration)
+        $integration = Integration::where('provider', IntegrationProvider::SHOPIFY)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $integration) {
+            activity()
+                ->performedOn($return)
+                ->withProperties(['error' => 'No active Shopify integration found'])
+                ->log('shopify_label_attachment_skipped');
+
+            return;
+        }
+
+        // Create Shopify adapter
+        $adapter = new \App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter($integration);
+
+        // Step 1: Approve the return in Shopify (changes status from REQUESTED to OPEN)
+        if ($return->external_return_id) {
+            $shopifyReturnId = 'gid://shopify/Return/'.$return->external_return_id;
+
+            activity()
+                ->performedOn($return)
+                ->withProperties([
+                    'shopify_return_id' => $shopifyReturnId,
+                    'action' => 'approving_return',
+                ])
+                ->log('shopify_return_approval_attempt');
+
+            $approvalResult = $adapter->approveReturn($shopifyReturnId);
+
+            if (! $approvalResult) {
+                throw new \Exception('Failed to approve return in Shopify. Check activity log for details.');
+            }
+
+            activity()
+                ->performedOn($return)
+                ->withProperties([
+                    'shopify_return_id' => $shopifyReturnId,
+                    'result' => $approvalResult,
+                ])
+                ->log('shopify_return_approved');
+        }
+
+        // Step 2: Get label URL
+        // Option 1: Use BasitKargo's label URL if provided
+        $labelUrl = $shipment->labelUrl;
+
+        // Option 2: Get public URL from media library if BasitKargo doesn't provide one
+        if (! $labelUrl) {
+            $media = $return->getFirstMedia('documents');
+            if ($media) {
+                $labelUrl = $media->getFullUrl();
+            }
+        }
+
+        // If we still don't have a label URL, we can't attach to Shopify
+        if (! $labelUrl) {
+            throw new \Exception('No public label URL available for Shopify attachment');
+        }
+
+        activity()
+            ->performedOn($return)
+            ->withProperties([
+                'label_url' => $labelUrl,
+                'tracking_number' => $shipment->trackingNumber,
+                'action' => 'attaching_label',
+            ])
+            ->log('shopify_label_attachment_attempt');
+
+        // Step 3: Call the action to attach label to Shopify
+        $action = app(AttachReturnLabelToShopifyAction::class);
+        $action->execute($return, [
+            'label_url' => $labelUrl,
+            'tracking_number' => $shipment->trackingNumber,
+            'tracking_url' => null, // BasitKargo doesn't provide tracking URL
+            'notify_customer' => true,
+        ]);
     }
 }

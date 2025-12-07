@@ -133,9 +133,6 @@ class PopulateReturnItemsFilamentAction extends Action
                         ->title(__('Items Added'))
                         ->body(__(':count return item(s) added successfully. You can now approve the return.', ['count' => $created]))
                         ->send();
-
-                    // Redirect to refresh the page
-                    $this->redirect(request()->url());
                 } catch (\Exception $e) {
                     Notification::make()
                         ->danger()

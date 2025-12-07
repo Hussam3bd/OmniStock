@@ -35,9 +35,6 @@ class StartInspectionFilamentAction extends Action
                         ->title(__('Inspection Started'))
                         ->body(__('Return inspection has been started.'))
                         ->send();
-
-                    // Redirect to refresh the page
-                    $this->redirect(request()->url());
                 } catch (\Exception $e) {
                     Notification::make()
                         ->danger()

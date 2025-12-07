@@ -35,9 +35,6 @@ class ApproveReturnFilamentAction extends Action
                         ->title(__('Return Approved'))
                         ->body(__('The return has been approved successfully.'))
                         ->send();
-
-                    // Redirect to refresh the page
-                    $this->redirect(request()->url());
                 } catch (\Exception $e) {
                     Notification::make()
                         ->danger()

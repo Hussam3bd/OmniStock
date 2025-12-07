@@ -495,6 +495,31 @@ class ShopifyAdapter implements SalesChannelAdapter
                         }
                       }
                     }
+                    reverseFulfillmentOrders(first: 10) {
+                      edges {
+                        node {
+                          id
+                          status
+                          lineItems(first: 50) {
+                            edges {
+                              node {
+                                id
+                                totalQuantity
+                                fulfillmentLineItem {
+                                  lineItem {
+                                    id
+                                    variant {
+                                      id
+                                      legacyResourceId
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -564,6 +589,31 @@ class ShopifyAdapter implements SalesChannelAdapter
                 }
               }
             }
+            reverseFulfillmentOrders(first: 10) {
+              edges {
+                node {
+                  id
+                  status
+                  lineItems(first: 50) {
+                    edges {
+                      node {
+                        id
+                        totalQuantity
+                        fulfillmentLineItem {
+                          lineItem {
+                            id
+                            variant {
+                              id
+                              legacyResourceId
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
         GRAPHQL;
@@ -598,6 +648,194 @@ class ShopifyAdapter implements SalesChannelAdapter
         }
 
         return $data['data']['return'] ?? null;
+    }
+
+    /**
+     * Approve a return request
+     * Changes return status from REQUESTED to OPEN
+     */
+    public function approveReturn(string $returnId): ?array
+    {
+        $mutation = <<<'GRAPHQL'
+        mutation returnApproveRequest($id: ID!) {
+          returnApproveRequest(input: {id: $id}) {
+            return {
+              id
+              name
+              status
+            }
+            userErrors {
+              code
+              field
+              message
+            }
+          }
+        }
+        GRAPHQL;
+
+        $response = $this->makeGraphQLRequest($mutation, ['id' => $returnId]);
+
+        if (! $response->successful()) {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'error' => $response->body(),
+                    'status' => $response->status(),
+                    'return_id' => $returnId,
+                ])
+                ->log('shopify_approve_return_failed');
+
+            return null;
+        }
+
+        $data = $response->json();
+
+        if (isset($data['errors'])) {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'errors' => $data['errors'],
+                    'return_id' => $returnId,
+                ])
+                ->log('shopify_approve_return_graphql_errors');
+
+            return null;
+        }
+
+        if (! empty($data['data']['returnApproveRequest']['userErrors'])) {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'user_errors' => $data['data']['returnApproveRequest']['userErrors'],
+                    'return_id' => $returnId,
+                ])
+                ->log('shopify_approve_return_user_errors');
+
+            return null;
+        }
+
+        return $data['data']['returnApproveRequest']['return'] ?? null;
+    }
+
+    /**
+     * Attach return label and tracking to a reverse delivery
+     * Creates a new reverse delivery with shipping information
+     *
+     * @param  string  $reverseFulfillmentOrderId  The reverse fulfillment order ID
+     * @param  array  $lineItems  Array of line items with reverseFulfillmentOrderLineItemId and quantity
+     * @param  string|null  $labelUrl  Public URL to the return label file
+     * @param  string|null  $trackingNumber  Tracking number for the return shipment
+     * @param  string|null  $trackingUrl  URL to track the shipment
+     * @param  bool  $notifyCustomer  Whether to notify customer (default: true)
+     */
+    public function attachReturnLabel(
+        string $reverseFulfillmentOrderId,
+        array $lineItems,
+        ?string $labelUrl = null,
+        ?string $trackingNumber = null,
+        ?string $trackingUrl = null,
+        bool $notifyCustomer = true
+    ): ?array {
+        // Build the mutation based on what data is provided
+        $mutation = <<<'GRAPHQL'
+        mutation reverseDeliveryCreateWithShipping(
+          $reverseFulfillmentOrderId: ID!
+          $reverseDeliveryLineItems: [ReverseDeliveryLineItemInput!]!
+          $trackingInput: ReverseDeliveryTrackingInput
+          $labelInput: ReverseDeliveryLabelInput
+          $notifyCustomer: Boolean
+        ) {
+          reverseDeliveryCreateWithShipping(
+            reverseFulfillmentOrderId: $reverseFulfillmentOrderId
+            reverseDeliveryLineItems: $reverseDeliveryLineItems
+            trackingInput: $trackingInput
+            labelInput: $labelInput
+            notifyCustomer: $notifyCustomer
+          ) {
+            reverseDelivery {
+              id
+              deliverable {
+                ... on ReverseDeliveryShippingDeliverable {
+                  label {
+                    publicFileUrl
+                  }
+                  tracking {
+                    number
+                    url
+                  }
+                }
+              }
+            }
+            userErrors {
+              code
+              field
+              message
+            }
+          }
+        }
+        GRAPHQL;
+
+        $variables = [
+            'reverseFulfillmentOrderId' => $reverseFulfillmentOrderId,
+            'reverseDeliveryLineItems' => $lineItems,
+            'notifyCustomer' => $notifyCustomer,
+        ];
+
+        if ($trackingNumber || $trackingUrl) {
+            $variables['trackingInput'] = array_filter([
+                'number' => $trackingNumber,
+                'url' => $trackingUrl,
+            ]);
+        }
+
+        if ($labelUrl) {
+            $variables['labelInput'] = [
+                'fileUrl' => $labelUrl,
+            ];
+        }
+
+        $response = $this->makeGraphQLRequest($mutation, $variables);
+
+        if (! $response->successful()) {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'error' => $response->body(),
+                    'status' => $response->status(),
+                    'reverse_fulfillment_order_id' => $reverseFulfillmentOrderId,
+                ])
+                ->log('shopify_attach_return_label_failed');
+
+            return null;
+        }
+
+        $data = $response->json();
+
+        if (isset($data['errors'])) {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'errors' => $data['errors'],
+                    'reverse_fulfillment_order_id' => $reverseFulfillmentOrderId,
+                ])
+                ->log('shopify_attach_return_label_graphql_errors');
+
+            return null;
+        }
+
+        if (! empty($data['data']['reverseDeliveryCreateWithShipping']['userErrors'])) {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'user_errors' => $data['data']['reverseDeliveryCreateWithShipping']['userErrors'],
+                    'reverse_fulfillment_order_id' => $reverseFulfillmentOrderId,
+                ])
+                ->log('shopify_attach_return_label_user_errors');
+
+            return null;
+        }
+
+        return $data['data']['reverseDeliveryCreateWithShipping']['reverseDelivery'] ?? null;
     }
 
     /**

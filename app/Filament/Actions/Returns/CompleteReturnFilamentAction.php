@@ -35,9 +35,6 @@ class CompleteReturnFilamentAction extends Action
                         ->title(__('Return Completed'))
                         ->body(__('The return has been completed successfully.'))
                         ->send();
-
-                    // Redirect to refresh the page
-                    $this->redirect(request()->url());
                 } catch (\Exception $e) {
                     Notification::make()
                         ->danger()

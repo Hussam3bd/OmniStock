@@ -41,9 +41,6 @@ class GenerateReturnLabelFilamentAction extends Action
                             'tracking' => $record->return_tracking_number,
                         ]))
                         ->send();
-
-                    // Redirect to refresh the page
-                    $this->redirect(request()->url());
                 } catch (\Exception $e) {
                     Notification::make()
                         ->danger()

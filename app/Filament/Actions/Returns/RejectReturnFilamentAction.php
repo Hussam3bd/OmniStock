@@ -46,9 +46,6 @@ class RejectReturnFilamentAction extends Action
                         ->title(__('Return Rejected'))
                         ->body(__('The return has been rejected.'))
                         ->send();
-
-                    // Redirect to refresh the page
-                    $this->redirect(request()->url());
                 } catch (\Exception $e) {
                     Notification::make()
                         ->danger()

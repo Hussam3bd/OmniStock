@@ -35,9 +35,6 @@ class MarkAsReceivedFilamentAction extends Action
                         ->title(__('Return Received'))
                         ->body(__('The return has been marked as received.'))
                         ->send();
-
-                    // Redirect to refresh the page
-                    $this->redirect(request()->url());
                 } catch (\Exception $e) {
                     Notification::make()
                         ->danger()

@@ -77,9 +77,6 @@ class ResyncOrderAction extends Action
                             'channel' => $record->channel->getLabel(),
                         ]))
                         ->send();
-
-                    // Refresh the page to show updated data
-                    $this->redirect(request()->url());
                 } catch (\Exception $e) {
                     Notification::make()
                         ->danger()
