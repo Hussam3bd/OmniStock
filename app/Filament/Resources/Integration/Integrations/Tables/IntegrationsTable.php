@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Integration\Integrations\Tables;
 
 use App\Enums\Integration\IntegrationProvider;
 use App\Enums\Order\OrderChannel;
+use App\Filament\Actions\Integration\SyncShopifyOrderReturnsAction;
 use App\Jobs\FetchAndSyncShopifyRefunds;
 use App\Jobs\SyncShopifyOrders;
 use App\Jobs\SyncShopifyProducts;
@@ -438,6 +439,8 @@ class IntegrationsTable
                                 ->send();
                         }
                     }),
+
+                SyncShopifyOrderReturnsAction::make(),
 
                 Action::make('sync_claims')
                     ->label(__('Sync Claims'))

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Integration\Integrations\Pages;
 
 use App\Enums\Integration\IntegrationProvider;
+use App\Filament\Actions\Integration\SyncShopifyOrderReturnsAction;
 use App\Filament\Resources\Integration\Integrations\IntegrationResource;
 use App\Jobs\SyncPaymentFees;
 use App\Models\Order\Order;
@@ -182,6 +183,9 @@ class EditIntegration extends EditRecord
                     }
                 });
         }
+
+        // Add sync returns action for Shopify integration
+        $actions[] = SyncShopifyOrderReturnsAction::make();
 
         return $actions;
     }

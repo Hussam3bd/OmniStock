@@ -448,9 +448,9 @@ class ShopifyAdapter implements SalesChannelAdapter
         $query = <<<'GRAPHQL'
         query($cursor: String) {
           orders(
-            first: 50
+            first: 5
             after: $cursor
-            query: "return_status:return_requested OR return_status:in_progress OR return_status:inspection_complete OR return_status:returned OR return_status:return_failed OR return_status:return_open"
+            query: "return_status:IN_PROGRESS OR return_status:RETURNED OR return_status:RETURN_REQUESTED OR return_status:RETURN_FAILED"
             sortKey: PROCESSED_AT
             reverse: true
           ) {
@@ -465,7 +465,7 @@ class ShopifyAdapter implements SalesChannelAdapter
               processedAt
               createdAt
               returnStatus
-              returns(first: 10) {
+              returns(first: 3) {
                 nodes {
                   id
                   name
@@ -478,7 +478,7 @@ class ShopifyAdapter implements SalesChannelAdapter
                     id
                     legacyResourceId
                   }
-                  returnLineItems(first: 50) {
+                  returnLineItems(first: 10) {
                     edges {
                       node {
                         ... on ReturnLineItem {
@@ -502,12 +502,12 @@ class ShopifyAdapter implements SalesChannelAdapter
                       }
                     }
                   }
-                  reverseFulfillmentOrders(first: 10) {
+                  reverseFulfillmentOrders(first: 3) {
                     edges {
                       node {
                         id
                         status
-                        lineItems(first: 50) {
+                        lineItems(first: 10) {
                           edges {
                             node {
                               id
