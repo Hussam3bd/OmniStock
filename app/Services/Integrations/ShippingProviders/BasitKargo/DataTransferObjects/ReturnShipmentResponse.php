@@ -15,7 +15,7 @@ class ReturnShipmentResponse
     public static function fromArray(array $data): self
     {
         return new self(
-            trackingNumber: $data['returnBarcode'] ?? $data['trackingNumber'] ?? '',
+            trackingNumber: $data['returnBarcode'] ?? $data['barcode'] ?? $data['trackingNumber'] ?? '',
             shipmentId: $data['id'] ?? $data['shipmentId'] ?? '',
             labelUrl: $data['labelUrl'] ?? null,
             status: $data['status'] ?? 'NEW',

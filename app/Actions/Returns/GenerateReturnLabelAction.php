@@ -147,24 +147,36 @@ class GenerateReturnLabelAction extends BaseReturnAction
 
     /**
      * Save label file to media library
+     * Note: Label can also be regenerated on-demand from barcode, so saving is optional
      */
     protected function saveLabelFile(OrderReturn $return, LabelResponse $label): void
     {
-        // Save label content to temporary file
-        $tempPath = tempnam(sys_get_temp_dir(), 'return_label_');
-        file_put_contents($tempPath, $label->labelContent);
+        try {
+            // Save label content to temporary file
+            $tempPath = tempnam(sys_get_temp_dir(), 'return_label_');
+            file_put_contents($tempPath, $label->labelContent);
 
-        // Add to media library
-        $return->addMedia($tempPath)
-            ->usingFileName("return_label_{$label->trackingNumber}{$label->getFileExtension()}")
-            ->withCustomProperties([
-                'tracking_number' => $label->trackingNumber,
-                'format' => $label->format,
-                'generated_at' => now()->toIso8601String(),
-            ])
-            ->toMediaCollection('documents');
+            // Add to media library
+            $return->addMedia($tempPath)
+                ->usingFileName("return_label_{$label->trackingNumber}{$label->getFileExtension()}")
+                ->withCustomProperties([
+                    'tracking_number' => $label->trackingNumber,
+                    'format' => $label->format,
+                    'generated_at' => now()->toIso8601String(),
+                ])
+                ->toMediaCollection('documents');
 
-        // Clean up temp file
-        @unlink($tempPath);
+            // Clean up temp file
+            @unlink($tempPath);
+        } catch (\Exception $e) {
+            // Log but don't fail - label can be regenerated from barcode if needed
+            activity()
+                ->performedOn($return)
+                ->withProperties([
+                    'error' => $e->getMessage(),
+                    'tracking_number' => $label->trackingNumber,
+                ])
+                ->log('return_label_file_save_failed');
+        }
     }
 }
