@@ -14,7 +14,7 @@ use App\Services\Integrations\Concerns\BaseReturnsMapper;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
-class ReturnsMapper extends BaseReturnsMapper
+class ShopifyRefundMapper extends BaseReturnsMapper
 {
     protected function getChannel(): OrderChannel
     {

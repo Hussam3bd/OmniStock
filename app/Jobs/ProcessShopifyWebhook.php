@@ -7,7 +7,7 @@ use App\Enums\Integration\IntegrationType;
 use App\Models\Integration\Integration;
 use App\Services\Integrations\SalesChannels\Shopify\Mappers\OrderMapper;
 use App\Services\Integrations\SalesChannels\Shopify\Mappers\ReturnRequestMapper;
-use App\Services\Integrations\SalesChannels\Shopify\Mappers\ReturnsMapper;
+use App\Services\Integrations\SalesChannels\Shopify\Mappers\ShopifyRefundMapper;
 use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -129,7 +129,7 @@ class ProcessShopifyWebhook extends ProcessWebhookJob implements ShouldQueue
 
     protected function handleRefundWebhook(Integration $integration, string $topic, array $payload): void
     {
-        $mapper = app(ReturnsMapper::class);
+        $mapper = app(ShopifyRefundMapper::class);
 
         try {
             $return = $mapper->mapReturn($payload);

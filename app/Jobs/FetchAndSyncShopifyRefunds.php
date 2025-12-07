@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Integration\Integration;
-use App\Services\Integrations\SalesChannels\Shopify\Mappers\ReturnsMapper;
+use App\Services\Integrations\SalesChannels\Shopify\Mappers\ShopifyRefundMapper;
 use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,7 +28,7 @@ class FetchAndSyncShopifyRefunds implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(ReturnsMapper $mapper): void
+    public function handle(ShopifyRefundMapper $mapper): void
     {
         // Skip if batch has been cancelled
         if ($this->batch()?->cancelled()) {

@@ -82,6 +82,17 @@ return [
             'store_headers' => ['*'],
             'process_webhook_job' => \App\Jobs\ProcessShopifyWebhook::class,
         ],
+        [
+            'name' => 'basitkargo',
+            'signing_secret' => '',
+            'signature_header_name' => 'Authorization',
+            'signature_validator' => \App\Services\Integrations\ShippingProviders\BasitKargo\Webhooks\SignatureValidator::class,
+            'webhook_profile' => \App\Services\Integrations\ShippingProviders\BasitKargo\Webhooks\WebhookProfile::class,
+            'webhook_response' => \Spatie\WebhookClient\WebhookResponse\DefaultRespondsTo::class,
+            'webhook_model' => \Spatie\WebhookClient\Models\WebhookCall::class,
+            'store_headers' => ['*'],
+            'process_webhook_job' => \App\Jobs\ProcessBasitKargoWebhook::class,
+        ],
     ],
 
     /*
