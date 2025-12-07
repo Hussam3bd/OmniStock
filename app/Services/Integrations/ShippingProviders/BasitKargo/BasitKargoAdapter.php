@@ -155,7 +155,9 @@ class BasitKargoAdapter implements ShippingProviderAdapter
         $response = $this->client()->get("/v2/order/handler-shipment-code/{$trackingNumber}");
 
         if (! $response->successful()) {
-            throw new \Exception("Failed to track shipment: {$trackingNumber}");
+            $errorBody = $response->body();
+            $statusCode = $response->status();
+            throw new \Exception("Failed to track shipment {$trackingNumber} (HTTP {$statusCode}): {$errorBody}");
         }
 
         $data = $response->json();
