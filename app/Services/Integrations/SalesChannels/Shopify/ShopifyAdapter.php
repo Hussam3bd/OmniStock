@@ -507,6 +507,25 @@ class ShopifyAdapter implements SalesChannelAdapter
                       node {
                         id
                         status
+                        reverseDeliveries(first: 10) {
+                          edges {
+                            node {
+                              id
+                              deliverable {
+                                ... on ReverseDeliveryShippingDeliverable {
+                                  tracking {
+                                    number
+                                    url
+                                    carrierName
+                                  }
+                                  label {
+                                    publicFileUrl
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
                         lineItems(first: 10) {
                           edges {
                             node {
@@ -600,6 +619,25 @@ class ShopifyAdapter implements SalesChannelAdapter
                 node {
                   id
                   status
+                  reverseDeliveries(first: 10) {
+                    edges {
+                      node {
+                        id
+                        deliverable {
+                          ... on ReverseDeliveryShippingDeliverable {
+                            tracking {
+                              number
+                              url
+                              carrierName
+                            }
+                            label {
+                              publicFileUrl
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
                   lineItems(first: 50) {
                     edges {
                       node {

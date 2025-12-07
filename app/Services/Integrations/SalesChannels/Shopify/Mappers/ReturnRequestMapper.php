@@ -103,8 +103,11 @@ class ReturnRequestMapper extends BaseReturnsMapper
     {
         $currency = $order->currency;
 
+        // Extract tracking information from reverse deliveries
+        $trackingInfo = $this->extractTrackingInfo($shopifyReturn);
+
         // Map Shopify return status to our return status
-        $status = $this->mapReturnStatus($shopifyReturn['status'] ?? 'REQUESTED');
+        $status = $this->mapReturnStatus($shopifyReturn['status'] ?? 'REQUESTED', $trackingInfo);
 
         // Calculate original shipping cost from order
         $originalShippingCost = $order->total_shipping_cost?->getAmount() ?? 0;
@@ -124,12 +127,16 @@ class ReturnRequestMapper extends BaseReturnsMapper
             'approved_at' => isset($shopifyReturn['requestApprovedAt'])
                 ? Carbon::parse($shopifyReturn['requestApprovedAt'])
                 : null,
+            'label_generated_at' => $trackingInfo['has_label'] ? now() : null,
+            'shipped_at' => $trackingInfo['tracking_number'] ? now() : null,
             'completed_at' => $status === ReturnStatus::Completed && isset($shopifyReturn['closedAt'])
                 ? Carbon::parse($shopifyReturn['closedAt'])
                 : null,
             'reason_code' => $returnReason,
             'reason_name' => $returnReason ?? 'Customer Return Request',
             'customer_note' => $customerNote,
+            'return_tracking_number' => $trackingInfo['tracking_number'],
+            'return_tracking_url' => $trackingInfo['tracking_url'],
             'original_shipping_cost' => $originalShippingCost,
             'currency' => $currency,
             'platform_data' => $shopifyReturn,
@@ -153,7 +160,10 @@ class ReturnRequestMapper extends BaseReturnsMapper
 
     protected function updateReturn(OrderReturn $return, array $shopifyReturn, Order $order): void
     {
-        $status = $this->mapReturnStatus($shopifyReturn['status'] ?? 'REQUESTED');
+        // Extract tracking information from reverse deliveries
+        $trackingInfo = $this->extractTrackingInfo($shopifyReturn);
+
+        $status = $this->mapReturnStatus($shopifyReturn['status'] ?? 'REQUESTED', $trackingInfo);
         $customerNote = $this->getCustomerNote($shopifyReturn);
         $returnReason = $this->getReturnReason($shopifyReturn);
 
@@ -170,6 +180,22 @@ class ReturnRequestMapper extends BaseReturnsMapper
             'customer_note' => $customerNote ?? $return->customer_note,
             'platform_data' => $shopifyReturn,
         ];
+
+        // Update tracking info if available and not already set
+        if ($trackingInfo['tracking_number'] && ! $return->return_tracking_number) {
+            $updateData['return_tracking_number'] = $trackingInfo['tracking_number'];
+            $updateData['return_tracking_url'] = $trackingInfo['tracking_url'];
+        }
+
+        // Update label_generated_at if label exists but timestamp not set
+        if ($trackingInfo['has_label'] && ! $return->label_generated_at) {
+            $updateData['label_generated_at'] = now();
+        }
+
+        // Update shipped_at if tracking exists but timestamp not set
+        if ($trackingInfo['tracking_number'] && ! $return->shipped_at) {
+            $updateData['shipped_at'] = now();
+        }
 
         $return->update($updateData);
 
@@ -265,9 +291,9 @@ class ReturnRequestMapper extends BaseReturnsMapper
         }
     }
 
-    protected function mapReturnStatus(string $shopifyStatus): ReturnStatus
+    protected function mapReturnStatus(string $shopifyStatus, array $trackingInfo = []): ReturnStatus
     {
-        return match (strtoupper($shopifyStatus)) {
+        $baseStatus = match (strtoupper($shopifyStatus)) {
             'REQUESTED' => ReturnStatus::Requested,
             'OPEN' => ReturnStatus::PendingReview,
             'APPROVED' => ReturnStatus::Approved,
@@ -276,6 +302,64 @@ class ReturnRequestMapper extends BaseReturnsMapper
             'CANCELED', 'CANCELLED' => ReturnStatus::Cancelled,
             default => ReturnStatus::Requested,
         };
+
+        // Upgrade status based on tracking information
+        // Returns that have been approved or are pending review can be upgraded based on tracking
+        $upgradableStatuses = [ReturnStatus::Approved, ReturnStatus::PendingReview];
+
+        if (in_array($baseStatus, $upgradableStatuses)) {
+            if ($trackingInfo['tracking_number']) {
+                return ReturnStatus::InTransit;
+            }
+
+            if ($trackingInfo['has_label']) {
+                return ReturnStatus::LabelGenerated;
+            }
+        }
+
+        return $baseStatus;
+    }
+
+    /**
+     * Extract tracking information from Shopify return's reverse deliveries
+     */
+    protected function extractTrackingInfo(array $shopifyReturn): array
+    {
+        $trackingNumber = null;
+        $trackingUrl = null;
+        $hasLabel = false;
+        $carrier = null;
+
+        // Extract from reverseFulfillmentOrders.reverseDeliveries
+        foreach ($shopifyReturn['reverseFulfillmentOrders']['edges'] ?? [] as $rfoEdge) {
+            $reverseDeliveries = $rfoEdge['node']['reverseDeliveries']['edges'] ?? [];
+
+            foreach ($reverseDeliveries as $rdEdge) {
+                $delivery = $rdEdge['node'] ?? [];
+                $deliverable = $delivery['deliverable'] ?? [];
+
+                // Check if this delivery has a label
+                if (isset($deliverable['label']['publicFileUrl'])) {
+                    $hasLabel = true;
+                }
+
+                // Extract tracking info if available (from deliverable.tracking)
+                $tracking = $deliverable['tracking'] ?? null;
+                if ($tracking && isset($tracking['number'])) {
+                    $trackingNumber = $tracking['number'];
+                    $trackingUrl = $tracking['url'] ?? null;
+                    $carrier = $tracking['carrierName'] ?? null;
+                    break 2; // Found tracking, exit both loops
+                }
+            }
+        }
+
+        return [
+            'tracking_number' => $trackingNumber,
+            'tracking_url' => $trackingUrl,
+            'carrier' => $carrier,
+            'has_label' => $hasLabel,
+        ];
     }
 
     protected function getCustomerNote(array $shopifyReturn): ?string
