@@ -40,8 +40,8 @@ class GenerateReturnLabelAction extends BaseReturnAction
             // Step 1: Create return shipment
             $returnShipment = $adapter->createReturnShipment($return);
 
-            // Step 2: Get the label
-            $label = $adapter->getReturnLabel($returnShipment->trackingNumber);
+            // Step 2: Get the label using shipment ID (not tracking number)
+            $label = $adapter->getReturnLabel($returnShipment->shipmentId, $returnShipment->trackingNumber);
 
             // Step 3: Update the return with shipment details
             $this->updateReturnWithShipmentDetails($return, $integration, $returnShipment, $label);

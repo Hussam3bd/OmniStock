@@ -230,20 +230,17 @@ class BasitKargoAdapter implements ShippingProviderAdapter
     }
 
     /**
-     * Get shipping label for a shipment
+     * Get shipping label for a shipment using shipment ID
      */
-    public function getReturnLabel(string $trackingNumber): LabelResponse
+    public function getReturnLabel(string $shipmentId, string $trackingNumber): LabelResponse
     {
         try {
-            // First, get the shipment details to get the internal ID
-            $shipment = $this->getShipmentDetails($trackingNumber);
-
             // BasitKargo API: GET /label/svg/{id}
-            // Downloads the shipping label in SVG format
-            $response = $this->client()->get("/label/svg/{$shipment->id}");
+            // Downloads the shipping label in SVG format using shipment ID
+            $response = $this->client()->get("/label/svg/{$shipmentId}");
 
             if (! $response->successful()) {
-                throw new \Exception("Failed to get label for tracking {$trackingNumber}: ".$response->body());
+                throw new \Exception("Failed to get label for shipment {$shipmentId}: ".$response->body());
             }
 
             $svgContent = $response->body();
@@ -256,7 +253,7 @@ class BasitKargoAdapter implements ShippingProviderAdapter
                 ->withProperties([
                     'integration_id' => $this->integration->id,
                     'tracking_number' => $trackingNumber,
-                    'shipment_id' => $shipment->id,
+                    'shipment_id' => $shipmentId,
                     'label_format' => 'svg',
                 ])
                 ->log('basitkargo_label_downloaded');
@@ -267,6 +264,7 @@ class BasitKargoAdapter implements ShippingProviderAdapter
                 ->withProperties([
                     'integration_id' => $this->integration->id,
                     'tracking_number' => $trackingNumber,
+                    'shipment_id' => $shipmentId,
                     'error' => $e->getMessage(),
                 ])
                 ->log('basitkargo_label_download_failed');
