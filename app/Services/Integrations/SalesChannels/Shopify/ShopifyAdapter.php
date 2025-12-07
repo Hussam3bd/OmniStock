@@ -440,78 +440,84 @@ class ShopifyAdapter implements SalesChannelAdapter
 
     /**
      * Fetch returns for orders with return requests
-     * Uses GraphQL to query orders with any returns (excludes NO_RETURN)
+     * Uses GraphQL to query only orders that have returns (optimized query filtering)
+     * Sorted by processed date (newest first) for better performance
      */
     public function fetchReturnRequests(): Collection
     {
         $query = <<<'GRAPHQL'
         query($cursor: String) {
-          orders(first: 50, query: "return_status:RETURN_REQUESTED OR return_status:IN_PROGRESS OR return_status:RETURNED OR return_status:INSPECTION_COMPLETE", after: $cursor) {
+          orders(
+            first: 50
+            after: $cursor
+            query: "return_status:return_requested OR return_status:in_progress OR return_status:inspection_complete OR return_status:returned OR return_status:return_failed OR return_status:return_open"
+            sortKey: PROCESSED_AT
+            reverse: true
+          ) {
             pageInfo {
               hasNextPage
               endCursor
             }
-            edges {
-              node {
-                id
-                legacyResourceId
-                name
-                createdAt
-                returnStatus
-                returns(first: 10) {
-                  nodes {
+            nodes {
+              id
+              legacyResourceId
+              name
+              processedAt
+              createdAt
+              returnStatus
+              returns(first: 10) {
+                nodes {
+                  id
+                  name
+                  status
+                  createdAt
+                  requestApprovedAt
+                  closedAt
+                  totalQuantity
+                  order {
                     id
-                    name
-                    status
-                    createdAt
-                    requestApprovedAt
-                    closedAt
-                    totalQuantity
-                    order {
-                      id
-                      legacyResourceId
-                    }
-                    returnLineItems(first: 50) {
-                      edges {
-                        node {
-                          ... on ReturnLineItem {
-                            id
-                            quantity
-                            returnReason
-                            returnReasonNote
-                            customerNote
-                            fulfillmentLineItem {
-                              lineItem {
+                    legacyResourceId
+                  }
+                  returnLineItems(first: 50) {
+                    edges {
+                      node {
+                        ... on ReturnLineItem {
+                          id
+                          quantity
+                          returnReason
+                          returnReasonNote
+                          customerNote
+                          fulfillmentLineItem {
+                            lineItem {
+                              id
+                              sku
+                              name
+                              variant {
                                 id
-                                sku
-                                name
-                                variant {
-                                  id
-                                  legacyResourceId
-                                }
+                                legacyResourceId
                               }
                             }
                           }
                         }
                       }
                     }
-                    reverseFulfillmentOrders(first: 10) {
-                      edges {
-                        node {
-                          id
-                          status
-                          lineItems(first: 50) {
-                            edges {
-                              node {
-                                id
-                                totalQuantity
-                                fulfillmentLineItem {
-                                  lineItem {
+                  }
+                  reverseFulfillmentOrders(first: 10) {
+                    edges {
+                      node {
+                        id
+                        status
+                        lineItems(first: 50) {
+                          edges {
+                            node {
+                              id
+                              totalQuantity
+                              fulfillmentLineItem {
+                                lineItem {
+                                  id
+                                  variant {
                                     id
-                                    variant {
-                                      id
-                                      legacyResourceId
-                                    }
+                                    legacyResourceId
                                   }
                                 }
                               }
@@ -528,7 +534,7 @@ class ShopifyAdapter implements SalesChannelAdapter
         }
         GRAPHQL;
 
-        return $this->fetchPaginatedGraphQL($query);
+        return $this->fetchPaginatedGraphQLOrders($query);
     }
 
     /**
@@ -839,7 +845,67 @@ class ShopifyAdapter implements SalesChannelAdapter
     }
 
     /**
-     * Helper to fetch paginated GraphQL results
+     * Helper to fetch paginated GraphQL results using nodes format
+     * More efficient than edges format for large datasets
+     */
+    protected function fetchPaginatedGraphQLOrders(string $query, array $baseVariables = []): Collection
+    {
+        $allResults = collect();
+        $cursor = null;
+        $hasNextPage = true;
+
+        while ($hasNextPage) {
+            $variables = $cursor ? array_merge($baseVariables, ['cursor' => $cursor]) : $baseVariables;
+            $response = $this->makeGraphQLRequest($query, $variables);
+
+            if (! $response->successful()) {
+                activity()
+                    ->performedOn($this->integration)
+                    ->withProperties([
+                        'error' => $response->body(),
+                        'status' => $response->status(),
+                    ])
+                    ->log('shopify_graphql_request_failed');
+
+                break;
+            }
+
+            $data = $response->json();
+
+            if (isset($data['errors'])) {
+                activity()
+                    ->performedOn($this->integration)
+                    ->withProperties([
+                        'errors' => $data['errors'],
+                    ])
+                    ->log('shopify_graphql_errors');
+
+                break;
+            }
+
+            // Use nodes format directly (more efficient than edges)
+            $orders = $data['data']['orders']['nodes'] ?? [];
+            $pageInfo = $data['data']['orders']['pageInfo'] ?? [];
+
+            // Nodes are already in the correct format, no need to extract from edges
+            foreach ($orders as $order) {
+                $allResults->push($order);
+            }
+
+            $hasNextPage = $pageInfo['hasNextPage'] ?? false;
+            $cursor = $pageInfo['endCursor'] ?? null;
+
+            // Safety break to prevent infinite loops
+            if ($allResults->count() > 1000) {
+                break;
+            }
+        }
+
+        return $allResults;
+    }
+
+    /**
+     * Helper to fetch paginated GraphQL results (legacy edges format)
      */
     protected function fetchPaginatedGraphQL(string $query, array $baseVariables = []): Collection
     {
