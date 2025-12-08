@@ -3,9 +3,11 @@
 namespace App\Services\Integrations\SalesChannels\Shopify;
 
 use App\Enums\Order\OrderChannel;
+use App\Enums\Order\ReturnStatus;
 use App\Models\Customer\Customer;
 use App\Models\Integration\Integration;
 use App\Models\Order\Order;
+use App\Models\Order\OrderReturn;
 use App\Models\Product\ProductVariant;
 use App\Services\Integrations\Contracts\SalesChannelAdapter;
 use Carbon\Carbon;
@@ -1274,5 +1276,73 @@ GQL;
     public function getWebhookInfo(): ?array
     {
         return $this->integration->config['webhook'] ?? null;
+    }
+
+    /**
+     * Update return status in Shopify
+     *
+     * Shopify API: https://shopify.dev/docs/api/admin-rest/2025-10/resources/return
+     */
+    public function updateReturn(OrderReturn $return): bool
+    {
+        try {
+            // Map internal status to Shopify return status
+            $shopifyStatus = match ($return->status) {
+                ReturnStatus::Approved => 'approved',
+                ReturnStatus::Rejected => 'declined',
+                ReturnStatus::Completed => 'closed',
+                default => null,
+            };
+
+            if (! $shopifyStatus) {
+                activity()
+                    ->performedOn($return)
+                    ->withProperties([
+                        'status' => $return->status->value,
+                        'reason' => 'status_not_mappable_to_shopify',
+                    ])
+                    ->log('shopify_return_update_skipped');
+
+                return true; // Not an error, just not actionable
+            }
+
+            $response = $this->makeRequest('put', "/returns/{$return->external_return_id}.json", [
+                'return' => [
+                    'status' => $shopifyStatus,
+                ],
+            ]);
+
+            if ($response->successful()) {
+                activity()
+                    ->performedOn($return)
+                    ->withProperties([
+                        'external_return_id' => $return->external_return_id,
+                        'shopify_status' => $shopifyStatus,
+                    ])
+                    ->log('shopify_return_updated');
+
+                return true;
+            }
+
+            activity()
+                ->performedOn($return)
+                ->withProperties([
+                    'external_return_id' => $return->external_return_id,
+                    'status_code' => $response->status(),
+                    'error' => $response->json(),
+                ])
+                ->log('shopify_return_update_failed');
+
+            return false;
+        } catch (\Exception $e) {
+            activity()
+                ->performedOn($return)
+                ->withProperties([
+                    'error' => $e->getMessage(),
+                ])
+                ->log('shopify_return_update_exception');
+
+            return false;
+        }
     }
 }

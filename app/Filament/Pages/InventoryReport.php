@@ -50,6 +50,12 @@ class InventoryReport extends Page implements HasTable
     {
         return $table
             ->query($this->getTableQuery())
+            ->defaultGroup('product.title')
+            ->groups([
+                Tables\Grouping\Group::make('product.title')
+                    ->label(__('Product'))
+                    ->collapsible(),
+            ])
             ->columns([
                 Tables\Columns\TextColumn::make('product.title')
                     ->label(__('Product'))

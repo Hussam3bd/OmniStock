@@ -3,9 +3,11 @@
 namespace App\Services\Integrations\SalesChannels\Trendyol;
 
 use App\Enums\Order\OrderChannel;
+use App\Enums\Order\ReturnStatus;
 use App\Models\Customer\Customer;
 use App\Models\Integration\Integration;
 use App\Models\Order\Order;
+use App\Models\Order\OrderReturn;
 use App\Models\Product\ProductVariant;
 use App\Services\Integrations\Contracts\SalesChannelAdapter;
 use Carbon\Carbon;
@@ -531,5 +533,110 @@ class TrendyolAdapter implements SalesChannelAdapter
     public function getWebhookInfo(): ?array
     {
         return $this->integration->config['webhook'] ?? null;
+    }
+
+    /**
+     * Update return (claim) status in Trendyol
+     *
+     * Trendyol API: https://developers.trendyol.com/docs/marketplace/siparis-iptal-ve-iade-yonetimi/iade-onayla-reddet
+     */
+    public function updateReturn(OrderReturn $return): bool
+    {
+        try {
+            $supplierId = $this->integration->settings['supplier_id'];
+
+            // Determine action based on status
+            $action = match ($return->status) {
+                ReturnStatus::Approved => 'approve',
+                ReturnStatus::Rejected => 'reject',
+                default => null,
+            };
+
+            if (! $action) {
+                activity()
+                    ->performedOn($return)
+                    ->withProperties([
+                        'status' => $return->status->value,
+                        'reason' => 'status_not_actionable_for_trendyol',
+                    ])
+                    ->log('trendyol_claim_update_skipped');
+
+                return true; // Not an error, just not actionable
+            }
+
+            // Trendyol requires claim items to be included
+            $claimItemIds = [];
+            foreach ($return->items as $returnItem) {
+                // Extract Trendyol claim item ID from platform_data
+                $externalItemId = $returnItem->external_item_id
+                    ?? $returnItem->platform_data['claim_item_id']
+                    ?? null;
+
+                if ($externalItemId) {
+                    $claimItemIds[] = $externalItemId;
+                }
+            }
+
+            if (empty($claimItemIds)) {
+                activity()
+                    ->performedOn($return)
+                    ->withProperties([
+                        'reason' => 'no_claim_item_ids_found',
+                    ])
+                    ->log('trendyol_claim_update_failed');
+
+                return false;
+            }
+
+            $endpoint = $action === 'approve'
+                ? "/claims/approve/{$return->external_return_id}"
+                : "/claims/reject/{$return->external_return_id}";
+
+            $payload = ['claimItemIds' => $claimItemIds];
+
+            // Add reject reason if rejecting
+            if ($action === 'reject' && $return->internal_note) {
+                $payload['rejectReasonDetail'] = $return->internal_note;
+            }
+
+            $response = Http::withBasicAuth(
+                $this->integration->settings['api_key'],
+                $this->integration->settings['api_secret']
+            )->put("https://api.trendyol.com/sapigw/suppliers/{$supplierId}{$endpoint}", $payload);
+
+            if ($response->successful()) {
+                activity()
+                    ->performedOn($return)
+                    ->withProperties([
+                        'external_return_id' => $return->external_return_id,
+                        'action' => $action,
+                        'claim_item_ids' => $claimItemIds,
+                    ])
+                    ->log('trendyol_claim_updated');
+
+                return true;
+            }
+
+            activity()
+                ->performedOn($return)
+                ->withProperties([
+                    'external_return_id' => $return->external_return_id,
+                    'action' => $action,
+                    'status_code' => $response->status(),
+                    'error' => $response->json(),
+                ])
+                ->log('trendyol_claim_update_failed');
+
+            return false;
+        } catch (\Exception $e) {
+            activity()
+                ->performedOn($return)
+                ->withProperties([
+                    'error' => $e->getMessage(),
+                ])
+                ->log('trendyol_claim_update_exception');
+
+            return false;
+        }
     }
 }

@@ -2,7 +2,9 @@
 
 namespace App\Actions\Shipping;
 
+use App\Enums\Order\FulfillmentStatus;
 use App\Enums\Order\OrderStatus;
+use App\Enums\Order\PaymentStatus;
 use App\Enums\Order\ReturnReason;
 use App\Enums\Order\ReturnStatus;
 use App\Models\Integration\Integration;
@@ -134,8 +136,20 @@ class ProcessReturnedShipmentAction
             ]);
         }
 
-        // Update order status
-        $order->update(['order_status' => $orderStatus]);
+        // Update order status, fulfillment status, and payment status
+        $updateData = ['order_status' => $orderStatus];
+
+        if ($isCOD) {
+            // COD rejected: not fulfilled and no payment collected
+            $updateData['fulfillment_status'] = FulfillmentStatus::RETURNED;
+            $updateData['payment_status'] = PaymentStatus::VOIDED;
+        } else {
+            // Non-COD return: was delivered and paid, now returned
+            $updateData['fulfillment_status'] = FulfillmentStatus::RETURNED;
+            // Payment status remains as is (customer already paid, refund handled separately)
+        }
+
+        $order->update($updateData);
 
         activity()
             ->performedOn($return)

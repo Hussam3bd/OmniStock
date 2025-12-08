@@ -1,7 +1,12 @@
 # Return Management System - Implementation Plan
 
+⚠️ **SUPERSEDED**: This document is kept for historical reference. For the latest shipping sync and auto-return implementation plan, see:
+- **[Shipping Sync Implementation Plan](../docs/SHIPPING_SYNC_IMPLEMENTATION_PLAN.md)** - Complete unified approach for shipping sync and auto-return creation
+
+---
+
 ## Overview
-This document outlines the complete implementation plan for the return management system across all sales channels (Shopify, Trendyol, future channels).
+This document outlines the original implementation plan for the return management system across all sales channels (Shopify, Trendyol, future channels).
 
 ## Table of Contents
 - [Current State Analysis](#current-state-analysis)

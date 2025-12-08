@@ -9,6 +9,7 @@ use App\Enums\Order\PaymentStatus;
 use App\Enums\Shipping\ShippingCarrier;
 use App\Models\Accounting\Transaction;
 use App\Models\Address\Address;
+use App\Models\Concerns\HasAddressSnapshots;
 use App\Models\Customer\Customer;
 use App\Models\Inventory\InventoryMovement;
 use App\Models\Platform\PlatformMapping;
@@ -24,7 +25,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Order extends Model
 {
-    use \App\Models\Concerns\HasAddressSnapshots;
+    use HasAddressSnapshots;
     use LogsActivity;
 
     protected $fillable = [

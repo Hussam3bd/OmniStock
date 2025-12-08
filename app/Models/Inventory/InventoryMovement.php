@@ -5,6 +5,7 @@ namespace App\Models\Inventory;
 use App\Enums\Inventory\InventoryMovementType;
 use App\Models\Order\Order;
 use App\Models\Product\ProductVariant;
+use App\Models\Purchase\PurchaseOrderItem;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -45,7 +46,7 @@ class InventoryMovement extends Model
 
     public function purchaseOrderItem(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Purchase\PurchaseOrderItem::class);
+        return $this->belongsTo(PurchaseOrderItem::class);
     }
 
     public function location(): BelongsTo

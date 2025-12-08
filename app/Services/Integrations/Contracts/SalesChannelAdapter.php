@@ -4,6 +4,7 @@ namespace App\Services\Integrations\Contracts;
 
 use App\Models\Customer\Customer;
 use App\Models\Order\Order;
+use App\Models\Order\OrderReturn;
 use App\Models\Product\ProductVariant;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -26,4 +27,6 @@ interface SalesChannelAdapter
     public function registerWebhooks(): bool;
 
     public function verifyWebhook(Request $request): bool;
+
+    public function updateReturn(OrderReturn $return): bool;
 }

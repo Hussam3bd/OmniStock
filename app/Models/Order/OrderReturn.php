@@ -181,6 +181,9 @@ class OrderReturn extends Model implements HasMedia
 
         // Update order return status
         $this->updateOrderReturnStatus();
+
+        // Sync to sales channel
+        \App\Jobs\SyncReturnToChannel::dispatch($this);
     }
 
     public function reject(\App\Models\User $user, ?string $reason = null): void
@@ -191,6 +194,9 @@ class OrderReturn extends Model implements HasMedia
             'rejected_by' => $user->id,
             'internal_note' => $reason,
         ]);
+
+        // Sync to sales channel
+        \App\Jobs\SyncReturnToChannel::dispatch($this);
     }
 
     public function markAsReceived(\App\Models\User $user): void
