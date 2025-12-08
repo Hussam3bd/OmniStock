@@ -88,19 +88,19 @@ class EditIntegration extends EditRecord
                 ->requiresConfirmation()
                 ->modalHeading(__('Sync Payment Fees for All Orders'))
                 ->modalDescription(function () {
-                    $ordersCount = Order::where('payment_gateway', 'LIKE', '%iyzico%')
+                    $ordersCount = Order::where('integration_id', $this->record->id)
                         ->whereNotNull('payment_transaction_id')
                         ->count();
 
-                    return __('This will sync payment gateway fees from Iyzico for :count orders with payment transaction IDs. The process will run in the background.', [
+                    return __('This will sync payment gateway fees from Iyzico for :count orders from this integration. The process will run in the background.', [
                         'count' => $ordersCount,
                     ]);
                 })
                 ->modalSubmitActionLabel(__('Start Sync'))
                 ->action(function () {
                     try {
-                        // Get all orders with Iyzico payment gateway
-                        $orders = Order::where('payment_gateway', 'LIKE', '%iyzico%')
+                        // Get all orders from this integration with payment transaction IDs
+                        $orders = Order::where('integration_id', $this->record->id)
                             ->whereNotNull('payment_transaction_id')
                             ->get();
 
@@ -109,7 +109,7 @@ class EditIntegration extends EditRecord
                         if ($totalOrders === 0) {
                             Notification::make()
                                 ->title(__('No orders found'))
-                                ->body(__('No Iyzico orders with payment transaction IDs to sync'))
+                                ->body(__('No orders with payment transaction IDs found for this integration'))
                                 ->warning()
                                 ->send();
 

@@ -70,7 +70,7 @@ class ProcessTrendyolWebhook extends ProcessWebhookJob implements ShouldQueue
 
         try {
             $mapper = app(OrderMapper::class);
-            $order = $mapper->mapOrder($payload);
+            $order = $mapper->mapOrder($payload, $integration);
 
             activity()
                 ->performedOn($order)

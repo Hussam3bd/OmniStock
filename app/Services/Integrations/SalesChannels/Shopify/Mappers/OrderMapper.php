@@ -8,6 +8,7 @@ use App\Enums\Order\OrderStatus;
 use App\Enums\Order\PaymentStatus;
 use App\Enums\Shipping\ShippingCarrier;
 use App\Models\Customer\Customer;
+use App\Models\Integration\Integration;
 use App\Models\Order\Order;
 use App\Models\Platform\PlatformMapping;
 use App\Models\Product\ProductVariant;
@@ -31,9 +32,9 @@ class OrderMapper extends BaseOrderMapper
         return OrderChannel::SHOPIFY;
     }
 
-    public function mapOrder(array $shopifyOrder): Order
+    public function mapOrder(array $shopifyOrder, ?Integration $integration = null): Order
     {
-        return DB::transaction(function () use ($shopifyOrder) {
+        return DB::transaction(function () use ($shopifyOrder, $integration) {
             $customer = $this->findOrCreateCustomerFromShopify($shopifyOrder);
 
             $existingMapping = PlatformMapping::where('platform', $this->getChannel()->value)
@@ -43,14 +44,14 @@ class OrderMapper extends BaseOrderMapper
 
             if ($existingMapping && $existingMapping->entity) {
                 $order = $existingMapping->entity;
-                $this->updateOrder($order, $shopifyOrder);
+                $this->updateOrder($order, $shopifyOrder, $integration);
             } else {
                 // Clean up orphaned mapping if entity is missing
                 if ($existingMapping) {
                     $existingMapping->delete();
                 }
 
-                $order = $this->createOrder($customer, $shopifyOrder);
+                $order = $this->createOrder($customer, $shopifyOrder, $integration);
             }
 
             $this->syncOrderItems($order, $shopifyOrder['line_items'] ?? [], $shopifyOrder['refunds'] ?? []);
@@ -124,7 +125,7 @@ class OrderMapper extends BaseOrderMapper
         return $customer;
     }
 
-    protected function createOrder(Customer $customer, array $shopifyOrder): Order
+    protected function createOrder(Customer $customer, array $shopifyOrder, ?Integration $integration = null): Order
     {
         $currency = $shopifyOrder['currency'] ?? 'USD';
         // Use current_subtotal_price and current_total_price to account for order edits/refunds
@@ -159,6 +160,7 @@ class OrderMapper extends BaseOrderMapper
             'shipping_address_id' => null,
             'billing_address_id' => null,
             'channel' => $this->getChannel(),
+            'integration_id' => $integration?->id,
             'order_number' => $shopifyOrder['order_number'] ?? $shopifyOrder['name'] ?? null,
             'order_status' => $orderStatus,
             'payment_status' => $paymentStatus,
@@ -214,7 +216,7 @@ class OrderMapper extends BaseOrderMapper
         return $order;
     }
 
-    protected function updateOrder(Order $order, array $shopifyOrder): void
+    protected function updateOrder(Order $order, array $shopifyOrder, ?Integration $integration = null): void
     {
         $currency = $shopifyOrder['currency'] ?? 'USD';
         // Use current_subtotal_price and current_total_price to account for order edits/refunds
@@ -227,6 +229,11 @@ class OrderMapper extends BaseOrderMapper
         $newOrderStatus = $this->mapOrderStatus($shopifyOrder);
         $newPaymentStatus = $this->mapPaymentStatus($shopifyOrder);
         $newFulfillmentStatus = $this->mapFulfillmentStatus($shopifyOrder);
+
+        // Update integration_id if provided and not already set
+        if ($integration && ! $order->integration_id) {
+            $order->update(['integration_id' => $integration->id]);
+        }
 
         // Extract payment information
         $paymentInfo = $this->extractPaymentInformation($shopifyOrder);

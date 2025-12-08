@@ -47,10 +47,16 @@ class ResyncOrderAction extends Action
                         return;
                     }
 
-                    // Get the integration for this channel
-                    $integration = Integration::where('provider', $record->channel->value)
-                        ->where('is_active', true)
-                        ->first();
+                    // Get the integration for this order
+                    // Prefer the order's integration if available, otherwise fall back to first active integration
+                    $integration = $record->integration;
+
+                    if (! $integration || ! $integration->is_active) {
+                        // Fall back to finding an active integration for this channel
+                        $integration = Integration::where('provider', $record->channel->value)
+                            ->where('is_active', true)
+                            ->first();
+                    }
 
                     if (! $integration) {
                         Notification::make()
@@ -100,7 +106,7 @@ class ResyncOrderAction extends Action
         }
 
         // Map/sync the order
-        $mapper->mapOrder($orderData);
+        $mapper->mapOrder($orderData, $integration);
     }
 
     protected function resyncTrendyolOrder($record, $mapping, Integration $integration): void
@@ -117,6 +123,6 @@ class ResyncOrderAction extends Action
         }
 
         // Map/sync the order - this will recalculate costs, profits, etc.
-        $mapper->mapOrder($packageData);
+        $mapper->mapOrder($packageData, $integration);
     }
 }

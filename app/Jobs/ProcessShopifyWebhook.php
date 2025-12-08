@@ -113,7 +113,7 @@ class ProcessShopifyWebhook extends ProcessWebhookJob implements ShouldQueue
     protected function handleOrderWebhook(Integration $integration, string $topic, array $payload): void
     {
         $mapper = app(OrderMapper::class);
-        $order = $mapper->mapOrder($payload);
+        $order = $mapper->mapOrder($payload, $integration);
 
         activity()
             ->performedOn($order)

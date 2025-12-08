@@ -27,8 +27,8 @@ class InventoryService
                 return;
             }
 
-            // Get the default location (location with most stock)
-            $location = $this->getDefaultLocation($variant);
+            // Get location from order's integration or fall back to default
+            $location = $this->getLocationForOrder($order, $variant);
 
             if (! $location) {
                 Log::warning('No location found for inventory deduction', [
@@ -75,8 +75,8 @@ class InventoryService
                     continue;
                 }
 
-                // Get the default location (first location or location with most stock)
-                $location = $this->getDefaultLocation($variant);
+                // Get location from order's integration or fall back to default
+                $location = $this->getLocationForOrder($order, $variant);
 
                 if (! $location) {
                     Log::warning('No location found for inventory deduction', [
@@ -315,6 +315,36 @@ class InventoryService
 
         // Sync the variant's inventory_quantity with the total across all locations
         $variant->syncInventoryQuantity();
+    }
+
+    /**
+     * Get location for an order based on integration configuration
+     * If order has integration with location_id, use that
+     * Otherwise fall back to default location strategy
+     */
+    protected function getLocationForOrder(Order $order, ProductVariant $variant): ?Location
+    {
+        // Check if order has an integration with a configured location
+        if ($order->integration_id && $order->integration) {
+            $locationId = $order->integration->location_id;
+
+            if ($locationId) {
+                $location = Location::find($locationId);
+
+                if ($location) {
+                    return $location;
+                }
+
+                Log::warning('Integration location not found, falling back to default', [
+                    'order_id' => $order->id,
+                    'integration_id' => $order->integration_id,
+                    'location_id' => $locationId,
+                ]);
+            }
+        }
+
+        // Fall back to default location strategy
+        return $this->getDefaultLocation($variant);
     }
 
     /**

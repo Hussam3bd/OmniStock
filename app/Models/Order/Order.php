@@ -33,6 +33,7 @@ class Order extends Model
         'shipping_address_id',
         'billing_address_id',
         'channel',
+        'integration_id',
         'order_number',
         'order_status',
         'payment_status',
@@ -258,6 +259,11 @@ class Order extends Model
     public function shippingAggregatorIntegration(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Integration\Integration::class, 'shipping_aggregator_integration_id');
+    }
+
+    public function integration(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Integration\Integration::class);
     }
 
     public function items(): HasMany

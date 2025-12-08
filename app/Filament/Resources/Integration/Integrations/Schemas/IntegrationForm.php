@@ -58,6 +58,15 @@ class IntegrationForm
                     ->inline(false)
                     ->columnSpan(1),
 
+                Select::make('location_id')
+                    ->label(__('Warehouse / Location'))
+                    ->relationship('location', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->helperText(__('Select the warehouse/location for inventory management. Orders from this integration will deduct inventory from this location.'))
+                    ->visible(fn (Get $get): bool => $get('type') === IntegrationType::SALES_CHANNEL->value || $get('type') === IntegrationType::SALES_CHANNEL)
+                    ->columnSpanFull(),
+
                 Section::make(__('Provider Configuration'))
                     ->description(fn (Get $get): string => self::getProviderDescription($get('type'), $get('provider')))
                     ->schema(fn (Get $get): array => self::getProviderFields($get('type'), $get('provider')))

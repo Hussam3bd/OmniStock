@@ -37,7 +37,7 @@ class SyncTrendyolOrders implements ShouldQueue
         }
 
         try {
-            $mapper->mapOrder($this->orderData);
+            $mapper->mapOrder($this->orderData, $this->integration);
         } catch (\Exception $e) {
             // Log error but don't fail the entire batch
             activity()

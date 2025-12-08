@@ -45,7 +45,7 @@ class SyncShopifyOrders implements ShouldQueue
             // If we couldn't fetch the order, use the basic data we have
             $orderData = $orderWithTransactions ?? $this->orderData;
 
-            $mapper->mapOrder($orderData);
+            $mapper->mapOrder($orderData, $this->integration);
         } catch (\Exception $e) {
             // Log error but don't fail the entire batch
             activity()

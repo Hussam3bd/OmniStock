@@ -30,9 +30,9 @@ class OrderMapper extends BaseOrderMapper
         return OrderChannel::TRENDYOL;
     }
 
-    public function mapOrder(array $trendyolPackage): Order
+    public function mapOrder(array $trendyolPackage, ?\App\Models\Integration\Integration $integration = null): Order
     {
-        return DB::transaction(function () use ($trendyolPackage) {
+        return DB::transaction(function () use ($trendyolPackage, $integration) {
             $customer = $this->findOrCreateCustomerFromTrendyol($trendyolPackage);
 
             $existingMapping = PlatformMapping::where('platform', $this->getChannel()->value)
@@ -42,14 +42,14 @@ class OrderMapper extends BaseOrderMapper
 
             if ($existingMapping && $existingMapping->entity) {
                 $order = $existingMapping->entity;
-                $this->updateOrder($order, $trendyolPackage);
+                $this->updateOrder($order, $trendyolPackage, $integration);
             } else {
                 // Clean up orphaned mapping if entity is missing
                 if ($existingMapping) {
                     $existingMapping->delete();
                 }
 
-                $order = $this->createOrder($customer, $trendyolPackage);
+                $order = $this->createOrder($customer, $trendyolPackage, $integration);
             }
 
             $this->syncOrderItems($order, $trendyolPackage['lines'] ?? []);
@@ -103,7 +103,7 @@ class OrderMapper extends BaseOrderMapper
         return $customer;
     }
 
-    protected function createOrder(Customer $customer, array $trendyolPackage): Order
+    protected function createOrder(Customer $customer, array $trendyolPackage, ?\App\Models\Integration\Integration $integration = null): Order
     {
         $grossAmount = $this->convertToMinorUnits($trendyolPackage['grossAmount'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
         $totalDiscount = $this->convertToMinorUnits($trendyolPackage['totalDiscount'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
@@ -140,6 +140,7 @@ class OrderMapper extends BaseOrderMapper
             'shipping_address_id' => null,
             'billing_address_id' => null,
             'channel' => $this->getChannel(),
+            'integration_id' => $integration?->id,
             'order_number' => $trendyolPackage['orderNumber'] ?? null,
             'order_status' => $orderStatus,
             'payment_status' => $paymentStatus,
@@ -207,11 +208,16 @@ class OrderMapper extends BaseOrderMapper
         return $order;
     }
 
-    protected function updateOrder(Order $order, array $trendyolPackage): void
+    protected function updateOrder(Order $order, array $trendyolPackage, ?\App\Models\Integration\Integration $integration = null): void
     {
         $grossAmount = $this->convertToMinorUnits($trendyolPackage['grossAmount'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
         $totalDiscount = $this->convertToMinorUnits($trendyolPackage['totalDiscount'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
         $totalPrice = $this->convertToMinorUnits($trendyolPackage['totalPrice'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
+
+        // Update integration_id if provided and not already set
+        if ($integration && ! $order->integration_id) {
+            $order->update(['integration_id' => $integration->id]);
+        }
 
         $newOrderStatus = $this->mapOrderStatus($trendyolPackage['status'] ?? '');
         $newPaymentStatus = $this->mapPaymentStatus($trendyolPackage);
