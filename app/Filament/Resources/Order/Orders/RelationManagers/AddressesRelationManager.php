@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Order\Orders\RelationManagers;
 
-use App\Filament\Actions\Order\SyncAddressesToShopifyAction;
 use App\Filament\Resources\Address\Addresses\Schemas\AddressForm;
 use App\Filament\Resources\Address\Addresses\Tables\AddressesTable;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -15,6 +14,11 @@ class AddressesRelationManager extends RelationManager
 
     protected static ?string $recordTitleAttribute = 'full_name';
 
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
+
     public function form(Schema $schema): Schema
     {
         return AddressForm::configure($schema);
@@ -23,9 +27,6 @@ class AddressesRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return AddressesTable::configure($table)
-            ->headerActions([
-                SyncAddressesToShopifyAction::make(),
-            ])
             ->paginated(false);
     }
 }

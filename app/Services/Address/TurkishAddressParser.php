@@ -198,15 +198,12 @@ class TurkishAddressParser
     protected function findProvinceByName(string $name): ?Province
     {
         $normalized = $this->normalizeText($name);
-        $asciiNormalized = Str::ascii($normalized);
 
         return $this->getProvinces()
-            ->first(function ($province) use ($normalized, $asciiNormalized) {
+            ->first(function ($province) use ($normalized) {
                 $provinceName = $this->normalizeText($province->getTranslation('name', 'tr'));
-                $provinceNameAscii = Str::ascii($provinceName);
 
                 return $provinceName === $normalized
-                    || $provinceNameAscii === $asciiNormalized
                     || $this->normalizeText($province->getTranslation('name', 'en')) === $normalized;
             });
     }
@@ -217,15 +214,12 @@ class TurkishAddressParser
     protected function findProvinceInText(string $text): ?Province
     {
         $normalized = $this->normalizeText($text);
-        $asciiNormalized = Str::ascii($normalized);
 
         // Try to find any province name mentioned in the text
         foreach ($this->getProvinces() as $province) {
             $provinceName = $this->normalizeText($province->getTranslation('name', 'tr'));
-            $provinceNameAscii = Str::ascii($provinceName);
 
-            if (str_contains($normalized, $provinceName)
-                || str_contains($asciiNormalized, $provinceNameAscii)) {
+            if (str_contains($normalized, $provinceName)) {
                 return $province;
             }
         }
@@ -239,16 +233,13 @@ class TurkishAddressParser
     protected function findDistrictByName(string $name, Province $province): ?District
     {
         $normalized = $this->normalizeText($name);
-        $asciiNormalized = Str::ascii($normalized);
 
         return $this->getDistricts()
             ->where('province_id', $province->id)
-            ->first(function ($district) use ($normalized, $asciiNormalized) {
+            ->first(function ($district) use ($normalized) {
                 $districtName = $this->normalizeText($district->getTranslation('name', 'tr'));
-                $districtNameAscii = Str::ascii($districtName);
 
                 return $districtName === $normalized
-                    || $districtNameAscii === $asciiNormalized
                     || $this->normalizeText($district->getTranslation('name', 'en')) === $normalized;
             });
     }
@@ -259,15 +250,12 @@ class TurkishAddressParser
     protected function findDistrictInText(string $text, Province $province): ?District
     {
         $normalized = $this->normalizeText($text);
-        $asciiNormalized = Str::ascii($normalized);
 
         // Try to find any district name mentioned in the text
         foreach ($this->getDistricts()->where('province_id', $province->id) as $district) {
             $districtName = $this->normalizeText($district->getTranslation('name', 'tr'));
-            $districtNameAscii = Str::ascii($districtName);
 
-            if (str_contains($normalized, $districtName)
-                || str_contains($asciiNormalized, $districtNameAscii)) {
+            if (str_contains($normalized, $districtName)) {
                 return $district;
             }
         }
@@ -281,15 +269,20 @@ class TurkishAddressParser
     protected function findNeighborhoodByName(string $name, District $district): ?Neighborhood
     {
         $normalized = $this->normalizeText($name);
-        $asciiNormalized = Str::ascii($normalized);
 
-        return Neighborhood::where('district_id', $district->id)
-            ->where(function ($query) use ($normalized, $asciiNormalized) {
-                $query->whereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, "$.tr"))) = ?', [$normalized])
-                    ->orWhereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, "$.tr"))) = ?', [$asciiNormalized])
-                    ->orWhereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, "$.en"))) = ?', [$normalized]);
-            })
-            ->first();
+        // Get all neighborhoods in this district
+        $neighborhoods = Neighborhood::where('district_id', $district->id)->get();
+
+        // Search by comparing normalized versions
+        foreach ($neighborhoods as $neighborhood) {
+            $neighborhoodName = $this->normalizeText($neighborhood->getTranslation('name', 'tr'));
+
+            if ($neighborhoodName === $normalized) {
+                return $neighborhood;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -298,14 +291,20 @@ class TurkishAddressParser
     protected function findNeighborhoodByNameGlobal(string $name): ?Neighborhood
     {
         $normalized = $this->normalizeText($name);
-        $asciiNormalized = Str::ascii($normalized);
 
-        return Neighborhood::where(function ($query) use ($normalized, $asciiNormalized) {
-            $query->whereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, "$.tr"))) = ?', [$normalized])
-                ->orWhereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, "$.tr"))) = ?', [$asciiNormalized])
-                ->orWhereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, "$.en"))) = ?', [$normalized]);
-        })
-            ->first();
+        // Get all neighborhoods
+        $neighborhoods = Neighborhood::all();
+
+        // Search by comparing normalized versions
+        foreach ($neighborhoods as $neighborhood) {
+            $neighborhoodName = $this->normalizeText($neighborhood->getTranslation('name', 'tr'));
+
+            if ($neighborhoodName === $normalized) {
+                return $neighborhood;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -333,11 +332,11 @@ class TurkishAddressParser
     }
 
     /**
-     * Normalize text for matching (lowercase, trim)
+     * Normalize text for matching (trim, lowercase, ASCII conversion for Turkish characters)
      */
     protected function normalizeText(string $text): string
     {
-        return mb_strtolower(trim($text));
+        return Str::of($text)->trim()->lower()->ascii()->toString();
     }
 
     /**
