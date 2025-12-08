@@ -165,7 +165,7 @@ class ReceivePurchaseOrder extends Page implements HasSchemas
                     'product_variant_id' => $productVariant->id,
                     'location_id' => $locationId,
                     'purchase_order_item_id' => $item->id,
-                    'type' => 'purchase',
+                    'type' => \App\Enums\Inventory\InventoryMovementType::PurchaseReceived,
                     'quantity' => $quantityToReceive,
                     'quantity_before' => $quantityBefore,
                     'quantity_after' => $quantityBefore + $quantityToReceive,
