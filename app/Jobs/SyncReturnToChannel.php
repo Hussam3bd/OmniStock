@@ -3,9 +3,6 @@
 namespace App\Jobs;
 
 use App\Models\Order\OrderReturn;
-use App\Services\Integrations\Contracts\SalesChannelAdapter;
-use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
-use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -37,15 +34,20 @@ class SyncReturnToChannel implements ShouldQueue
             return;
         }
 
-        // Get the sales channel integration
+        // Get the sales channel integration by channel
         $order = $this->return->order;
-        $integration = $order->integration;
+
+        // Try order integration first, then fall back to channel-based lookup
+        $integration = $order->integration ?? \App\Models\Integration\Integration::where('provider', $this->return->channel->value)
+            ->where('type', 'sales_channel')
+            ->first();
 
         if (! $integration) {
             activity()
                 ->performedOn($this->return)
                 ->withProperties([
                     'reason' => 'no_integration_found',
+                    'channel' => $this->return->channel->value,
                 ])
                 ->log('return_sync_failed');
 
@@ -53,8 +55,8 @@ class SyncReturnToChannel implements ShouldQueue
         }
 
         try {
-            // Create adapter based on channel
-            $adapter = $this->createAdapter($integration);
+            // Get adapter from integration
+            $adapter = $integration->adapter();
 
             if (! $adapter) {
                 activity()
@@ -62,6 +64,7 @@ class SyncReturnToChannel implements ShouldQueue
                     ->withProperties([
                         'reason' => 'adapter_not_supported',
                         'channel' => $this->return->channel->value,
+                        'provider' => $integration->provider?->value,
                     ])
                     ->log('return_sync_skipped');
 
@@ -103,20 +106,5 @@ class SyncReturnToChannel implements ShouldQueue
 
             throw $e; // Re-throw for job retry logic
         }
-    }
-
-    /**
-     * Create the appropriate adapter for the integration
-     */
-    protected function createAdapter($integration): ?SalesChannelAdapter
-    {
-        return match ($integration->type) {
-            'sales_channel' => match ($integration->name) {
-                'Shopify' => new ShopifyAdapter($integration),
-                'Trendyol' => new TrendyolAdapter($integration),
-                default => null,
-            },
-            default => null,
-        };
     }
 }

@@ -4,6 +4,7 @@ namespace App\Actions\Shipping;
 
 use App\Enums\Order\FulfillmentStatus;
 use App\Enums\Order\OrderStatus;
+use App\Enums\Order\PaymentMethod;
 use App\Enums\Order\PaymentStatus;
 use App\Enums\Order\ReturnReason;
 use App\Enums\Order\ReturnStatus;
@@ -47,20 +48,59 @@ class ProcessReturnedShipmentAction
         }
 
         // Determine if COD
-        $isCOD = strtolower($order->payment_method ?? '') === 'cod';
+        $isCOD = $order->payment_method == PaymentMethod::COD;
 
-        // Set status, reason, and order status based on payment method
+        // For COD rejections: cancel the order at the channel instead of creating a return
+        // Customer never received the order, so it's a cancellation not a return
         if ($isCOD) {
-            $status = ReturnStatus::Received; // Already physically returned, no label needed
-            $reason = ReturnReason::COD_REJECTED;
-            $reasonText = __('Customer did not accept COD delivery');
-            $orderStatus = OrderStatus::REJECTED; // COD rejection at delivery
-        } else {
-            $status = ReturnStatus::Received; // Auto-received for non-COD
-            $reason = ReturnReason::RETURNED_BY_CARRIER;
-            $reasonText = __('Shipment returned by carrier');
-            $orderStatus = OrderStatus::RETURNED; // Post-delivery return
+            // Update order status
+            $order->update([
+                'order_status' => OrderStatus::REJECTED,
+                'fulfillment_status' => FulfillmentStatus::RETURNED,
+                'payment_status' => PaymentStatus::VOIDED,
+            ]);
+
+            // Cancel order at sales channel (Shopify/Trendyol)
+            // Get integration by channel if order doesn't have direct integration
+            $channelIntegration = $order->integration ?? Integration::where('provider', $order->channel->value)
+                ->where('type', 'sales_channel')
+                ->first();
+
+            if ($channelIntegration) {
+                $adapter = $channelIntegration->adapter();
+                if ($adapter) {
+                    try {
+                        $adapter->cancelOrder($order, __('Customer refused COD delivery'));
+                    } catch (\Exception $e) {
+                        activity()
+                            ->performedOn($order)
+                            ->withProperties([
+                                'error' => $e->getMessage(),
+                            ])
+                            ->log('order_cancellation_failed');
+                    }
+                }
+            }
+
+            activity()
+                ->performedOn($order)
+                ->withProperties([
+                    'integration_id' => $integration->id,
+                    'order_number' => $order->order_number,
+                    'tracking_number' => $order->shipping_tracking_number,
+                    'reason' => 'cod_rejected',
+                    'auto_cancelled' => true,
+                ])
+                ->log('order_auto_cancelled_cod_rejection');
+
+            return null; // No return created for COD rejections
         }
+
+        // For non-COD: create actual return (customer already received and paid)
+        $status = ReturnStatus::Received; // Already physically returned, no label needed
+        $reason = ReturnReason::RETURNED_BY_CARRIER;
+        $reasonText = __('Shipment returned by carrier');
+        $orderStatus = OrderStatus::RETURNED; // Post-delivery return
 
         // Extract tracking info
         $trackingNumber = $order->shipping_tracking_number;
@@ -103,9 +143,7 @@ class ProcessReturnedShipmentAction
             'reason_name' => $reasonText,
             'requested_at' => now(),
             'received_at' => $receivedAt ?? now(), // Already physically returned
-            'customer_note' => $isCOD
-                ? __('Customer refused to accept COD delivery')
-                : __('Shipment could not be delivered and was returned'),
+            'customer_note' => __('Shipment could not be delivered and was returned'),
             'internal_note' => __('Automatic return created from BasitKargo webhook. Shipment returned by :handler', [
                 'handler' => $handlerName ?? 'shipping carrier',
             ]),
@@ -121,7 +159,7 @@ class ProcessReturnedShipmentAction
             'platform_data' => [
                 'auto_created' => true,
                 'source' => 'basitkargo_webhook',
-                'is_cod' => $isCOD,
+                'is_cod' => false, // This path is only for non-COD
                 'shipment_data' => $shipmentData,
             ],
         ]);
@@ -136,20 +174,12 @@ class ProcessReturnedShipmentAction
             ]);
         }
 
-        // Update order status, fulfillment status, and payment status
-        $updateData = ['order_status' => $orderStatus];
-
-        if ($isCOD) {
-            // COD rejected: not fulfilled and no payment collected
-            $updateData['fulfillment_status'] = FulfillmentStatus::RETURNED;
-            $updateData['payment_status'] = PaymentStatus::VOIDED;
-        } else {
-            // Non-COD return: was delivered and paid, now returned
-            $updateData['fulfillment_status'] = FulfillmentStatus::RETURNED;
+        // Update order status for non-COD returns
+        $order->update([
+            'order_status' => $orderStatus,
+            'fulfillment_status' => FulfillmentStatus::RETURNED,
             // Payment status remains as is (customer already paid, refund handled separately)
-        }
-
-        $order->update($updateData);
+        ]);
 
         activity()
             ->performedOn($return)
@@ -157,7 +187,7 @@ class ProcessReturnedShipmentAction
                 'integration_id' => $integration->id,
                 'order_number' => $order->order_number,
                 'tracking_number' => $trackingNumber,
-                'is_cod' => $isCOD,
+                'is_cod' => false,
                 'status' => $status->value,
                 'reason' => $reason->value,
                 'order_status' => $orderStatus->value,

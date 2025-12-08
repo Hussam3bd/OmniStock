@@ -639,4 +639,64 @@ class TrendyolAdapter implements SalesChannelAdapter
             return false;
         }
     }
+
+    /**
+     * Cancel an order in Trendyol
+     *
+     * Trendyol API: https://developers.trendyol.com/docs/marketplace/siparis-iptal-ve-iade-yonetimi/siparis-iptal
+     */
+    public function cancelOrder(Order $order, string $reason): bool
+    {
+        try {
+            if (! $order->external_id) {
+                activity()
+                    ->performedOn($order)
+                    ->withProperties([
+                        'reason' => 'no_external_id',
+                    ])
+                    ->log('trendyol_order_cancel_skipped');
+
+                return false;
+            }
+
+            $supplierId = $this->integration->settings['supplier_id'];
+
+            $response = Http::withBasicAuth(
+                $this->integration->settings['api_key'],
+                $this->integration->settings['api_secret']
+            )->put("https://api.trendyol.com/sapigw/suppliers/{$supplierId}/orders/{$order->external_id}/cancel");
+
+            if ($response->successful()) {
+                activity()
+                    ->performedOn($order)
+                    ->withProperties([
+                        'external_id' => $order->external_id,
+                        'reason' => $reason,
+                    ])
+                    ->log('trendyol_order_cancelled');
+
+                return true;
+            }
+
+            activity()
+                ->performedOn($order)
+                ->withProperties([
+                    'external_id' => $order->external_id,
+                    'status_code' => $response->status(),
+                    'error' => $response->json(),
+                ])
+                ->log('trendyol_order_cancel_failed');
+
+            return false;
+        } catch (\Exception $e) {
+            activity()
+                ->performedOn($order)
+                ->withProperties([
+                    'error' => $e->getMessage(),
+                ])
+                ->log('trendyol_order_cancel_exception');
+
+            return false;
+        }
+    }
 }

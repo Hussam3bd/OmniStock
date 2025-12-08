@@ -1345,4 +1345,63 @@ GQL;
             return false;
         }
     }
+
+    /**
+     * Cancel an order in Shopify
+     *
+     * Shopify API: https://shopify.dev/docs/api/admin-rest/2025-10/resources/order#post-orders-order-id-cancel
+     */
+    public function cancelOrder(Order $order, string $reason): bool
+    {
+        try {
+            if (! $order->external_id) {
+                activity()
+                    ->performedOn($order)
+                    ->withProperties([
+                        'reason' => 'no_external_id',
+                    ])
+                    ->log('shopify_order_cancel_skipped');
+
+                return false;
+            }
+
+            $response = $this->makeRequest('post', "/orders/{$order->external_id}/cancel.json", [
+                'reason' => 'customer',
+                'email' => false, // Don't send cancellation email
+                'restock' => true, // Restock items
+            ]);
+
+            if ($response->successful()) {
+                activity()
+                    ->performedOn($order)
+                    ->withProperties([
+                        'external_id' => $order->external_id,
+                        'reason' => $reason,
+                    ])
+                    ->log('shopify_order_cancelled');
+
+                return true;
+            }
+
+            activity()
+                ->performedOn($order)
+                ->withProperties([
+                    'external_id' => $order->external_id,
+                    'status_code' => $response->status(),
+                    'error' => $response->json(),
+                ])
+                ->log('shopify_order_cancel_failed');
+
+            return false;
+        } catch (\Exception $e) {
+            activity()
+                ->performedOn($order)
+                ->withProperties([
+                    'error' => $e->getMessage(),
+                ])
+                ->log('shopify_order_cancel_exception');
+
+            return false;
+        }
+    }
 }

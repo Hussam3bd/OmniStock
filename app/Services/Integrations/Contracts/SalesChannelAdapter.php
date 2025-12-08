@@ -29,4 +29,6 @@ interface SalesChannelAdapter
     public function verifyWebhook(Request $request): bool;
 
     public function updateReturn(OrderReturn $return): bool;
+
+    public function cancelOrder(Order $order, string $reason): bool;
 }
