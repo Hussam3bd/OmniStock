@@ -270,19 +270,14 @@ class TurkishAddressParser
     {
         $normalized = $this->normalizeText($name);
 
-        // Get all neighborhoods in this district
-        $neighborhoods = Neighborhood::where('district_id', $district->id)->get();
-
-        // Search by comparing normalized versions
-        foreach ($neighborhoods as $neighborhood) {
-            $neighborhoodName = $this->normalizeText($neighborhood->getTranslation('name', 'tr'));
-
-            if ($neighborhoodName === $normalized) {
-                return $neighborhood;
-            }
-        }
-
-        return null;
+        // Use database query with normalized comparison to avoid N+1
+        // Since we normalize to ASCII, we can use database LOWER() function
+        return Neighborhood::where('district_id', $district->id)
+            ->where(function ($query) use ($normalized) {
+                $query->whereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, "$.tr"))) = ?', [$normalized])
+                    ->orWhereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, "$.en"))) = ?', [$normalized]);
+            })
+            ->first();
     }
 
     /**
@@ -292,19 +287,12 @@ class TurkishAddressParser
     {
         $normalized = $this->normalizeText($name);
 
-        // Get all neighborhoods
-        $neighborhoods = Neighborhood::all();
-
-        // Search by comparing normalized versions
-        foreach ($neighborhoods as $neighborhood) {
-            $neighborhoodName = $this->normalizeText($neighborhood->getTranslation('name', 'tr'));
-
-            if ($neighborhoodName === $normalized) {
-                return $neighborhood;
-            }
-        }
-
-        return null;
+        // Use database query with normalized comparison to avoid N+1
+        return Neighborhood::where(function ($query) use ($normalized) {
+            $query->whereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, "$.tr"))) = ?', [$normalized])
+                ->orWhereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, "$.en"))) = ?', [$normalized]);
+        })
+            ->first();
     }
 
     /**

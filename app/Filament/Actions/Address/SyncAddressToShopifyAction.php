@@ -2,10 +2,8 @@
 
 namespace App\Filament\Actions\Address;
 
-use App\Enums\Integration\IntegrationProvider;
-use App\Enums\Integration\IntegrationType;
 use App\Enums\Order\OrderChannel;
-use App\Models\Integration\Integration;
+use App\Jobs\SyncAddressToShopify;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 
@@ -51,42 +49,22 @@ class SyncAddressToShopifyAction extends Action
                 }
 
                 try {
-                    // Find Shopify integration
-                    $integration = Integration::where('type', IntegrationType::SALES_CHANNEL)
-                        ->where('provider', IntegrationProvider::SHOPIFY)
-                        ->where('is_active', true)
-                        ->first();
+                    // Dispatch job to queue for async processing
+                    SyncAddressToShopify::dispatch($order);
 
-                    if (! $integration) {
-                        Notification::make()
-                            ->danger()
-                            ->title('No Shopify Integration Found')
-                            ->body('Please configure and activate a Shopify integration first.')
-                            ->send();
+                    Notification::make()
+                        ->success()
+                        ->title('Sync Queued')
+                        ->body('The address sync has been queued. It will be processed shortly.')
+                        ->send();
 
-                        return;
-                    }
-
-                    $adapter = $integration->adapter();
-                    $success = $adapter->updateOrderAddresses($order);
-
-                    if ($success) {
-                        Notification::make()
-                            ->success()
-                            ->title('Address Synced Successfully')
-                            ->body('The address has been updated in Shopify.')
-                            ->send();
-                    } else {
-                        Notification::make()
-                            ->danger()
-                            ->title('Sync Failed')
-                            ->body('Failed to update address in Shopify. Check the activity log for details.')
-                            ->send();
-                    }
+                    activity()
+                        ->performedOn($order)
+                        ->log('shopify_address_sync_queued');
                 } catch (\Exception $e) {
                     Notification::make()
                         ->danger()
-                        ->title('Sync Error')
+                        ->title('Queue Error')
                         ->body($e->getMessage())
                         ->send();
                 }

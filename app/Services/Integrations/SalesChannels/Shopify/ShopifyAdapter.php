@@ -13,15 +13,65 @@ use App\Services\Integrations\Contracts\SalesChannelAdapter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class ShopifyAdapter implements SalesChannelAdapter
 {
     protected Integration $integration;
 
+    /**
+     * Shopify API rate limit: 40 requests per second for REST API
+     * GraphQL has a cost-based system, but we'll use a conservative limit
+     */
+    protected int $maxRequestsPerSecond = 30;
+
     public function __construct(Integration $integration)
     {
         $this->integration = $integration;
+    }
+
+    /**
+     * Rate limit API requests using cache-based token bucket algorithm
+     */
+    protected function rateLimit(): void
+    {
+        $cacheKey = "shopify_rate_limit:{$this->integration->id}";
+        $now = microtime(true);
+
+        // Get current bucket state
+        $bucket = Cache::get($cacheKey, [
+            'tokens' => $this->maxRequestsPerSecond,
+            'last_refill' => $now,
+        ]);
+
+        // Calculate tokens to add based on time elapsed
+        $timePassed = $now - $bucket['last_refill'];
+        $tokensToAdd = floor($timePassed * $this->maxRequestsPerSecond);
+
+        if ($tokensToAdd > 0) {
+            $bucket['tokens'] = min(
+                $this->maxRequestsPerSecond,
+                $bucket['tokens'] + $tokensToAdd
+            );
+            $bucket['last_refill'] = $now;
+        }
+
+        // If no tokens available, wait
+        if ($bucket['tokens'] < 1) {
+            $waitTime = (1 - $bucket['tokens']) / $this->maxRequestsPerSecond;
+            usleep((int) ($waitTime * 1000000)); // Convert to microseconds
+
+            // Refill after waiting
+            $bucket['tokens'] = 1;
+            $bucket['last_refill'] = microtime(true);
+        }
+
+        // Consume one token
+        $bucket['tokens'] -= 1;
+
+        // Store updated bucket state (expire after 2 seconds of inactivity)
+        Cache::put($cacheKey, $bucket, 2);
     }
 
     protected function getBaseUrl(): string
@@ -29,7 +79,7 @@ class ShopifyAdapter implements SalesChannelAdapter
         $shopDomain = $this->integration->settings['shop_domain'];
 
         // Ensure domain has .myshopify.com suffix if not already present
-        if (!str_contains($shopDomain, '.myshopify.com')) {
+        if (! str_contains($shopDomain, '.myshopify.com')) {
             $shopDomain .= '.myshopify.com';
         }
 
@@ -43,6 +93,9 @@ class ShopifyAdapter implements SalesChannelAdapter
         string $endpoint,
         array $params = []
     ): \Illuminate\Http\Client\Response {
+        // Apply rate limiting before making request
+        $this->rateLimit();
+
         $url = $this->getBaseUrl().$endpoint;
 
         return Http::withHeaders([
@@ -56,12 +109,15 @@ class ShopifyAdapter implements SalesChannelAdapter
      */
     protected function makeGraphQLRequest(string $query, array $variables = []): \Illuminate\Http\Client\Response
     {
+        // Apply rate limiting before making request
+        $this->rateLimit();
+
         $url = $this->getBaseUrl().'/graphql.json';
 
         $payload = ['query' => $query];
 
         // Only include variables if they're provided
-        if (!empty($variables)) {
+        if (! empty($variables)) {
             $payload['variables'] = $variables;
         }
 
@@ -102,7 +158,7 @@ class ShopifyAdapter implements SalesChannelAdapter
 
         $response = $this->makeRequest('get', '/orders.json', $params);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             activity()
                 ->performedOn($this->integration)
                 ->withProperties([
@@ -121,7 +177,7 @@ class ShopifyAdapter implements SalesChannelAdapter
     {
         $response = $this->makeRequest('get', "/orders/{$orderId}.json");
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             return null;
         }
 
@@ -178,7 +234,7 @@ class ShopifyAdapter implements SalesChannelAdapter
                 $response = $this->makeRequest('get', '/orders.json', $params);
             }
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 activity()
                     ->performedOn($this->integration)
                     ->withProperties([
@@ -222,7 +278,7 @@ class ShopifyAdapter implements SalesChannelAdapter
      */
     protected function parseNextPageUrl(?string $linkHeader): ?string
     {
-        if (!$linkHeader) {
+        if (! $linkHeader) {
             return null;
         }
 
@@ -236,7 +292,7 @@ class ShopifyAdapter implements SalesChannelAdapter
     {
         $response = $this->makeRequest('get', "/orders/{$externalId}.json");
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             return null;
         }
 
@@ -251,7 +307,7 @@ class ShopifyAdapter implements SalesChannelAdapter
 
         $response = $this->makeRequest('get', '/products.json', $params);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             activity()
                 ->performedOn($this->integration)
                 ->withProperties([
@@ -278,7 +334,7 @@ class ShopifyAdapter implements SalesChannelAdapter
         do {
             $response = $this->makeRequest('get', '/products.json', $params);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 break;
             }
 
@@ -318,14 +374,14 @@ class ShopifyAdapter implements SalesChannelAdapter
             ->where('platform', OrderChannel::SHOPIFY->value)
             ->first();
 
-        if (!$mapping || !isset($mapping->platform_data['inventory_item_id'])) {
+        if (! $mapping || ! isset($mapping->platform_data['inventory_item_id'])) {
             return false;
         }
 
         $inventoryItemId = $mapping->platform_data['inventory_item_id'];
         $locationId = $this->integration->settings['location_id'] ?? null;
 
-        if (!$locationId) {
+        if (! $locationId) {
             activity()
                 ->performedOn($this->integration)
                 ->withProperties([
@@ -363,7 +419,7 @@ class ShopifyAdapter implements SalesChannelAdapter
             ->where('platform', OrderChannel::SHOPIFY->value)
             ->first();
 
-        if (!$mapping) {
+        if (! $mapping) {
             return false;
         }
 
@@ -404,7 +460,7 @@ class ShopifyAdapter implements SalesChannelAdapter
     {
         $response = $this->makeRequest('get', "/orders/{$orderId}/refunds.json");
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             activity()
                 ->performedOn($this->integration)
                 ->withProperties([
@@ -669,7 +725,7 @@ class ShopifyAdapter implements SalesChannelAdapter
 
         $response = $this->makeGraphQLRequest($query, ['id' => $returnId]);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             activity()
                 ->performedOn($this->integration)
                 ->withProperties([
@@ -724,7 +780,7 @@ class ShopifyAdapter implements SalesChannelAdapter
 
         $response = $this->makeGraphQLRequest($mutation, ['id' => $returnId]);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             activity()
                 ->performedOn($this->integration)
                 ->withProperties([
@@ -751,7 +807,7 @@ class ShopifyAdapter implements SalesChannelAdapter
             return null;
         }
 
-        if (!empty($data['data']['returnApproveRequest']['userErrors'])) {
+        if (! empty($data['data']['returnApproveRequest']['userErrors'])) {
             activity()
                 ->performedOn($this->integration)
                 ->withProperties([
@@ -845,7 +901,7 @@ class ShopifyAdapter implements SalesChannelAdapter
 
         $response = $this->makeGraphQLRequest($mutation, $variables);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             activity()
                 ->performedOn($this->integration)
                 ->withProperties([
@@ -872,7 +928,7 @@ class ShopifyAdapter implements SalesChannelAdapter
             return null;
         }
 
-        if (!empty($data['data']['reverseDeliveryCreateWithShipping']['userErrors'])) {
+        if (! empty($data['data']['reverseDeliveryCreateWithShipping']['userErrors'])) {
             activity()
                 ->performedOn($this->integration)
                 ->withProperties([
@@ -901,7 +957,7 @@ class ShopifyAdapter implements SalesChannelAdapter
             $variables = $cursor ? array_merge($baseVariables, ['cursor' => $cursor]) : $baseVariables;
             $response = $this->makeGraphQLRequest($query, $variables);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 activity()
                     ->performedOn($this->integration)
                     ->withProperties([
@@ -960,7 +1016,7 @@ class ShopifyAdapter implements SalesChannelAdapter
             $variables = $cursor ? array_merge($baseVariables, ['cursor' => $cursor]) : $baseVariables;
             $response = $this->makeGraphQLRequest($query, $variables);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 activity()
                     ->performedOn($this->integration)
                     ->withProperties([
@@ -1063,7 +1119,7 @@ class ShopifyAdapter implements SalesChannelAdapter
             }
         }
 
-        if (!empty($webhooks)) {
+        if (! empty($webhooks)) {
             $config = $this->integration->config ?? [];
             $config['webhook'] = [
                 'topics' => $topics,
@@ -1097,7 +1153,7 @@ class ShopifyAdapter implements SalesChannelAdapter
     {
         $webhookConfig = $this->integration->config['webhook'] ?? null;
 
-        if (!$webhookConfig || !isset($webhookConfig['webhooks'])) {
+        if (! $webhookConfig || ! isset($webhookConfig['webhooks'])) {
             return true;
         }
 
@@ -1116,7 +1172,7 @@ class ShopifyAdapter implements SalesChannelAdapter
         $data = $request->getContent();
         $secret = $this->integration->settings['api_secret'] ?? $this->integration->settings['access_token'];
 
-        if (!$hmac || !$secret) {
+        if (! $hmac || ! $secret) {
             return false;
         }
 
@@ -1136,7 +1192,7 @@ class ShopifyAdapter implements SalesChannelAdapter
                 ->where('platform', OrderChannel::SHOPIFY->value)
                 ->first();
 
-            if (!$platformMapping) {
+            if (! $platformMapping) {
                 activity()
                     ->performedOn($order)
                     ->log('shopify_update_addresses_no_mapping');
@@ -1200,7 +1256,7 @@ GQL;
 
             $response = $this->makeGraphQLRequest($mutation, $variables);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 activity()
                     ->performedOn($order)
                     ->withProperties([
@@ -1283,7 +1339,7 @@ GQL;
                 default => null,
             };
 
-            if (!$shopifyStatus) {
+            if (! $shopifyStatus) {
                 activity()
                     ->performedOn($return)
                     ->withProperties([
@@ -1343,7 +1399,7 @@ GQL;
     public function cancelOrder(Order $order, string $reason): bool
     {
         try {
-            if (!$order->external_id) {
+            if (! $order->external_id) {
                 activity()
                     ->performedOn($order)
                     ->withProperties([
