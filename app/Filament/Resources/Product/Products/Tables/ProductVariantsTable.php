@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Product\Products\Tables;
 
+use App\Enums\Inventory\InventoryMovementType;
 use App\Enums\Order\OrderChannel;
 use App\Filament\Actions\AdjustStockAction;
 use App\Forms\Components\MoneyInput;
@@ -391,11 +392,7 @@ class ProductVariantsTable
                         ->schema([
                             Forms\Components\Select::make('type')
                                 ->label(__('Movement Type'))
-                                ->options([
-                                    'received' => __('Received (Purchase)'),
-                                    'adjustment' => __('Adjustment'),
-                                    'correction' => __('Correction'),
-                                ])
+                                ->options(InventoryMovementType::class)
                                 ->required()
                                 ->native(false),
 

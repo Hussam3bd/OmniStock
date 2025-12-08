@@ -2,6 +2,7 @@
 
 namespace App\Models\Inventory;
 
+use App\Enums\Inventory\InventoryMovementType;
 use App\Models\Order\Order;
 use App\Models\Product\ProductVariant;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,16 @@ class InventoryMovement extends Model
         'reference',
         'notes',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'type' => InventoryMovementType::class,
+            'quantity' => 'integer',
+            'quantity_before' => 'integer',
+            'quantity_after' => 'integer',
+        ];
+    }
 
     public function productVariant(): BelongsTo
     {

@@ -171,6 +171,25 @@ class ProductVariant extends Model implements HasMedia
         return $value ? $value->getTranslation('value', app()->getLocale()) : __('No value');
     }
 
+    /**
+     * Get total available quantity across all locations.
+     */
+    public function totalAvailableQuantity(): int
+    {
+        return $this->locations()->sum('location_inventory.quantity');
+    }
+
+    /**
+     * Update the inventory_quantity column based on location inventory.
+     * This syncs the variant's inventory_quantity with the sum of all location quantities.
+     */
+    public function syncInventoryQuantity(): void
+    {
+        $this->update([
+            'inventory_quantity' => $this->totalAvailableQuantity(),
+        ]);
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('images')

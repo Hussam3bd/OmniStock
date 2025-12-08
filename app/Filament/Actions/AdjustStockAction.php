@@ -2,6 +2,7 @@
 
 namespace App\Filament\Actions;
 
+use App\Enums\Inventory\InventoryMovementType;
 use App\Models\Inventory\InventoryMovement;
 use App\Models\Product\ProductVariant;
 use Filament\Actions\Action;
@@ -19,14 +20,7 @@ class AdjustStockAction
             ->schema([
                 Forms\Components\Select::make('type')
                     ->label(__('Movement Type'))
-                    ->options([
-                        'received' => __('Received (Purchase)'),
-                        'sold' => __('Sold (Manual)'),
-                        'returned' => __('Returned'),
-                        'damaged' => __('Damaged/Lost'),
-                        'adjustment' => __('Adjustment'),
-                        'correction' => __('Correction'),
-                    ])
+                    ->options(InventoryMovementType::class)
                     ->required()
                     ->native(false)
                     ->live(),
