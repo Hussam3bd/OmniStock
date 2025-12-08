@@ -3,6 +3,7 @@
 namespace App\Services\Integrations\SalesChannels\Trendyol\Mappers;
 
 use App\Enums\Order\OrderChannel;
+use App\Enums\Order\ReturnReason;
 use App\Enums\Order\ReturnStatus;
 use App\Enums\Shipping\ShippingCarrier;
 use App\Models\Order\Order;
@@ -54,6 +55,18 @@ class ClaimsMapper extends BaseReturnsMapper
             $firstItem = $claim['items'][0] ?? null;
             $firstClaimItem = $firstItem['claimItems'][0] ?? null;
 
+            // Map Trendyol reason to our unified ReturnReason enum
+            $trendyolReasonCode = $firstClaimItem['customerClaimItemReason']['code'] ?? null;
+            $trendyolReasonName = $firstClaimItem['customerClaimItemReason']['name'] ?? null;
+
+            $returnReason = null;
+            if ($trendyolReasonCode) {
+                $returnReason = ReturnReason::fromTrendyolCode($trendyolReasonCode);
+            }
+            if (! $returnReason && $trendyolReasonName) {
+                $returnReason = ReturnReason::fromText($trendyolReasonName);
+            }
+
             // Determine if this is approved/rejected
             $approvedAt = null;
             $rejectedAt = null;
@@ -89,8 +102,8 @@ class ClaimsMapper extends BaseReturnsMapper
                     'completed_at' => $completedAt,
                     'rejected_at' => $rejectedAt,
                     'last_modified_date' => $lastModifiedDate,
-                    'reason_code' => $firstClaimItem['customerClaimItemReason']['code'] ?? null,
-                    'reason_name' => $firstClaimItem['customerClaimItemReason']['name'] ?? null,
+                    'return_reason' => $returnReason?->value,
+                    'reason_name' => $trendyolReasonName,
                     'customer_note' => $firstClaimItem['customerNote'] ?? null,
                     'internal_note' => $firstClaimItem['note'] ?? null,
                     'return_shipping_carrier' => isset($claim['cargoProviderName']) ? ShippingCarrier::fromString($claim['cargoProviderName'])?->value : null,
@@ -204,6 +217,17 @@ class ClaimsMapper extends BaseReturnsMapper
                 // Calculate refund amount from order item (accounts for discounts)
                 $refundAmount = $orderItem?->unit_price?->getAmount() ?? 0;
 
+                // Map item reason to unified enum
+                $itemReasonCode = $claimItem['customerClaimItemReason']['code'] ?? null;
+                $itemReasonName = $claimItem['customerClaimItemReason']['name'] ?? null;
+                $itemReturnReason = null;
+                if ($itemReasonCode) {
+                    $itemReturnReason = ReturnReason::fromTrendyolCode($itemReasonCode);
+                }
+                if (! $itemReturnReason && $itemReasonName) {
+                    $itemReturnReason = ReturnReason::fromText($itemReasonName);
+                }
+
                 // Create return item
                 ReturnItem::updateOrCreate(
                     [
@@ -213,8 +237,8 @@ class ClaimsMapper extends BaseReturnsMapper
                     [
                         'order_item_id' => $orderItem?->id,
                         'quantity' => 1, // Trendyol claims are typically 1 item at a time
-                        'reason_code' => $claimItem['customerClaimItemReason']['code'] ?? null,
-                        'reason_name' => $claimItem['customerClaimItemReason']['name'] ?? null,
+                        'return_reason' => $itemReturnReason?->value,
+                        'reason_name' => $itemReasonName,
                         'note' => $claimItem['note'] ?? null,
                         'received_condition' => $this->mapCondition($claimItem),
                         'inspection_note' => $claimItem['note'] ?? null,

@@ -4,6 +4,7 @@ namespace App\Services\Shipping;
 
 use App\Enums\Integration\IntegrationProvider;
 use App\Enums\Integration\IntegrationType;
+use App\Enums\Order\OrderStatus;
 use App\Enums\Shipping\ShippingCarrier;
 use App\Models\Integration\Integration;
 use App\Models\Order\Order;
@@ -97,7 +98,7 @@ class ShippingCostSyncService
         $isReturned = $shipmentData['is_returned'] ?? false;
 
         // Determine if this is a COD rejected delivery
-        $isRejectedDelivery = $isReturned && $order->order_status === \App\Enums\Order\OrderStatus::REJECTED;
+        $isRejectedDelivery = $isReturned && $order->order_status === OrderStatus::REJECTED;
 
         // For rejected deliveries, use outbound cost only
         // For normal orders, use total cost

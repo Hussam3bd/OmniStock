@@ -2,8 +2,11 @@
 
 namespace App\Filament\Actions\Order;
 
+use App\Enums\Integration\IntegrationProvider;
+use App\Enums\Integration\IntegrationType;
+use App\Models\Integration\Integration;
 use App\Models\Order\Order;
-use App\Services\Shipping\ShippingCostSyncService;
+use App\Services\Shipping\ShippingDataSyncService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 
@@ -18,12 +21,12 @@ class ResyncShippingCostAction extends Action
     {
         parent::setUp();
 
-        $this->label(__('Resync Shipping Cost'))
+        $this->label(__('Resync Shipping Data'))
             ->icon('heroicon-o-truck')
             ->color('warning')
             ->requiresConfirmation()
-            ->modalHeading(__('Resync Shipping Cost from BasitKargo'))
-            ->modalDescription(fn (Order $record) => __('This will fetch the latest shipping cost data for tracking number :number from BasitKargo and update the order.', [
+            ->modalHeading(__('Resync Shipping Data from BasitKargo'))
+            ->modalDescription(fn (Order $record) => __('This will fetch the latest shipping data for tracking number :number from BasitKargo. It will update costs, carrier info, desi, and automatically create a return if the shipment was returned.', [
                 'number' => $record->shipping_tracking_number ?? 'N/A',
             ]))
             ->visible(fn (Order $record) => $record->shipping_tracking_number !== null)
@@ -38,30 +41,52 @@ class ResyncShippingCostAction extends Action
                     return;
                 }
 
-                try {
-                    $service = app(ShippingCostSyncService::class);
-                    $synced = $service->syncShippingCostFromBasitKargo($record, force: true);
+                // Get active BasitKargo integration
+                $integration = Integration::where('type', IntegrationType::SHIPPING_PROVIDER)
+                    ->where('provider', IntegrationProvider::BASIT_KARGO)
+                    ->where('is_active', true)
+                    ->first();
 
-                    if ($synced) {
+                if (! $integration) {
+                    Notification::make()
+                        ->danger()
+                        ->title(__('Integration Not Found'))
+                        ->body(__('No active BasitKargo integration found.'))
+                        ->send();
+
+                    return;
+                }
+
+                try {
+                    $service = app(ShippingDataSyncService::class);
+                    $result = $service->syncShippingData($record, $integration, force: true);
+
+                    if ($result['success']) {
+                        $results = $result['results'];
+                        $return = $result['return'] ?? null;
+
+                        $message = __('Successfully synced shipping data.');
+                        if ($return) {
+                            $message .= ' '.__('A return was automatically created.');
+                        }
+
                         Notification::make()
                             ->success()
-                            ->title(__('Shipping Cost Synced'))
-                            ->body(__('Successfully synced shipping cost from BasitKargo for tracking number :number.', [
-                                'number' => $record->shipping_tracking_number,
-                            ]))
+                            ->title(__('Shipping Data Synced'))
+                            ->body($message)
                             ->send();
                     } else {
                         Notification::make()
                             ->warning()
-                            ->title(__('Sync Skipped'))
-                            ->body(__('Shipping cost was not synced. This may be because the cost data is not available in BasitKargo or already exists.'))
+                            ->title(__('Sync Failed'))
+                            ->body(__('Failed to sync: :error', ['error' => $result['error'] ?? 'unknown']))
                             ->send();
                     }
                 } catch (\Exception $e) {
                     Notification::make()
                         ->danger()
                         ->title(__('Sync Failed'))
-                        ->body(__('Failed to sync shipping cost: :error', ['error' => $e->getMessage()]))
+                        ->body(__('Failed to sync shipping data: :error', ['error' => $e->getMessage()]))
                         ->send();
                 }
             });

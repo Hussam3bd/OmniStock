@@ -3,6 +3,7 @@
 namespace App\Models\Order;
 
 use App\Enums\Order\OrderChannel;
+use App\Enums\Order\ReturnReason;
 use App\Enums\Order\ReturnStatus;
 use App\Enums\Shipping\ShippingCarrier;
 use App\Models\Shipping\ShippingRate;
@@ -35,7 +36,7 @@ class OrderReturn extends Model implements HasMedia
         'inspected_at',
         'completed_at',
         'rejected_at',
-        'reason_code',
+        'return_reason',
         'reason_name',
         'customer_note',
         'internal_note',
@@ -46,7 +47,7 @@ class OrderReturn extends Model implements HasMedia
         'return_shipping_aggregator_integration_id',
         'return_shipping_aggregator_shipment_id',
         'return_shipping_aggregator_data',
-        'return_shipping_cost_excluding_vat',
+        'return_shipping_cost',
         'return_shipping_desi',
         'return_shipping_vat_rate',
         'return_shipping_vat_amount',
@@ -66,6 +67,7 @@ class OrderReturn extends Model implements HasMedia
         return [
             'channel' => OrderChannel::class,
             'status' => ReturnStatus::class,
+            'return_reason' => ReturnReason::class,
             'requested_at' => 'datetime',
             'approved_at' => 'datetime',
             'label_generated_at' => 'datetime',
@@ -75,7 +77,7 @@ class OrderReturn extends Model implements HasMedia
             'completed_at' => 'datetime',
             'rejected_at' => 'datetime',
             'return_shipping_carrier' => ShippingCarrier::class,
-            'return_shipping_cost_excluding_vat' => MoneyIntegerCast::class,
+            'return_shipping_cost' => MoneyIntegerCast::class,
             'return_shipping_vat_rate' => 'decimal:2',
             'return_shipping_vat_amount' => MoneyIntegerCast::class,
             'return_shipping_desi' => 'decimal:2',
@@ -222,11 +224,11 @@ class OrderReturn extends Model implements HasMedia
 
     public function getReturnShippingTotalAttribute(): Money
     {
-        if ($this->return_shipping_cost_excluding_vat && $this->return_shipping_vat_amount) {
-            return $this->return_shipping_cost_excluding_vat->add($this->return_shipping_vat_amount);
+        if ($this->return_shipping_cost && $this->return_shipping_vat_amount) {
+            return $this->return_shipping_cost->add($this->return_shipping_vat_amount);
         }
 
-        return $this->return_shipping_cost_excluding_vat ?? Money::TRY(0);
+        return $this->return_shipping_cost ?? Money::TRY(0);
     }
 
     public function getTotalShippingLoss(): Money

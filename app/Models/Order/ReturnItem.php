@@ -2,6 +2,7 @@
 
 namespace App\Models\Order;
 
+use App\Enums\Order\ReturnReason;
 use Cknow\Money\Casts\MoneyIntegerCast;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +13,7 @@ class ReturnItem extends Model
         'return_id',
         'order_item_id',
         'quantity',
-        'reason_code',
+        'return_reason',
         'reason_name',
         'note',
         'received_condition',
@@ -25,6 +26,7 @@ class ReturnItem extends Model
     protected function casts(): array
     {
         return [
+            'return_reason' => ReturnReason::class,
             'refund_amount' => MoneyIntegerCast::class,
             'platform_data' => 'array',
         ];

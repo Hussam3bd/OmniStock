@@ -8,7 +8,9 @@ use App\Enums\Order\ReturnStatus;
 use App\Models\Integration\Integration;
 use App\Models\Order\Order;
 use App\Models\Order\OrderReturn;
+use App\Services\Integrations\ShippingProviders\BasitKargo\BasitKargoAdapter;
 use App\Services\Integrations\ShippingProviders\BasitKargo\Enums\ShipmentStatus;
+use App\Services\Shipping\ShippingDataSyncService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -250,20 +252,22 @@ class ProcessBasitKargoWebhook extends ProcessWebhookJob implements ShouldQueue
             $updateData['shipping_aggregator_integration_id'] = $integration->id;
         }
 
-        // **CRITICAL: Handle COD returns (customer rejected delivery)**
-        if ($status === ShipmentStatus::RETURNED || $status === ShipmentStatus::RETURNING) {
-            $isCOD = strtolower($order->payment_method ?? '') === 'cod';
-
-            if ($isCOD) {
-                $this->handleCODReturn($order, $status, $payload, $integration, $isDetailedWebhook);
-
-                return;
-            }
-        }
-
         // Update order fields
         if (! empty($updateData)) {
             $order->update($updateData);
+        }
+
+        // Use unified shipping data sync service
+        // This handles: cost updates, info updates, and auto-return creation
+        if ($isDetailedWebhook) {
+            // For detailed webhooks, we have all the data we need
+            $adapter = new BasitKargoAdapter($integration);
+            $shipmentData = $adapter->trackShipment($trackingNumber);
+
+            if ($shipmentData) {
+                $syncService = app(ShippingDataSyncService::class);
+                $syncService->syncFromShipmentData($order, $shipmentData, $integration);
+            }
         }
 
         // Extract status message based on webhook type
@@ -285,123 +289,5 @@ class ProcessBasitKargoWebhook extends ProcessWebhookJob implements ShouldQueue
                 'webhook_type' => $isDetailedWebhook ? 'detailed' : 'simple',
             ])
             ->log('basitkargo_order_webhook_processed');
-    }
-
-    protected function handleCODReturn(
-        Order $order,
-        ShipmentStatus $status,
-        array $payload,
-        Integration $integration,
-        bool $isDetailedWebhook = false
-    ): void {
-        // Check if return already exists for this order
-        $existingReturn = OrderReturn::where('order_id', $order->id)
-            ->whereIn('status', [
-                ReturnStatus::Requested,
-                ReturnStatus::PendingReview,
-                ReturnStatus::Approved,
-                ReturnStatus::Completed,
-            ])
-            ->first();
-
-        if ($existingReturn) {
-            activity()
-                ->performedOn($order)
-                ->withProperties([
-                    'order_number' => $order->order_number,
-                    'tracking_number' => $payload['barcode'] ?? null,
-                    'existing_return_id' => $existingReturn->id,
-                    'reason' => 'Return already exists for this COD order',
-                ])
-                ->log('basitkargo_cod_return_skipped');
-
-            return;
-        }
-
-        // Extract return details
-        $trackingNumber = $payload['barcode'] ?? null;
-        $shipmentId = $payload['id'] ?? null;
-        $handlerName = $isDetailedWebhook
-            ? ($payload['shipmentInfo']['handler']['name'] ?? null)
-            : ($payload['handler']['name'] ?? null);
-
-        // Get delivery attempt time from detailed webhook
-        $receivedAt = null;
-        if ($isDetailedWebhook && isset($payload['traces']) && is_array($payload['traces'])) {
-            // Find the RETURNED trace entry
-            foreach ($payload['traces'] as $trace) {
-                if (str_contains(strtolower($trace['status'] ?? ''), 'geri dön')) {
-                    $receivedAt = isset($trace['time']) ? \Carbon\Carbon::parse($trace['time']) : null;
-                    break;
-                }
-            }
-        }
-
-        // Calculate original shipping cost from order
-        $originalShippingCost = $order->total_shipping_cost?->getAmount() ?? 0;
-
-        // Create return request with PendingReview status for employee approval
-        $return = OrderReturn::create([
-            'order_id' => $order->id,
-            'channel' => $order->channel,
-            'external_return_id' => $shipmentId,
-            'status' => ReturnStatus::PendingReview, // Employee must approve
-            'requested_at' => now(),
-            'received_at' => $receivedAt ?? now(),
-            'reason_code' => 'cod_rejected',
-            'reason_name' => __('COD Delivery Rejected by Customer'),
-            'customer_note' => __('Customer refused to accept COD delivery'),
-            'internal_note' => __('Automatic return created from BasitKargo webhook. Shipment returned by :handler', [
-                'handler' => $handlerName ?? 'shipping carrier',
-            ]),
-            // Copy outbound shipping details since same shipment returned
-            'return_shipping_carrier' => $handlerName ?? $order->shipping_carrier,
-            'return_tracking_number' => $trackingNumber,
-            'return_shipping_aggregator_integration_id' => $integration->id,
-            'return_shipping_aggregator_shipment_id' => $shipmentId,
-            'return_shipping_aggregator_data' => $payload,
-            // Shipping costs (loss = outbound cost, no return shipping cost for rejected COD)
-            'original_shipping_cost' => $originalShippingCost,
-            'return_shipping_cost_excluding_vat' => $originalShippingCost, // Copy from original
-            'currency' => $order->currency,
-            'platform_data' => [
-                'webhook_type' => $isDetailedWebhook ? 'detailed' : 'simple',
-                'basitkargo_status' => $status->value,
-                'auto_created' => true,
-                'source' => 'basitkargo_webhook',
-            ],
-        ]);
-
-        // Copy all order items to return items with full quantities
-        foreach ($order->items as $orderItem) {
-            $return->items()->create([
-                'order_item_id' => $orderItem->id,
-                'quantity' => $orderItem->quantity,
-                'refund_amount' => $orderItem->total_price, // Full refund for COD
-                'reason_name' => __('COD Delivery Rejected'),
-            ]);
-        }
-
-        activity()
-            ->performedOn($return)
-            ->withProperties([
-                'integration_id' => $integration->id,
-                'order_number' => $order->order_number,
-                'tracking_number' => $trackingNumber,
-                'shipment_id' => $shipmentId,
-                'basitkargo_status' => $status->value,
-                'auto_created' => true,
-            ])
-            ->log('basitkargo_cod_return_auto_created');
-
-        // Log activity on order as well
-        activity()
-            ->performedOn($order)
-            ->withProperties([
-                'return_id' => $return->id,
-                'return_number' => $return->return_number,
-                'reason' => 'COD delivery rejected - automatic return created',
-            ])
-            ->log('order_cod_return_created');
     }
 }

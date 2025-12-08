@@ -15,6 +15,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
     case COMPLETED = 'completed';
     case CANCELLED = 'cancelled';
     case REJECTED = 'rejected';
+    case RETURNED = 'returned';
     case REFUNDED = 'refunded';
     case PARTIALLY_REFUNDED = 'partially_refunded';
     case FAILED = 'failed';
@@ -29,6 +30,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
             self::COMPLETED => __('Completed'),
             self::CANCELLED => __('Cancelled'),
             self::REJECTED => __('Rejected'),
+            self::RETURNED => __('Returned'),
             self::REFUNDED => __('Refunded'),
             self::PARTIALLY_REFUNDED => __('Partially Refunded'),
             self::FAILED => __('Failed'),
@@ -38,16 +40,13 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
     public function getColor(): string|array|null
     {
         return match ($this) {
-            self::PENDING => 'warning',
+            self::PENDING, self::RETURNED, self::REFUNDED => 'warning',
             self::CONFIRMED => 'info',
             self::PROCESSING => 'primary',
             self::ON_HOLD => 'gray',
             self::COMPLETED => 'success',
-            self::CANCELLED => 'danger',
-            self::REJECTED => 'danger',
-            self::REFUNDED => 'warning',
+            self::CANCELLED, self::REJECTED, self::FAILED => 'danger',
             self::PARTIALLY_REFUNDED => 'warning',
-            self::FAILED => 'danger',
         };
     }
 
@@ -61,6 +60,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
             self::COMPLETED => 'heroicon-o-check-badge',
             self::CANCELLED => 'heroicon-o-x-circle',
             self::REJECTED => 'heroicon-o-hand-thumb-down',
+            self::RETURNED => 'heroicon-o-arrow-uturn-left',
             self::REFUNDED => 'heroicon-o-arrow-uturn-left',
             self::PARTIALLY_REFUNDED => 'heroicon-o-arrow-uturn-left',
             self::FAILED => 'heroicon-o-exclamation-triangle',
@@ -77,6 +77,7 @@ enum OrderStatus: string implements HasColor, HasIcon, HasLabel
             self::COMPLETED => __('Order successfully completed and delivered'),
             self::CANCELLED => __('Order cancelled'),
             self::REJECTED => __('Order rejected by customer at delivery'),
+            self::RETURNED => __('Order returned after delivery'),
             self::REFUNDED => __('Order refunded to customer'),
             self::PARTIALLY_REFUNDED => __('Order partially refunded to customer'),
             self::FAILED => __('Order failed to process'),
