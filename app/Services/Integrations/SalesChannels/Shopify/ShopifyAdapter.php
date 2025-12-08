@@ -1120,6 +1120,152 @@ class ShopifyAdapter implements SalesChannelAdapter
         return hash_equals($calculatedHmac, $hmac);
     }
 
+    /**
+     * Update order addresses in Shopify
+     */
+    public function updateOrderAddresses(Order $order): bool
+    {
+        try {
+            // Get Shopify order ID from platform mapping
+            $platformMapping = $order->platformMappings()
+                ->where('platform', OrderChannel::SHOPIFY->value)
+                ->first();
+
+            if (! $platformMapping) {
+                activity()
+                    ->performedOn($order)
+                    ->log('shopify_update_addresses_no_mapping');
+
+                return false;
+            }
+
+            $shopifyOrderId = 'gid://shopify/Order/'.$platformMapping->platform_id;
+
+            // Prepare shipping address
+            $shippingAddress = null;
+            if ($order->shippingAddress) {
+                $addr = $order->shippingAddress;
+                $shippingAddress = [
+                    'address1' => $addr->address_line1,
+                    'address2' => $addr->address_line2,
+                    'city' => $addr->district?->name,
+                    'province' => $addr->province?->name,
+                    'zip' => $addr->postal_code,
+                    'country' => $addr->country?->name ?? 'Turkey',
+                    'firstName' => $addr->first_name,
+                    'lastName' => $addr->last_name,
+                    'phone' => $addr->phone,
+                    'company' => $addr->company_name,
+                ];
+            }
+
+            // Prepare billing address
+            $billingAddress = null;
+            if ($order->billingAddress) {
+                $addr = $order->billingAddress;
+                $billingAddress = [
+                    'address1' => $addr->address_line1,
+                    'address2' => $addr->address_line2,
+                    'city' => $addr->district?->name,
+                    'province' => $addr->province?->name,
+                    'zip' => $addr->postal_code,
+                    'country' => $addr->country?->name ?? 'Turkey',
+                    'firstName' => $addr->first_name,
+                    'lastName' => $addr->last_name,
+                    'phone' => $addr->phone,
+                    'company' => $addr->company_name,
+                ];
+            }
+
+            // Build the mutation
+            $mutation = <<<'GQL'
+mutation OrderUpdate($input: OrderInput!) {
+  orderUpdate(input: $input) {
+    order {
+      id
+      shippingAddress {
+        address1
+        address2
+        city
+        province
+        zip
+        country
+        firstName
+        lastName
+        phone
+        company
+      }
+      billingAddress {
+        address1
+        address2
+        city
+        province
+        zip
+        country
+        firstName
+        lastName
+        phone
+        company
+      }
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+GQL;
+
+            $input = [
+                'id' => $shopifyOrderId,
+            ];
+
+            if ($shippingAddress) {
+                $input['shippingAddress'] = $shippingAddress;
+            }
+
+            if ($billingAddress) {
+                $input['billingAddress'] = $billingAddress;
+            }
+
+            $variables = [
+                'input' => $input,
+            ];
+
+            $response = $this->graphql->query($mutation, $variables);
+
+            if (isset($response['data']['orderUpdate']['userErrors']) &&
+                count($response['data']['orderUpdate']['userErrors']) > 0) {
+                activity()
+                    ->performedOn($order)
+                    ->withProperties([
+                        'errors' => $response['data']['orderUpdate']['userErrors'],
+                    ])
+                    ->log('shopify_update_addresses_failed');
+
+                return false;
+            }
+
+            activity()
+                ->performedOn($order)
+                ->withProperties([
+                    'shopify_order_id' => $shopifyOrderId,
+                ])
+                ->log('shopify_update_addresses_success');
+
+            return true;
+        } catch (\Exception $e) {
+            activity()
+                ->performedOn($order)
+                ->withProperties([
+                    'error' => $e->getMessage(),
+                ])
+                ->log('shopify_update_addresses_exception');
+
+            return false;
+        }
+    }
+
     public function hasWebhook(): bool
     {
         return isset($this->integration->config['webhook']['webhooks']);

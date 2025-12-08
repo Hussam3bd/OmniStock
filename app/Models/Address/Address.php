@@ -12,6 +12,17 @@ class Address extends Model
 {
     use SoftDeletes;
 
+    protected static function booted(): void
+    {
+        // Prevent hard deletion of order address snapshots
+        static::deleting(function (Address $address) {
+            if ($address->addressable_type === \App\Models\Order\Order::class && ! $address->isForceDeleting()) {
+                // For order addresses, only allow soft delete, not hard delete
+                return $address->trashed() ? true : null;
+            }
+        });
+    }
+
     protected $fillable = [
         'addressable_type',
         'addressable_id',

@@ -24,6 +24,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Order extends Model
 {
+    use \App\Models\Concerns\HasAddressSnapshots;
     use LogsActivity;
 
     protected $fillable = [
@@ -276,6 +277,11 @@ class Order extends Model
     public function platformMappings(): MorphMany
     {
         return $this->morphMany(PlatformMapping::class, 'entity');
+    }
+
+    public function addresses(): MorphMany
+    {
+        return $this->morphMany(Address::class, 'addressable');
     }
 
     public function returns(): HasMany

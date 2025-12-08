@@ -113,66 +113,6 @@ class OrderMapper extends BaseOrderMapper
         $paymentStatus = $this->mapPaymentStatus($trendyolPackage);
         $fulfillmentStatus = $this->mapFulfillmentStatus($trendyolPackage);
 
-        // Create addresses
-        $shippingAddressId = null;
-        $billingAddressId = null;
-
-        $hasShippingAddress = ! empty($trendyolPackage['shipmentAddress']);
-        $hasBillingAddress = ! empty($trendyolPackage['invoiceAddress']);
-
-        // Check if both addresses exist and are the same
-        if ($hasShippingAddress && $hasBillingAddress) {
-            $mappedShippingAddress = $this->mapTrendyolAddress($trendyolPackage['shipmentAddress']);
-            $mappedBillingAddress = $this->mapTrendyolAddress($trendyolPackage['invoiceAddress']);
-
-            $addressesAreSame = $this->addressService->isSameAddress(
-                $mappedShippingAddress,
-                $mappedBillingAddress
-            );
-
-            if ($addressesAreSame) {
-                // Create only one address for both shipping and billing
-                $address = $this->addressService->createOrUpdateAddress(
-                    $customer,
-                    $mappedShippingAddress,
-                    'shipping'
-                );
-                $shippingAddressId = $address->id;
-                $billingAddressId = $address->id;
-            } else {
-                // Create separate addresses
-                $shippingAddress = $this->addressService->createOrUpdateAddress(
-                    $customer,
-                    $mappedShippingAddress,
-                    'shipping'
-                );
-                $shippingAddressId = $shippingAddress->id;
-
-                $billingAddress = $this->addressService->createOrUpdateAddress(
-                    $customer,
-                    $mappedBillingAddress,
-                    'billing'
-                );
-                $billingAddressId = $billingAddress->id;
-            }
-        } elseif ($hasShippingAddress) {
-            // Only shipping address exists
-            $shippingAddress = $this->addressService->createOrUpdateAddress(
-                $customer,
-                $this->mapTrendyolAddress($trendyolPackage['shipmentAddress']),
-                'shipping'
-            );
-            $shippingAddressId = $shippingAddress->id;
-        } elseif ($hasBillingAddress) {
-            // Only billing address exists
-            $billingAddress = $this->addressService->createOrUpdateAddress(
-                $customer,
-                $this->mapTrendyolAddress($trendyolPackage['invoiceAddress']),
-                'billing'
-            );
-            $billingAddressId = $billingAddress->id;
-        }
-
         // Extract shipping information
         $shippedAt = isset($trendyolPackage['originShipmentDate'])
             ? Carbon::createFromTimestampMs($trendyolPackage['originShipmentDate'])
@@ -197,8 +137,8 @@ class OrderMapper extends BaseOrderMapper
 
         $order = Order::create([
             'customer_id' => $customer->id,
-            'shipping_address_id' => $shippingAddressId,
-            'billing_address_id' => $billingAddressId,
+            'shipping_address_id' => null,
+            'billing_address_id' => null,
             'channel' => $this->getChannel(),
             'order_number' => $trendyolPackage['orderNumber'] ?? null,
             'order_status' => $orderStatus,
@@ -244,6 +184,25 @@ class OrderMapper extends BaseOrderMapper
                 'last_synced_at' => now(),
             ]
         );
+
+        // Create addresses for both customer and order using unified method
+        $mappedShippingAddress = ! empty($trendyolPackage['shipmentAddress'])
+            ? $this->mapTrendyolAddress($trendyolPackage['shipmentAddress'])
+            : null;
+
+        $mappedBillingAddress = ! empty($trendyolPackage['invoiceAddress'])
+            ? $this->mapTrendyolAddress($trendyolPackage['invoiceAddress'])
+            : null;
+
+        $addressIds = $this->addressService->createOrderAndCustomerAddresses(
+            $order,
+            $customer,
+            $mappedShippingAddress,
+            $mappedBillingAddress
+        );
+
+        // Update order with address IDs
+        $order->update($addressIds);
 
         return $order;
     }

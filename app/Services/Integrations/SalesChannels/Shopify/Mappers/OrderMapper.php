@@ -153,67 +153,11 @@ class OrderMapper extends BaseOrderMapper
             ? Carbon::parse($firstFulfillment['updated_at'])
             : null;
 
-        // Create addresses
-        $shippingAddressId = null;
-        $billingAddressId = null;
-
-        $hasShippingAddress = ! empty($shopifyOrder['shipping_address']);
-        $hasBillingAddress = ! empty($shopifyOrder['billing_address']);
-
-        // Check if both addresses exist and are the same
-        if ($hasShippingAddress && $hasBillingAddress) {
-            $addressesAreSame = $this->addressService->isSameAddress(
-                $shopifyOrder['shipping_address'],
-                $shopifyOrder['billing_address']
-            );
-
-            if ($addressesAreSame) {
-                // Create only one address for both shipping and billing
-                $address = $this->addressService->createOrUpdateAddress(
-                    $customer,
-                    $shopifyOrder['shipping_address'],
-                    'shipping'
-                );
-                $shippingAddressId = $address->id;
-                $billingAddressId = $address->id;
-            } else {
-                // Create separate addresses
-                $shippingAddress = $this->addressService->createOrUpdateAddress(
-                    $customer,
-                    $shopifyOrder['shipping_address'],
-                    'shipping'
-                );
-                $shippingAddressId = $shippingAddress->id;
-
-                $billingAddress = $this->addressService->createOrUpdateAddress(
-                    $customer,
-                    $shopifyOrder['billing_address'],
-                    'billing'
-                );
-                $billingAddressId = $billingAddress->id;
-            }
-        } elseif ($hasShippingAddress) {
-            // Only shipping address exists
-            $shippingAddress = $this->addressService->createOrUpdateAddress(
-                $customer,
-                $shopifyOrder['shipping_address'],
-                'shipping'
-            );
-            $shippingAddressId = $shippingAddress->id;
-        } elseif ($hasBillingAddress) {
-            // Only billing address exists
-            $billingAddress = $this->addressService->createOrUpdateAddress(
-                $customer,
-                $shopifyOrder['billing_address'],
-                'billing'
-            );
-            $billingAddressId = $billingAddress->id;
-        }
-
+        // Create order first (without addresses)
         $order = Order::create([
             'customer_id' => $customer->id,
-            'shipping_address_id' => $shippingAddressId,
-            'billing_address_id' => $billingAddressId,
+            'shipping_address_id' => null,
+            'billing_address_id' => null,
             'channel' => $this->getChannel(),
             'order_number' => $shopifyOrder['order_number'] ?? $shopifyOrder['name'] ?? null,
             'order_status' => $orderStatus,
@@ -255,6 +199,17 @@ class OrderMapper extends BaseOrderMapper
                 'last_synced_at' => now(),
             ]
         );
+
+        // Create addresses for both customer and order using unified method
+        $addressIds = $this->addressService->createOrderAndCustomerAddresses(
+            $order,
+            $customer,
+            $shopifyOrder['shipping_address'] ?? null,
+            $shopifyOrder['billing_address'] ?? null
+        );
+
+        // Update order with address IDs
+        $order->update($addressIds);
 
         return $order;
     }

@@ -90,7 +90,7 @@ class AddressService
                 'addressable_type' => get_class($addressable),
                 'addressable_id' => $addressable->id,
                 'type' => $type->value,
-                'title' => $addressData['title'] ?? ucfirst($addressType),
+                'title' => $addressData['title'] ?? ucfirst($addressType === 'both' ? 'shipping & billing' : $addressType),
             ],
             [
                 'country_id' => $country?->id,
@@ -112,8 +112,8 @@ class AddressService
                 'tax_number' => $addressData['tax_number'] ?? null,
                 'identity_number' => $addressData['identity_number'] ?? null,
                 'is_default' => $isDefault,
-                'is_billing' => $addressType === 'billing',
-                'is_shipping' => $addressType === 'shipping',
+                'is_billing' => $addressType === 'billing' || $addressType === 'both',
+                'is_shipping' => $addressType === 'shipping' || $addressType === 'both',
             ]
         );
     }
@@ -283,6 +283,184 @@ class AddressService
         ]);
 
         return $this->parser->parse($addressText);
+    }
+
+    /**
+     * Create an address snapshot for an order (immutable copy)
+     * This creates a NEW address that belongs to the order, not the customer
+     */
+    public function createOrderAddressSnapshot(
+        Model $order,
+        array $addressData,
+        string $addressType = 'shipping'
+    ): Address {
+        // Find matching Turkish locations
+        $country = $this->findCountry($addressData['country'] ?? null, $addressData['country_code'] ?? null);
+        $province = null;
+        $district = null;
+        $neighborhood = null;
+
+        // Only match Turkish addresses
+        if ($country && $country->iso2 === 'TR') {
+            // Try structured data first
+            $province = $this->matchProvince($addressData['province'] ?? $addressData['city'] ?? null);
+
+            if ($province) {
+                $district = $this->matchDistrict($province, $addressData['district'] ?? $addressData['city'] ?? null);
+
+                if ($district) {
+                    $neighborhood = $this->matchNeighborhood($district, $addressData['neighborhood'] ?? null);
+                }
+            }
+
+            // If we still don't have province/district, try parsing the full address
+            if (! $province || ! $district) {
+                $parsed = $this->parseFullAddress($addressData);
+
+                if (! $province && $parsed['province']) {
+                    $province = $parsed['province'];
+                }
+
+                if (! $district && $parsed['district']) {
+                    $district = $parsed['district'];
+                }
+
+                if (! $neighborhood && $parsed['neighborhood']) {
+                    $neighborhood = $parsed['neighborhood'];
+                }
+
+                // Extract building details from parsed data
+                $addressData['building_number'] = $addressData['building_number'] ?? $parsed['building_number'];
+                $addressData['floor'] = $addressData['floor'] ?? $parsed['floor'];
+                $addressData['apartment'] = $addressData['apartment'] ?? $parsed['apartment'];
+            }
+        }
+
+        // Determine address type
+        $type = $this->determineAddressType($addressData);
+
+        // Normalize phone number based on country
+        $phone = $this->phoneService->normalize(
+            $addressData['phone'] ?? null,
+            $country?->iso2
+        );
+
+        // Create NEW address snapshot (always create, never update)
+        return Address::create([
+            'addressable_type' => get_class($order),
+            'addressable_id' => $order->id,
+            'type' => $type->value,
+            'title' => $addressData['title'] ?? ucfirst($addressType === 'both' ? 'shipping & billing' : $addressType),
+            'country_id' => $country?->id,
+            'province_id' => $province?->id,
+            'district_id' => $district?->id,
+            'neighborhood_id' => $neighborhood?->id,
+            'first_name' => $addressData['first_name'] ?? null,
+            'last_name' => $addressData['last_name'] ?? null,
+            'company_name' => $addressData['company'] ?? $addressData['company_name'] ?? null,
+            'phone' => $phone,
+            'email' => $addressData['email'] ?? null,
+            'address_line1' => $addressData['address1'] ?? $addressData['address_line1'] ?? null,
+            'address_line2' => $addressData['address2'] ?? $addressData['address_line2'] ?? null,
+            'building_number' => $addressData['building_number'] ?? null,
+            'floor' => $addressData['floor'] ?? null,
+            'apartment' => $addressData['apartment'] ?? null,
+            'postal_code' => $addressData['zip'] ?? $addressData['postal_code'] ?? null,
+            'tax_office' => $addressData['tax_office'] ?? null,
+            'tax_number' => $addressData['tax_number'] ?? null,
+            'identity_number' => $addressData['identity_number'] ?? null,
+            'is_default' => false, // Order addresses are never default
+            'is_billing' => $addressType === 'billing' || $addressType === 'both',
+            'is_shipping' => $addressType === 'shipping' || $addressType === 'both',
+        ]);
+    }
+
+    /**
+     * Create addresses for an order and its customer in one unified operation
+     * This handles the complete flow: customer address book + order snapshots
+     *
+     * @param  Model  $order  The order model
+     * @param  Customer  $customer  The customer model
+     * @param  array|null  $shippingAddressData  Shipping address data from platform
+     * @param  array|null  $billingAddressData  Billing address data from platform
+     * @return array ['shipping_address_id' => int|null, 'billing_address_id' => int|null]
+     */
+    public function createOrderAndCustomerAddresses(
+        Model $order,
+        Model $customer,
+        ?array $shippingAddressData,
+        ?array $billingAddressData
+    ): array {
+        $hasShipping = ! empty($shippingAddressData);
+        $hasBilling = ! empty($billingAddressData);
+
+        // Check if both addresses exist and are the same
+        $addressesAreSame = $hasShipping && $hasBilling &&
+            $this->isSameAddress($shippingAddressData, $billingAddressData);
+
+        $shippingAddressId = null;
+        $billingAddressId = null;
+
+        if ($addressesAreSame) {
+            // Create ONE address for customer (with both flags)
+            $this->createOrUpdateAddress(
+                $customer,
+                $shippingAddressData,
+                'both'
+            );
+
+            // Create ONE snapshot for order (with both flags)
+            $orderSnapshot = $this->createOrderAddressSnapshot(
+                $order,
+                $shippingAddressData,
+                'both'
+            );
+
+            $shippingAddressId = $orderSnapshot->id;
+            $billingAddressId = $orderSnapshot->id;
+        } else {
+            // Create separate addresses
+            if ($hasShipping) {
+                // Create customer address
+                $this->createOrUpdateAddress(
+                    $customer,
+                    $shippingAddressData,
+                    'shipping'
+                );
+
+                // Create order snapshot
+                $shippingSnapshot = $this->createOrderAddressSnapshot(
+                    $order,
+                    $shippingAddressData,
+                    'shipping'
+                );
+
+                $shippingAddressId = $shippingSnapshot->id;
+            }
+
+            if ($hasBilling) {
+                // Create customer address
+                $this->createOrUpdateAddress(
+                    $customer,
+                    $billingAddressData,
+                    'billing'
+                );
+
+                // Create order snapshot
+                $billingSnapshot = $this->createOrderAddressSnapshot(
+                    $order,
+                    $billingAddressData,
+                    'billing'
+                );
+
+                $billingAddressId = $billingSnapshot->id;
+            }
+        }
+
+        return [
+            'shipping_address_id' => $shippingAddressId,
+            'billing_address_id' => $billingAddressId,
+        ];
     }
 
     /**
