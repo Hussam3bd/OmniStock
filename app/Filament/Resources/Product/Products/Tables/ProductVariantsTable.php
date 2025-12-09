@@ -27,6 +27,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 
 class ProductVariantsTable
 {
@@ -317,67 +318,14 @@ class ProductVariantsTable
                     ->label(__('History'))
                     ->icon('heroicon-o-clock')
                     ->color('gray')
-                    ->modalHeading(fn (Model $record): string => __('Inventory History: :sku', ['sku' => $record->sku]))
-                    ->modalWidth('4xl')
-                    ->infolist(function (Model $record): array {
-                        $movements = $record->inventoryMovements()
-                            ->orderBy('created_at', 'desc')
-                            ->limit(50)
-                            ->get();
-
-                        if ($movements->isEmpty()) {
-                            return [
-                                \Filament\Infolists\Components\TextEntry::make('no_history')
-                                    ->label('')
-                                    ->state(__('No inventory movements recorded yet'))
-                                    ->color('gray'),
-                            ];
-                        }
-
-                        return [
-                            \Filament\Infolists\Components\RepeatableEntry::make('movements')
-                                ->label(__('Movement History'))
-                                ->state($movements->toArray())
-                                ->schema([
-                                    \Filament\Infolists\Components\TextEntry::make('created_at')
-                                        ->label(__('Date'))
-                                        ->dateTime()
-                                        ->size('sm'),
-
-                                    \Filament\Infolists\Components\TextEntry::make('type')
-                                        ->label(__('Type'))
-                                        ->badge()
-                                        ->formatStateUsing(fn ($state) => __(ucfirst($state)))
-                                        ->color(fn ($state): string => match ($state) {
-                                            'received' => 'success',
-                                            'sold' => 'primary',
-                                            'returned' => 'warning',
-                                            'damaged' => 'danger',
-                                            default => 'gray',
-                                        }),
-
-                                    \Filament\Infolists\Components\TextEntry::make('quantity')
-                                        ->label(__('Change'))
-                                        ->formatStateUsing(fn ($state) => $state > 0 ? "+{$state}" : $state)
-                                        ->color(fn ($state): string => $state > 0 ? 'success' : 'danger')
-                                        ->weight('bold'),
-
-                                    \Filament\Infolists\Components\TextEntry::make('quantity_before')
-                                        ->label(__('Before'))
-                                        ->formatStateUsing(fn ($state) => (string) $state),
-
-                                    \Filament\Infolists\Components\TextEntry::make('quantity_after')
-                                        ->label(__('After'))
-                                        ->formatStateUsing(fn ($state) => (string) $state),
-
-                                    \Filament\Infolists\Components\TextEntry::make('reference')
-                                        ->label(__('Reference'))
-                                        ->default('-')
-                                        ->columnSpanFull(),
-                                ])
-                                ->columns(5),
-                        ];
-                    })
+                    ->modalHeading(fn (ProductVariant $record): string => __('Inventory History: :sku', ['sku' => $record->sku]))
+                    ->modalContent(fn (ProductVariant $record) => new HtmlString(
+                        \Illuminate\Support\Facades\Blade::render(
+                            "@livewire('inventory.view-inventory-history', ['variantId' => {$record->id}, 'locationId' => null])"
+                        )
+                    ))
+                    ->modalWidth('6xl')
+                    ->slideOver()
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel(__('Close')),
 

@@ -3,6 +3,7 @@
 namespace App\Models\Product;
 
 use App\Models\Inventory\InventoryMovement;
+use App\Models\Inventory\Location;
 use App\Models\Order\OrderItem;
 use App\Models\Platform\PlatformMapping;
 use Cknow\Money\Casts\MoneyIntegerCast;
@@ -73,7 +74,7 @@ class ProductVariant extends Model implements HasMedia
 
     public function locations(): BelongsToMany
     {
-        return $this->belongsToMany(\App\Models\Inventory\Location::class, 'location_inventory')
+        return $this->belongsToMany(Location::class, 'location_inventory')
             ->withPivot('quantity')
             ->withTimestamps();
     }

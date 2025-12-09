@@ -2,9 +2,10 @@
 
 namespace App\Enums\Inventory;
 
+use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasLabel;
 
-enum InventoryMovementType: string implements HasLabel
+enum InventoryMovementType: string implements HasColor, HasLabel
 {
     case Sale = 'sale';
     case Return = 'return';
@@ -42,5 +43,17 @@ enum InventoryMovementType: string implements HasLabel
             self::Cancellation,
             self::PurchaseReceived,
         ]);
+    }
+
+    public function getColor(): string|array|null
+    {
+        return match ($this) {
+            self::Sale, self::Damaged => 'danger',
+            self::PurchaseReceived => 'success',
+            self::Return => 'info',
+            self::Adjustment => 'warning',
+            self::Cancellation => 'primary',
+            default => 'gray',
+        };
     }
 }

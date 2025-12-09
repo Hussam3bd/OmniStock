@@ -166,6 +166,8 @@ class AttributeMappingService
             'size' => 'size',
             'beden' => 'size',
             'productsize' => 'size',
+            'shoe size' => 'size',
+            'shoesize' => 'size',
         ];
 
         $variantOptionType = $mappings[$normalizedName] ?? null;

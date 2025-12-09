@@ -5,12 +5,16 @@ namespace App\Filament\Pages;
 use App\Models\Inventory\Location;
 use App\Models\Product\ProductVariant;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Pages\Page;
+use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 
 class InventoryReport extends Page implements HasTable
 {
@@ -60,19 +64,22 @@ class InventoryReport extends Page implements HasTable
                 Tables\Columns\TextColumn::make('product.title')
                     ->label(__('Product'))
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->formatStateUsing(function (ProductVariant $record): HtmlString {
+                        return new HtmlString(
+                            view('components.variant-badges', [
+                                'productTitle' => $record->product->title,
+                                'optionValues' => $record->optionValues,
+                            ])->render()
+                        );
+                    })
+                    ->html(),
 
                 Tables\Columns\TextColumn::make('sku')
                     ->label(__('SKU'))
                     ->searchable()
                     ->sortable()
-                    ->weight('medium'),
-
-                Tables\Columns\TextColumn::make('optionValues.value')
-                    ->label(__('Variant'))
-                    ->badge()
-                    ->separator(' / ')
-                    ->formatStateUsing(fn ($state) => __($state)),
+                    ->weight(FontWeight::Medium),
 
                 Tables\Columns\TextColumn::make('location_name')
                     ->label(__('Location'))
@@ -129,6 +136,25 @@ class InventoryReport extends Page implements HasTable
                     })
                     ->toggleable()
                     ->color(fn (int $state): string => $state > 0 ? 'success' : 'danger'),
+            ])
+            ->recordActions([
+                Action::make('view_history')
+                    ->label(__('History'))
+                    ->icon('heroicon-o-clock')
+                    ->color('info')
+                    ->modalHeading(fn (ProductVariant $record) => __('Inventory History: :product', [
+                        'product' => $record->product->title.' - '.$record->sku,
+                    ]))
+                    ->modalDescription(fn (ProductVariant $record) => $record->optionValues->pluck('value')->join(' / '))
+                    ->modalContent(fn (ProductVariant $record) => new HtmlString(
+                        Blade::render(
+                            "@livewire('inventory.view-inventory-history', ['variantId' => {$record->id}, 'locationId' => ".($this->selectedLocation ?? 'null').'])'
+                        )
+                    ))
+                    ->modalWidth('6xl')
+                    ->slideOver()
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel(__('Close')),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('location')
