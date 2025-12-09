@@ -142,15 +142,19 @@ class InventoryReport extends Page implements HasTable
                     ->label(__('History'))
                     ->icon('heroicon-o-clock')
                     ->color('info')
-                    ->modalHeading(fn (ProductVariant $record) => __('Inventory History: :product', [
-                        'product' => $record->product->title.' - '.$record->sku,
-                    ]))
-                    ->modalDescription(fn (ProductVariant $record) => $record->optionValues->pluck('value')->join(' / '))
-                    ->modalContent(fn (ProductVariant $record) => new HtmlString(
-                        Blade::render(
-                            "@livewire('inventory.view-inventory-history', ['variantId' => {$record->id}, 'locationId' => ".($this->selectedLocation ?? 'null').'])'
+                    ->modalHeading(fn (?ProductVariant $record) => $record
+                        ? __('Inventory History: :product', [
+                            'product' => $record->product->title.' - '.$record->sku,
+                        ])
+                        : __('Inventory History'))
+                    ->modalDescription(fn (?ProductVariant $record) => $record?->optionValues->pluck('value')->join(' / ') ?? '')
+                    ->modalContent(fn (?ProductVariant $record) => $record
+                        ? new HtmlString(
+                            Blade::render(
+                                "@livewire('inventory.view-inventory-history', ['variantId' => {$record->id}, 'locationId' => ".($this->selectedLocation ?? 'null').'])'
+                            )
                         )
-                    ))
+                        : new HtmlString(''))
                     ->modalWidth('6xl')
                     ->slideOver()
                     ->modalSubmitAction(false)
