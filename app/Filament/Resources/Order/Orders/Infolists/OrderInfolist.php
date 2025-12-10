@@ -49,6 +49,26 @@ class OrderInfolist
                             ->label(__('Currency'))
                             ->badge()
                             ->color('gray'),
+
+                        Infolists\Components\TextEntry::make('exchange_rate')
+                            ->label(__('Exchange Rate'))
+                            ->formatStateUsing(function ($record) {
+                                if (! $record->exchange_rate || ! $record->currency_id) {
+                                    return '-';
+                                }
+
+                                $defaultCurrency = \App\Models\Currency::getDefault();
+
+                                // If order currency is same as default, no exchange rate needed
+                                if ($record->currency_id === $defaultCurrency?->id) {
+                                    return __('Default currency');
+                                }
+
+                                return "1 {$record->currency} = ".number_format($record->exchange_rate, 4)." {$defaultCurrency->code}";
+                            })
+                            ->icon('heroicon-o-arrow-path-rounded-square')
+                            ->color('info')
+                            ->visible(fn ($record) => $record->currency_id !== \App\Models\Currency::getDefault()?->id),
                     ])
                     ->columns(2),
 
@@ -162,6 +182,31 @@ class OrderInfolist
                             ->money(fn ($record) => $record->currency)
                             ->weight('bold')
                             ->size('lg')
+                            ->helperText(function ($record) {
+                                if (! $record->currency_id || ! $record->exchange_rate) {
+                                    return null;
+                                }
+
+                                $defaultCurrency = \App\Models\Currency::getDefault();
+
+                                // If order currency is same as default, no conversion needed
+                                if ($record->currency_id === $defaultCurrency?->id) {
+                                    return null;
+                                }
+
+                                // Show converted amount in default currency
+                                $convertedAmount = $record->getTotalInDefaultCurrency();
+                                $formatted = \App\Helpers\CurrencyHelper::format(
+                                    \Cknow\Money\Money::of($convertedAmount, $defaultCurrency->code),
+                                    $defaultCurrency->code
+                                );
+
+                                return __('≈ :amount in :currency (at rate :rate)', [
+                                    'amount' => $formatted,
+                                    'currency' => $defaultCurrency->code,
+                                    'rate' => number_format($record->exchange_rate, 4),
+                                ]);
+                            })
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
@@ -205,7 +250,36 @@ class OrderInfolist
 
                         Infolists\Components\TextEntry::make('gross_profit')
                             ->label(__('Gross Profit'))
-                            ->helperText(__('Revenue - Product Cost - Shipping - Commission - Payment Fees'))
+                            ->helperText(function ($record) {
+                                $baseText = __('Revenue - Product Cost - Shipping - Commission - Payment Fees');
+
+                                if (! $record->currency_id || ! $record->exchange_rate || ! $record->gross_profit) {
+                                    return $baseText;
+                                }
+
+                                $defaultCurrency = \App\Models\Currency::getDefault();
+
+                                // If order currency is same as default, no conversion needed
+                                if ($record->currency_id === $defaultCurrency?->id) {
+                                    return $baseText;
+                                }
+
+                                // Show converted profit in default currency
+                                $convertedProfit = $record->convertToDefaultCurrency($record->gross_profit);
+                                if ($convertedProfit) {
+                                    $formatted = \App\Helpers\CurrencyHelper::format(
+                                        $convertedProfit,
+                                        $defaultCurrency->code
+                                    );
+
+                                    return $baseText.' | '.__('≈ :amount in :currency', [
+                                        'amount' => $formatted,
+                                        'currency' => $defaultCurrency->code,
+                                    ]);
+                                }
+
+                                return $baseText;
+                            })
                             ->money(fn ($record) => $record->currency)
                             ->weight('bold')
                             ->size('lg')

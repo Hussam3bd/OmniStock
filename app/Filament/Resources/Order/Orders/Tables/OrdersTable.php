@@ -126,10 +126,56 @@ class OrdersTable
                 TextColumn::make('total_amount')
                     ->label('Total')
                     ->money(fn ($record) => $record->currency)
+                    ->description(function ($record) {
+                        if (! $record->currency_id || ! $record->exchange_rate) {
+                            return null;
+                        }
+
+                        $defaultCurrency = \App\Models\Currency::getDefault();
+
+                        // If order currency is same as default, no conversion needed
+                        if ($record->currency_id === $defaultCurrency?->id) {
+                            return null;
+                        }
+
+                        // Show converted amount in default currency
+                        $convertedAmount = $record->getTotalInDefaultCurrency();
+                        $formatted = \App\Helpers\CurrencyHelper::format(
+                            \Cknow\Money\Money::of($convertedAmount, $defaultCurrency->code),
+                            $defaultCurrency->code
+                        );
+
+                        return "≈ {$formatted}";
+                    })
                     ->sortable(),
                 TextColumn::make('gross_profit')
                     ->label('Gross Profit')
                     ->money(fn ($record) => $record->currency)
+                    ->description(function ($record) {
+                        if (! $record->currency_id || ! $record->exchange_rate || ! $record->gross_profit) {
+                            return null;
+                        }
+
+                        $defaultCurrency = \App\Models\Currency::getDefault();
+
+                        // If order currency is same as default, no conversion needed
+                        if ($record->currency_id === $defaultCurrency?->id) {
+                            return null;
+                        }
+
+                        // Show converted profit in default currency
+                        $convertedProfit = $record->convertToDefaultCurrency($record->gross_profit);
+                        if ($convertedProfit) {
+                            $formatted = \App\Helpers\CurrencyHelper::format(
+                                $convertedProfit,
+                                $defaultCurrency->code
+                            );
+
+                            return "≈ {$formatted}";
+                        }
+
+                        return null;
+                    })
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->color(fn ($record) => match (true) {
@@ -244,6 +290,28 @@ class OrdersTable
                         }
 
                         return $indicators;
+                    }),
+
+                SelectFilter::make('currency')
+                    ->label(__('Currency'))
+                    ->multiple()
+                    ->options(fn () => \App\Models\Currency::getActive()
+                        ->pluck('name', 'code')
+                        ->toArray())
+                    ->searchable()
+                    ->preload()
+                    ->query(fn (Builder $query, array $data): Builder => $query->when(
+                        ! empty($data['values']),
+                        fn (Builder $q): Builder => $q->whereIn('currency', $data['values'])
+                    ))
+                    ->indicateUsing(function (array $data): array {
+                        if (empty($data['values'])) {
+                            return [];
+                        }
+
+                        $currencies = \App\Models\Currency::whereIn('code', $data['values'])->get();
+
+                        return $currencies->map(fn ($currency) => Indicator::make($currency->name))->toArray();
                     }),
             ])
             ->recordActions([
