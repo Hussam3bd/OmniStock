@@ -388,4 +388,68 @@ class Order extends Model
 
         return \Cknow\Money\Money::of($convertedAmount, $defaultCurrency->code);
     }
+
+    /**
+     * Convert order total to any currency using historical exchange rate from order date
+     * This allows you to see what the order was worth in USD (or any currency) on the day it was placed
+     *
+     * Example: $order->getHistoricalValueInCurrency('USD') - shows what TRY order was worth in USD that day
+     */
+    public function getHistoricalValueInCurrency(string $targetCurrencyCode): ?Money
+    {
+        if (! $this->total_amount || ! $this->currency_id || ! $this->order_date) {
+            return null;
+        }
+
+        // Find target currency
+        $targetCurrency = Currency::where('code', strtoupper($targetCurrencyCode))->first();
+
+        if (! $targetCurrency) {
+            return null;
+        }
+
+        // If order is already in target currency, return as-is
+        if ($this->currency_id === $targetCurrency->id) {
+            return $this->total_amount;
+        }
+
+        // Get historical exchange rate from order date
+        $rate = \App\Models\ExchangeRate::getRate(
+            $this->currency_id,
+            $targetCurrency->id,
+            $this->order_date
+        );
+
+        if (! $rate) {
+            // Try to get current rate as fallback
+            $rate = CurrencyHelper::getRate($this->currency, $targetCurrency->code);
+        }
+
+        if (! $rate) {
+            return null;
+        }
+
+        // Convert: order amount (in cents) × exchange rate
+        // getAmount() returns cents, multiply by rate, result is also in cents
+        $convertedAmountInCents = (int) round($this->total_amount->getAmount() * $rate);
+
+        // Create Money object using factory method with amount in cents
+        return Money::parse($convertedAmountInCents / 100, $targetCurrency->code);
+    }
+
+    /**
+     * Get formatted historical value in any currency
+     * Example: $order->getFormattedHistoricalValue('USD') returns "$23.50 USD"
+     */
+    public function getFormattedHistoricalValue(string $targetCurrencyCode): ?string
+    {
+        $converted = $this->getHistoricalValueInCurrency($targetCurrencyCode);
+
+        if (! $converted) {
+            return null;
+        }
+
+        // Money object format() method returns formatted string with symbol
+        return $converted->format();
+    }
 }
