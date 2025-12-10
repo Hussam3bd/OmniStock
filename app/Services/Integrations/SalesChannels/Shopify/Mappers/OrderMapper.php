@@ -128,6 +128,8 @@ class OrderMapper extends BaseOrderMapper
     protected function createOrder(Customer $customer, array $shopifyOrder, ?Integration $integration = null): Order
     {
         $currency = $shopifyOrder['currency'] ?? 'USD';
+        $currencyFields = $this->resolveCurrencyFields($currency);
+
         // Use current_subtotal_price and current_total_price to account for order edits/refunds
         $subtotal = $this->convertToMinorUnits((float) ($shopifyOrder['current_subtotal_price'] ?? $shopifyOrder['subtotal_price'] ?? 0), $currency);
         $taxAmount = $this->convertToMinorUnits((float) ($shopifyOrder['current_total_tax'] ?? $shopifyOrder['total_tax'] ?? 0), $currency);
@@ -175,6 +177,8 @@ class OrderMapper extends BaseOrderMapper
             'total_amount' => $totalAmount,
             'total_commission' => 0,
             'currency' => $currency,
+            'currency_id' => $currencyFields['currency_id'],
+            'exchange_rate' => $currencyFields['exchange_rate'],
             'invoice_number' => null,
             'invoice_date' => null,
             'invoice_url' => null,
@@ -219,6 +223,13 @@ class OrderMapper extends BaseOrderMapper
     protected function updateOrder(Order $order, array $shopifyOrder, ?Integration $integration = null): void
     {
         $currency = $shopifyOrder['currency'] ?? 'USD';
+
+        // Only recalculate currency fields if currency changed (rare case)
+        $currencyChanged = $order->currency !== $currency;
+        if ($currencyChanged) {
+            $currencyFields = $this->resolveCurrencyFields($currency);
+        }
+
         // Use current_subtotal_price and current_total_price to account for order edits/refunds
         $subtotal = $this->convertToMinorUnits((float) ($shopifyOrder['current_subtotal_price'] ?? $shopifyOrder['subtotal_price'] ?? 0), $currency);
         $taxAmount = $this->convertToMinorUnits((float) ($shopifyOrder['current_total_tax'] ?? $shopifyOrder['total_tax'] ?? 0), $currency);
@@ -271,7 +282,7 @@ class OrderMapper extends BaseOrderMapper
             ? Carbon::parse($firstFulfillment['updated_at'])
             : null;
 
-        $order->update([
+        $updateData = [
             'order_status' => $newOrderStatus,
             'payment_status' => $newPaymentStatus,
             'payment_method' => $paymentInfo['method'],
@@ -288,7 +299,16 @@ class OrderMapper extends BaseOrderMapper
             'shipping_tracking_url' => $firstFulfillment['tracking_url'] ?? $order->shipping_tracking_url,
             'shipped_at' => $shippedAt ?? $order->shipped_at,
             'delivered_at' => $deliveredAt ?? $order->delivered_at,
-        ]);
+        ];
+
+        // Only update currency fields if currency changed
+        if ($currencyChanged) {
+            $updateData['currency'] = $currency;
+            $updateData['currency_id'] = $currencyFields['currency_id'];
+            $updateData['exchange_rate'] = $currencyFields['exchange_rate'];
+        }
+
+        $order->update($updateData);
 
         // Update platform mapping
         $order->platformMappings()

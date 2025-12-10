@@ -105,9 +105,12 @@ class OrderMapper extends BaseOrderMapper
 
     protected function createOrder(Customer $customer, array $trendyolPackage, ?\App\Models\Integration\Integration $integration = null): Order
     {
-        $grossAmount = $this->convertToMinorUnits($trendyolPackage['grossAmount'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
-        $totalDiscount = $this->convertToMinorUnits($trendyolPackage['totalDiscount'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
-        $totalPrice = $this->convertToMinorUnits($trendyolPackage['totalPrice'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
+        $currency = $trendyolPackage['currencyCode'] ?? 'TRY';
+        $currencyFields = $this->resolveCurrencyFields($currency);
+
+        $grossAmount = $this->convertToMinorUnits($trendyolPackage['grossAmount'] ?? 0, $currency);
+        $totalDiscount = $this->convertToMinorUnits($trendyolPackage['totalDiscount'] ?? 0, $currency);
+        $totalPrice = $this->convertToMinorUnits($trendyolPackage['totalPrice'] ?? 0, $currency);
 
         $orderStatus = $this->mapOrderStatus($trendyolPackage['status'] ?? '');
         $paymentStatus = $this->mapPaymentStatus($trendyolPackage);
@@ -151,7 +154,9 @@ class OrderMapper extends BaseOrderMapper
             'discount_amount' => $totalDiscount,
             'total_amount' => $totalPrice,
             'total_commission' => 0, // Will be calculated from items
-            'currency' => $trendyolPackage['currencyCode'] ?? 'TRY',
+            'currency' => $currency,
+            'currency_id' => $currencyFields['currency_id'],
+            'exchange_rate' => $currencyFields['exchange_rate'],
             'invoice_number' => null,
             'invoice_date' => null,
             'invoice_url' => $trendyolPackage['invoiceLink'] ?? null,
@@ -210,9 +215,17 @@ class OrderMapper extends BaseOrderMapper
 
     protected function updateOrder(Order $order, array $trendyolPackage, ?\App\Models\Integration\Integration $integration = null): void
     {
-        $grossAmount = $this->convertToMinorUnits($trendyolPackage['grossAmount'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
-        $totalDiscount = $this->convertToMinorUnits($trendyolPackage['totalDiscount'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
-        $totalPrice = $this->convertToMinorUnits($trendyolPackage['totalPrice'] ?? 0, $trendyolPackage['currencyCode'] ?? 'TRY');
+        $currency = $trendyolPackage['currencyCode'] ?? 'TRY';
+
+        // Only recalculate currency fields if currency changed (rare case)
+        $currencyChanged = $order->currency !== $currency;
+        if ($currencyChanged) {
+            $currencyFields = $this->resolveCurrencyFields($currency);
+        }
+
+        $grossAmount = $this->convertToMinorUnits($trendyolPackage['grossAmount'] ?? 0, $currency);
+        $totalDiscount = $this->convertToMinorUnits($trendyolPackage['totalDiscount'] ?? 0, $currency);
+        $totalPrice = $this->convertToMinorUnits($trendyolPackage['totalPrice'] ?? 0, $currency);
 
         // Update integration_id if provided and not already set
         if ($integration && ! $order->integration_id) {
@@ -266,7 +279,7 @@ class OrderMapper extends BaseOrderMapper
         // Calculate shipping costs
         $shippingCosts = $this->calculateShippingCosts($trendyolPackage);
 
-        $order->update([
+        $updateData = [
             'order_status' => $newOrderStatus,
             'payment_status' => $newPaymentStatus,
             'fulfillment_status' => $newFulfillmentStatus,
@@ -287,7 +300,16 @@ class OrderMapper extends BaseOrderMapper
             'delivered_at' => $deliveredAt,
             'estimated_delivery_start' => $estimatedDeliveryStart,
             'estimated_delivery_end' => $estimatedDeliveryEnd,
-        ]);
+        ];
+
+        // Only update currency fields if currency changed
+        if ($currencyChanged) {
+            $updateData['currency'] = $currency;
+            $updateData['currency_id'] = $currencyFields['currency_id'];
+            $updateData['exchange_rate'] = $currencyFields['exchange_rate'];
+        }
+
+        $order->update($updateData);
 
         $order->platformMappings()
             ->where('platform', $this->getChannel()->value)

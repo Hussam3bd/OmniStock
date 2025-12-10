@@ -3,6 +3,8 @@
 namespace App\Services\Integrations\Concerns;
 
 use App\Enums\Order\OrderChannel;
+use App\Helpers\CurrencyHelper;
+use App\Models\Currency;
 use App\Models\Customer\Customer;
 use App\Models\Order\Order;
 use App\Models\Platform\PlatformMapping;
@@ -80,5 +82,37 @@ abstract class BaseOrderMapper
 
             return $order;
         });
+    }
+
+    /**
+     * Resolve currency_id and exchange_rate from currency code
+     * Returns array with 'currency_id' and 'exchange_rate' keys
+     */
+    protected function resolveCurrencyFields(string $currencyCode): array
+    {
+        // Find the currency by code
+        $currency = Currency::where('code', strtoupper($currencyCode))->first();
+
+        if (! $currency) {
+            // Fallback to default currency if code not found
+            $currency = Currency::getDefault();
+        }
+
+        // Get exchange rate from order currency to default currency
+        $defaultCurrency = Currency::getDefault();
+        $exchangeRate = 1.0; // Default to 1.0 if same currency or rate not found
+
+        if ($currency->id !== $defaultCurrency?->id) {
+            // Get current exchange rate
+            $rate = CurrencyHelper::getRate($currency->code, $defaultCurrency->code);
+            if ($rate) {
+                $exchangeRate = $rate;
+            }
+        }
+
+        return [
+            'currency_id' => $currency->id,
+            'exchange_rate' => $exchangeRate,
+        ];
     }
 }

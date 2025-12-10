@@ -7,9 +7,11 @@ use App\Enums\Order\OrderChannel;
 use App\Enums\Order\OrderStatus;
 use App\Enums\Order\PaymentStatus;
 use App\Enums\Shipping\ShippingCarrier;
+use App\Helpers\CurrencyHelper;
 use App\Models\Accounting\Transaction;
 use App\Models\Address\Address;
 use App\Models\Concerns\HasAddressSnapshots;
+use App\Models\Currency;
 use App\Models\Customer\Customer;
 use App\Models\Inventory\InventoryMovement;
 use App\Models\Platform\PlatformMapping;
@@ -54,6 +56,8 @@ class Order extends Model
         'total_product_cost',
         'total_commission',
         'currency',
+        'currency_id',
+        'exchange_rate',
         'invoice_number',
         'invoice_date',
         'invoice_url',
@@ -94,6 +98,7 @@ class Order extends Model
             'payment_gateway_commission_amount' => MoneyIntegerCast::class,
             'payment_payout_amount' => MoneyIntegerCast::class,
             'payment_gateway_commission_rate' => 'decimal:4',
+            'exchange_rate' => 'decimal:8',
             'invoice_date' => 'date',
             'order_date' => 'datetime',
             'shipping_desi' => 'decimal:2',
@@ -296,6 +301,11 @@ class Order extends Model
         return $this->hasMany(OrderReturn::class);
     }
 
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(Currency::class);
+    }
+
     public function hasReturns(): bool
     {
         return $this->return_status && $this->return_status !== 'none';
@@ -309,5 +319,73 @@ class Order extends Model
     public function hasFullReturn(): bool
     {
         return $this->return_status === 'full';
+    }
+
+    /**
+     * Get the total amount in default currency using stored exchange rate
+     * This ensures historical accuracy - uses the rate from order creation time
+     */
+    public function getTotalInDefaultCurrency(): float
+    {
+        if (! $this->exchange_rate || ! $this->total_amount) {
+            return 0;
+        }
+
+        // Convert from order currency to default currency
+        return $this->total_amount->getAmount() * $this->exchange_rate / 100;
+    }
+
+    /**
+     * Get formatted total with currency symbol
+     */
+    public function getFormattedTotal(): string
+    {
+        if (! $this->total_amount) {
+            return '-';
+        }
+
+        return CurrencyHelper::format($this->total_amount, $this->currency);
+    }
+
+    /**
+     * Get formatted total with conversion to default currency
+     * Example: "$100.00 USD (₺3,420.00 TRY)"
+     */
+    public function getFormattedTotalWithConversion(): string
+    {
+        if (! $this->total_amount || ! $this->currency_id) {
+            return $this->getFormattedTotal();
+        }
+
+        $defaultCurrency = Currency::getDefault();
+
+        // If this is already in default currency, no conversion needed
+        if ($this->currency_id === $defaultCurrency?->id) {
+            return $this->getFormattedTotal();
+        }
+
+        $originalFormatted = $this->getFormattedTotal();
+        $convertedAmount = $this->getTotalInDefaultCurrency();
+        $convertedFormatted = CurrencyHelper::format(
+            \Cknow\Money\Money::of($convertedAmount, $defaultCurrency->code),
+            $defaultCurrency->code
+        );
+
+        return "{$originalFormatted} ({$convertedFormatted})";
+    }
+
+    /**
+     * Convert any Money amount to default currency using stored exchange rate
+     */
+    public function convertToDefaultCurrency(?Money $amount): ?Money
+    {
+        if (! $amount || ! $this->exchange_rate) {
+            return $amount;
+        }
+
+        $defaultCurrency = Currency::getDefault();
+        $convertedAmount = $amount->getAmount() * $this->exchange_rate / 100;
+
+        return \Cknow\Money\Money::of($convertedAmount, $defaultCurrency->code);
     }
 }

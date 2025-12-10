@@ -6,6 +6,7 @@ use App\Enums\Order\OrderChannel;
 use App\Enums\Order\ReturnReason;
 use App\Enums\Order\ReturnStatus;
 use App\Enums\Shipping\ShippingCarrier;
+use App\Models\Currency;
 use App\Models\Shipping\ShippingRate;
 use Cknow\Money\Casts\MoneyIntegerCast;
 use Cknow\Money\Money;
@@ -60,6 +61,8 @@ class OrderReturn extends Model implements HasMedia
         'inspected_by',
         'platform_data',
         'currency',
+        'currency_id',
+        'exchange_rate',
     ];
 
     protected function casts(): array
@@ -84,6 +87,7 @@ class OrderReturn extends Model implements HasMedia
             'original_shipping_cost' => MoneyIntegerCast::class,
             'total_refund_amount' => MoneyIntegerCast::class,
             'restocking_fee' => MoneyIntegerCast::class,
+            'exchange_rate' => 'decimal:8',
             'platform_data' => 'array',
             'return_shipping_aggregator_data' => 'array',
         ];
@@ -132,6 +136,11 @@ class OrderReturn extends Model implements HasMedia
     public function returnShippingAggregatorIntegration(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Integration\Integration::class, 'return_shipping_aggregator_integration_id');
+    }
+
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(Currency::class);
     }
 
     // Media collections
