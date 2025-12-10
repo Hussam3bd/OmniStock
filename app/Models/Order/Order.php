@@ -384,9 +384,9 @@ class Order extends Model
         }
 
         $defaultCurrency = Currency::getDefault();
-        $convertedAmount = $amount->getAmount() * $this->exchange_rate / 100;
+        $convertedAmountInCents = (int) round($amount->getAmount() * $this->exchange_rate);
 
-        return \Cknow\Money\Money::of($convertedAmount, $defaultCurrency->code);
+        return new Money($convertedAmountInCents, new \Money\Currency($defaultCurrency->code));
     }
 
     /**
@@ -408,9 +408,9 @@ class Order extends Model
             return null;
         }
 
-        // If order is already in target currency, return as-is
+        // If order is already in target currency, return Money object in that currency
         if ($this->currency_id === $targetCurrency->id) {
-            return $this->total_amount;
+            return new Money($this->total_amount->getAmount(), new \Money\Currency($targetCurrency->code));
         }
 
         // Get historical exchange rate from order date
@@ -433,8 +433,8 @@ class Order extends Model
         // getAmount() returns cents, multiply by rate, result is also in cents
         $convertedAmountInCents = (int) round($this->total_amount->getAmount() * $rate);
 
-        // Create Money object using factory method with amount in cents
-        return Money::parse($convertedAmountInCents / 100, $targetCurrency->code);
+        // Create Money object with amount in cents
+        return new Money($convertedAmountInCents, new \Money\Currency($targetCurrency->code));
     }
 
     /**
