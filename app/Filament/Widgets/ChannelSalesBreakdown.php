@@ -149,7 +149,7 @@ class ChannelSalesBreakdown extends TableWidget
             // Calculate return shipping costs (exclude cancelled returns)
             $returnShippingCost = OrderReturn::where('channel', $channelValue)
                 ->where('status', '!=', ReturnStatus::Cancelled)
-                ->sum('return_shipping_cost_excluding_vat') / 100;
+                ->sum('return_shipping_cost') / 100;
 
             $returnShippingVat = OrderReturn::where('channel', $channelValue)
                 ->where('status', '!=', ReturnStatus::Cancelled)

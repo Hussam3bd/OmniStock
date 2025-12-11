@@ -95,27 +95,41 @@ class PaymentCostSyncService
         $adapter = new IyzicoAdapter($integration);
         $transaction = $adapter->getTransaction($order->payment_transaction_id);
 
-        // Convert fees from TRY to minor units
-        // Iyzico returns fees in TRY (e.g., 0.25, 55.77)
-        // We store in minor units (e.g., 25, 5577)
+        // Convert amounts from TRY to minor units
+        // Iyzico returns amounts in TRY (e.g., 2400.00, 0.25, 395.86)
+        // We store in minor units (e.g., 240000, 25, 39586)
         $currency = $transaction['currency'] ?? 'TRY';
+        $price = $this->convertToMinorUnits($transaction['price'], $currency);
+
+        // Calculate fees
         $iyzicoCommissionFee = $this->convertToMinorUnits($transaction['iyzico_commission_fee'], $currency);
         $iyzicoCommissionRateAmount = $this->convertToMinorUnits($transaction['iyzico_commission_rate_amount'], $currency);
+        $merchantCommissionRateAmount = $this->convertToMinorUnits($transaction['merchant_commission_rate_amount'], $currency);
 
-        // Calculate actual merchant payout
-        // For direct merchants: paidPrice - totalIyzicoFees
-        // For marketplace: use merchant_payout_amount from API (when sub-merchants are involved)
-        $paidPrice = $this->convertToMinorUnits($transaction['paid_price'], $currency);
-        $totalIyzicoFees = $iyzicoCommissionFee + $iyzicoCommissionRateAmount;
+        // Total Iyzico fees (fixed + rate-based)
+        $totalIyzicoFee = $iyzicoCommissionFee + $iyzicoCommissionRateAmount;
+
+        // Calculate merchant payout
+        // For direct merchants: API returns 0, so we calculate manually
+        // Merchant Payout = Price - (Total Iyzico Fee - Installment Fees Paid by Customer)
+        // merchant_commission_rate_amount = installment fees paid by CUSTOMER
         $merchantPayoutAmount = $transaction['merchant_payout_amount'] > 0
             ? $this->convertToMinorUnits($transaction['merchant_payout_amount'], $currency)
-            : $paidPrice - $totalIyzicoFees;
+            : $price - ($totalIyzicoFee - $merchantCommissionRateAmount);
+
+        // Calculate ACTUAL merchant cost (what merchant pays to Iyzico)
+        // This is: Total Iyzico Fees - Customer Paid Installment Fees
+        $actualMerchantCost = $totalIyzicoFee - $merchantCommissionRateAmount;
+
+        // Split merchant cost into fixed fee + commission
+        $merchantCommissionRate = $transaction['merchant_commission_rate'];
+        $merchantCommissionAmount = $actualMerchantCost - $iyzicoCommissionFee;
 
         // Update order with payment costs
         $order->update([
             'payment_gateway_fee' => $iyzicoCommissionFee,
-            'payment_gateway_commission_rate' => $transaction['merchant_commission_rate'],
-            'payment_gateway_commission_amount' => $iyzicoCommissionRateAmount,
+            'payment_gateway_commission_rate' => $merchantCommissionRate,
+            'payment_gateway_commission_amount' => $merchantCommissionAmount,
             'payment_payout_amount' => $merchantPayoutAmount,
         ]);
 
@@ -125,12 +139,18 @@ class PaymentCostSyncService
             ->withProperties([
                 'payment_gateway' => 'iyzico',
                 'payment_id' => $transaction['payment_id'],
-                'total_fee' => $transaction['total_iyzico_fee'],
                 'payment_status' => $transaction['payment_status'],
+                'installment' => $transaction['installment'],
+                'price' => $price / 100,
+                'paid_price' => $transaction['paid_price'],
+                'merchant_payout' => $merchantPayoutAmount / 100,
+                'actual_merchant_cost' => $actualMerchantCost / 100,
+                'total_iyzico_fee' => $transaction['total_iyzico_fee'],
+                'customer_paid_installment_fee' => $merchantCommissionRateAmount / 100,
                 'synced_fields' => [
-                    'payment_gateway_fee' => $iyzicoCommissionFee,
-                    'payment_gateway_commission_amount' => $iyzicoCommissionRateAmount,
-                    'payment_payout_amount' => $merchantPayoutAmount,
+                    'payment_gateway_fee' => $iyzicoCommissionFee / 100,
+                    'payment_gateway_commission_amount' => $merchantCommissionAmount / 100,
+                    'payment_payout_amount' => $merchantPayoutAmount / 100,
                 ],
             ])
             ->log('payment_cost_synced');
