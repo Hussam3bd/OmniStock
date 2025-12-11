@@ -62,7 +62,6 @@ class ResyncShippingCostAction extends Action
                     $result = $service->syncShippingData($record, $integration, force: true);
 
                     if ($result['success']) {
-                        $results = $result['results'];
                         $return = $result['return'] ?? null;
 
                         $message = __('Successfully synced shipping data.');
