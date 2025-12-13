@@ -60,6 +60,13 @@ class PurchaseOrderObserver
             return;
         }
 
+        // Calculate exchange rate from PO currency to account currency
+        $exchangeRate = 1.0;
+        if ($purchaseOrder->currency_id !== $account->currency_id) {
+            // Use the PO's stored exchange rate
+            $exchangeRate = $purchaseOrder->exchange_rate ?? 1.0;
+        }
+
         // Create expense transaction with purchase order total
         $transaction = Transaction::create([
             'account_id' => $account->id,
@@ -70,6 +77,8 @@ class PurchaseOrderObserver
             'category' => ExpenseCategory::PRODUCT_PURCHASE->value,
             'amount' => $purchaseOrder->total->getAmount(),
             'currency' => $purchaseOrder->currency->code,
+            'currency_id' => $purchaseOrder->currency_id,
+            'exchange_rate' => $exchangeRate,
             'description' => __('Expense for purchase order #:number from :supplier', [
                 'number' => $purchaseOrder->order_number,
                 'supplier' => $purchaseOrder->supplier->name ?? 'N/A',

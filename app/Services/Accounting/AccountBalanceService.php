@@ -20,12 +20,8 @@ class AccountBalanceService
             return;
         }
 
-        // Get amount in account's currency
-        $amount = $this->convertAmount(
-            $transaction->amount,
-            $transaction->currency,
-            $account->currency->code
-        );
+        // Get amount in account's currency using the stored exchange rate
+        $amount = $this->convertAmount($transaction, $account);
 
         // Apply transaction based on type
         match ($transaction->type) {
@@ -56,12 +52,8 @@ class AccountBalanceService
             return;
         }
 
-        // Get amount in account's currency
-        $amount = $this->convertAmount(
-            $transaction->amount,
-            $transaction->currency,
-            $account->currency->code
-        );
+        // Get amount in account's currency using the stored exchange rate
+        $amount = $this->convertAmount($transaction, $account);
 
         // Reverse transaction based on type
         match ($transaction->type) {
@@ -101,18 +93,29 @@ class AccountBalanceService
     }
 
     /**
-     * Convert amount from one currency to another
-     * For now, uses simple conversion. Can be enhanced with real-time rates.
+     * Convert transaction amount to account currency using stored exchange rate
+     * The exchange_rate is captured at transaction creation time for historical accuracy
      */
-    protected function convertAmount(Money $amount, string $fromCurrency, string $toCurrency): Money
+    protected function convertAmount(Transaction $transaction, Account $account): Money
     {
+        $transactionCurrency = $transaction->currency;
+        $accountCurrency = $account->currency->code;
+
         // If same currency, no conversion needed
-        if ($fromCurrency === $toCurrency) {
-            return $amount;
+        if ($transactionCurrency === $accountCurrency) {
+            return $transaction->amount;
         }
 
-        // TODO: Implement proper currency conversion using exchange rates table
-        // For now, return the amount as-is (assumes same currency)
-        return Money::parse($amount->getAmount(), $toCurrency, true);
+        // Use the stored exchange rate from transaction
+        if (! $transaction->exchange_rate) {
+            // Fallback: if no exchange rate stored, use amount as-is
+            // This maintains backward compatibility with old transactions
+            return Money::parse($transaction->amount->getAmount(), $accountCurrency, true);
+        }
+
+        // Apply exchange rate: transaction amount × exchange rate
+        $convertedAmount = $transaction->amount->getAmount() * $transaction->exchange_rate;
+
+        return Money::parse((int) round($convertedAmount), $accountCurrency, true);
     }
 }

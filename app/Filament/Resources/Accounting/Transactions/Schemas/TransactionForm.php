@@ -5,11 +5,11 @@ namespace App\Filament\Resources\Accounting\Transactions\Schemas;
 use App\Enums\Accounting\ExpenseCategory;
 use App\Enums\Accounting\IncomeCategory;
 use App\Enums\Accounting\TransactionType;
+use App\Forms\Components\MoneyInput;
 use App\Models\Currency;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 
@@ -71,10 +71,8 @@ class TransactionForm
                     })
                     ->columnSpan(1),
 
-                TextInput::make('amount')
+                MoneyInput::make('amount')
                     ->required()
-                    ->numeric()
-                    ->prefix(fn (Get $get) => Currency::find($get('currency_id'))?->symbol ?? 'TRY')
                     ->columnSpan(1),
 
                 Select::make('currency_id')

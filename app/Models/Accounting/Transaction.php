@@ -5,9 +5,11 @@ namespace App\Models\Accounting;
 use App\Enums\Accounting\ExpenseCategory;
 use App\Enums\Accounting\IncomeCategory;
 use App\Enums\Accounting\TransactionType;
+use App\Models\Currency;
 use App\Models\Order\Order;
 use App\Models\Purchase\PurchaseOrder;
 use Cknow\Money\Casts\MoneyIntegerCast;
+use Cknow\Money\Money;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -24,6 +26,8 @@ class Transaction extends Model
         'category',
         'amount',
         'currency',
+        'currency_id',
+        'exchange_rate',
         'description',
         'transaction_date',
     ];
@@ -33,6 +37,7 @@ class Transaction extends Model
         return [
             'type' => TransactionType::class,
             'amount' => MoneyIntegerCast::class,
+            'exchange_rate' => 'decimal:8',
             'transaction_date' => 'date',
         ];
     }
@@ -40,6 +45,11 @@ class Transaction extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
+    }
+
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(Currency::class);
     }
 
     public function order(): BelongsTo
@@ -74,5 +84,69 @@ class Transaction extends Model
             TransactionType::EXPENSE => ExpenseCategory::tryFrom($this->category),
             default => null,
         };
+    }
+
+    /**
+     * Get the transaction amount converted to account currency
+     */
+    public function getAmountInAccountCurrency(): Money
+    {
+        if (! $this->account) {
+            return $this->amount;
+        }
+
+        // If same currency, no conversion needed
+        if ($this->currency === $this->account->currency->code) {
+            return $this->amount;
+        }
+
+        // Apply stored exchange rate
+        if (! $this->exchange_rate) {
+            return Money::parse($this->amount->getAmount(), $this->account->currency->code, true);
+        }
+
+        $convertedAmount = $this->amount->getAmount() * $this->exchange_rate;
+
+        return Money::parse((int) round($convertedAmount), $this->account->currency->code, true);
+    }
+
+    /**
+     * Get formatted transaction amount with currency
+     */
+    public function getFormattedAmount(): string
+    {
+        return $this->amount->format();
+    }
+
+    /**
+     * Get formatted amount in account currency
+     */
+    public function getFormattedAmountInAccountCurrency(): string
+    {
+        return $this->getAmountInAccountCurrency()->format();
+    }
+
+    /**
+     * Check if transaction involves currency conversion
+     */
+    public function hasCurrencyConversion(): bool
+    {
+        if (! $this->account) {
+            return false;
+        }
+
+        return $this->currency !== $this->account->currency->code;
+    }
+
+    /**
+     * Get dual currency display (original + converted)
+     */
+    public function getDualCurrencyDisplay(): string
+    {
+        if (! $this->hasCurrencyConversion()) {
+            return $this->getFormattedAmount();
+        }
+
+        return $this->getFormattedAmount().' ≈ '.$this->getFormattedAmountInAccountCurrency();
     }
 }

@@ -78,6 +78,14 @@ class OrderObserver
             default => IncomeCategory::OTHER,
         };
 
+        // Calculate exchange rate from order currency to account currency
+        $exchangeRate = 1.0;
+        if ($order->currency_id !== $account->currency_id) {
+            // Use the order's stored exchange rate to convert to default currency first
+            // then get rate from default to account currency
+            $exchangeRate = $order->exchange_rate ?? 1.0;
+        }
+
         // Create transaction with payment payout amount (after gateway fees)
         $transaction = Transaction::create([
             'account_id' => $account->id,
@@ -88,6 +96,8 @@ class OrderObserver
             'category' => $category->value,
             'amount' => $order->payment_payout_amount->getAmount(),
             'currency' => $order->currency->code,
+            'currency_id' => $order->currency_id,
+            'exchange_rate' => $exchangeRate,
             'description' => __('Income from order :number (:channel)', [
                 'number' => $order->order_number,
                 'channel' => $order->channel->getLabel(),
