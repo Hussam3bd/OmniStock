@@ -102,12 +102,12 @@ class Transaction extends Model
 
         // Apply stored exchange rate
         if (! $this->exchange_rate) {
-            return Money::parse($this->amount->getAmount(), $this->account->currency->code, true);
+            return new Money($this->amount->getAmount(), $this->account->currency->code);
         }
 
-        $convertedAmount = $this->amount->getAmount() * $this->exchange_rate;
+        $convertedAmountInMinorUnits = $this->amount->getAmount() * $this->exchange_rate;
 
-        return Money::parse((int) round($convertedAmount), $this->account->currency->code, true);
+        return new Money((int) round($convertedAmountInMinorUnits), $this->account->currency->code);
     }
 
     /**

@@ -110,12 +110,14 @@ class AccountBalanceService
         if (! $transaction->exchange_rate) {
             // Fallback: if no exchange rate stored, use amount as-is
             // This maintains backward compatibility with old transactions
-            return Money::parse($transaction->amount->getAmount(), $accountCurrency, true);
+            return new Money($transaction->amount->getAmount(), $accountCurrency);
         }
 
-        // Apply exchange rate: transaction amount × exchange rate
-        $convertedAmount = $transaction->amount->getAmount() * $transaction->exchange_rate;
+        // Apply exchange rate: transaction amount (in minor units) × exchange rate
+        // Example: 3400 USD cents × 42.55 rate = 144,670 TRY cents
+        $convertedAmountInMinorUnits = $transaction->amount->getAmount() * $transaction->exchange_rate;
 
-        return Money::parse((int) round($convertedAmount), $accountCurrency, true);
+        // Create Money object from minor units (already in cents/kuruş)
+        return new Money((int) round($convertedAmountInMinorUnits), $accountCurrency);
     }
 }
