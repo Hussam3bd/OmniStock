@@ -38,19 +38,37 @@ class TransactionForm
                             return [];
                         }
 
-                        return match ($type) {
+                        // Handle both enum objects and string values
+                        $typeValue = $type instanceof TransactionType ? $type->value : $type;
+
+                        return match ($typeValue) {
                             TransactionType::INCOME->value, 'income' => IncomeCategory::class,
                             TransactionType::EXPENSE->value, 'expense' => ExpenseCategory::class,
                             default => [],
                         };
                     })
-                    ->required()
-                    ->visible(fn (Get $get) => in_array($get('type'), [
-                        TransactionType::INCOME->value,
-                        TransactionType::EXPENSE->value,
-                        'income',
-                        'expense',
-                    ]))
+                    ->required(function (Get $get) {
+                        $type = $get('type');
+                        $typeValue = $type instanceof TransactionType ? $type->value : $type;
+
+                        return in_array($typeValue, [
+                            TransactionType::INCOME->value,
+                            TransactionType::EXPENSE->value,
+                            'income',
+                            'expense',
+                        ]);
+                    })
+                    ->visible(function (Get $get) {
+                        $type = $get('type');
+                        $typeValue = $type instanceof TransactionType ? $type->value : $type;
+
+                        return in_array($typeValue, [
+                            TransactionType::INCOME->value,
+                            TransactionType::EXPENSE->value,
+                            'income',
+                            'expense',
+                        ]);
+                    })
                     ->columnSpan(1),
 
                 TextInput::make('amount')
@@ -78,7 +96,12 @@ class TransactionForm
                     ->label(__('Related Order'))
                     ->searchable()
                     ->preload()
-                    ->visible(fn (Get $get) => $get('type') === TransactionType::INCOME->value || $get('type') === 'income')
+                    ->visible(function (Get $get) {
+                        $type = $get('type');
+                        $typeValue = $type instanceof TransactionType ? $type->value : $type;
+
+                        return $typeValue === TransactionType::INCOME->value || $typeValue === 'income';
+                    })
                     ->columnSpan(1),
 
                 Select::make('purchase_order_id')
@@ -86,7 +109,12 @@ class TransactionForm
                     ->label(__('Related Purchase Order'))
                     ->searchable()
                     ->preload()
-                    ->visible(fn (Get $get) => $get('type') === TransactionType::EXPENSE->value || $get('type') === 'expense')
+                    ->visible(function (Get $get) {
+                        $type = $get('type');
+                        $typeValue = $type instanceof TransactionType ? $type->value : $type;
+
+                        return $typeValue === TransactionType::EXPENSE->value || $typeValue === 'expense';
+                    })
                     ->columnSpan(1),
 
                 Textarea::make('description')
