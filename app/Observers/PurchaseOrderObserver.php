@@ -8,14 +8,9 @@ use App\Enums\PurchaseOrderStatus;
 use App\Models\Accounting\Account;
 use App\Models\Accounting\Transaction;
 use App\Models\Purchase\PurchaseOrder;
-use App\Services\Accounting\AccountBalanceService;
 
 class PurchaseOrderObserver
 {
-    public function __construct(
-        protected AccountBalanceService $balanceService
-    ) {}
-
     /**
      * Handle the PurchaseOrder "saving" event.
      */
@@ -81,9 +76,6 @@ class PurchaseOrderObserver
             ]),
             'transaction_date' => $purchaseOrder->received_date ?? now(),
         ]);
-
-        // Update account balance
-        $this->balanceService->applyTransaction($transaction);
 
         activity()
             ->performedOn($purchaseOrder)

@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Accounting\Expenses\Pages;
 
 use App\Enums\Accounting\TransactionType;
 use App\Filament\Resources\Accounting\Expenses\ExpenseResource;
-use App\Services\Accounting\AccountBalanceService;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateExpense extends CreateRecord
@@ -31,13 +30,6 @@ class CreateExpense extends CreateRecord
         }
 
         return $data;
-    }
-
-    protected function afterCreate(): void
-    {
-        // Update account balance after creating expense
-        $balanceService = app(AccountBalanceService::class);
-        $balanceService->applyTransaction($this->record);
     }
 
     protected function getRedirectUrl(): string

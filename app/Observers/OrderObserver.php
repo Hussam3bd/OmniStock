@@ -14,14 +14,9 @@ use App\Jobs\SyncOrderPaymentFees;
 use App\Models\Accounting\Account;
 use App\Models\Accounting\Transaction;
 use App\Models\Order\Order;
-use App\Services\Accounting\AccountBalanceService;
 
 class OrderObserver
 {
-    public function __construct(
-        protected AccountBalanceService $balanceService
-    ) {}
-
     /**
      * Handle the Order "updated" event.
      */
@@ -99,9 +94,6 @@ class OrderObserver
             ]),
             'transaction_date' => now(),
         ]);
-
-        // Update account balance
-        $this->balanceService->applyTransaction($transaction);
 
         activity()
             ->performedOn($order)

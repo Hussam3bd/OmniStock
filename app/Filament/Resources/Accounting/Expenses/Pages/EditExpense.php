@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Accounting\Expenses\Pages;
 
 use App\Filament\Resources\Accounting\Expenses\ExpenseResource;
-use App\Services\Accounting\AccountBalanceService;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
@@ -16,12 +15,7 @@ class EditExpense extends EditRecord
     {
         return [
             ViewAction::make(),
-            DeleteAction::make()
-                ->after(function () {
-                    // Reverse balance when deleting expense
-                    $balanceService = app(AccountBalanceService::class);
-                    $balanceService->reverseTransaction($this->record);
-                }),
+            DeleteAction::make(),
         ];
     }
 

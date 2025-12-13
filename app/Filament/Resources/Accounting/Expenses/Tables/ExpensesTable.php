@@ -85,14 +85,7 @@ class ExpensesTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make()
-                        ->after(function ($records) {
-                            // Reverse balances for deleted expenses
-                            $balanceService = app(\App\Services\Accounting\AccountBalanceService::class);
-                            foreach ($records as $record) {
-                                $balanceService->reverseTransaction($record);
-                            }
-                        }),
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('transaction_date', 'desc');

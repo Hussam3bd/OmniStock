@@ -27,6 +27,8 @@ class DatabaseSeeder extends Seeder
         // Seed Trendyol attribute mappings
         $this->call(TrendyolAttributeMappingSeeder::class);
 
+        $this->call(TrendyolShippingRatesSeeder::class);
+
         // Create test user
         User::factory()->create([
             'name' => 'Test User',

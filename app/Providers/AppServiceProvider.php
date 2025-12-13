@@ -8,6 +8,7 @@ use App\Events\Order\OrderReturnCompleted;
 use App\Listeners\Inventory\DeductInventoryForOrderItem;
 use App\Listeners\Inventory\RestoreInventoryForCancellation;
 use App\Listeners\Inventory\RestoreInventoryForReturn;
+use App\Models\Accounting\Transaction;
 use App\Models\Address\Address;
 use App\Models\Customer\Customer;
 use App\Models\Order\Order;
@@ -22,6 +23,7 @@ use App\Observers\OrderObserver;
 use App\Observers\OrderReturnObserver;
 use App\Observers\PurchaseOrderItemObserver;
 use App\Observers\PurchaseOrderObserver;
+use App\Observers\TransactionObserver;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -48,6 +50,7 @@ class AppServiceProvider extends ServiceProvider
         OrderReturn::observe(OrderReturnObserver::class);
         PurchaseOrder::observe(PurchaseOrderObserver::class);
         PurchaseOrderItem::observe(PurchaseOrderItemObserver::class);
+        Transaction::observe(TransactionObserver::class);
 
         // Register queued event listeners for inventory tracking
         Event::listen(OrderItemCreated::class, DeductInventoryForOrderItem::class);
