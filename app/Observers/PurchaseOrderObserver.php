@@ -67,16 +67,19 @@ class PurchaseOrderObserver
             $exchangeRate = $purchaseOrder->exchange_rate ?? 1.0;
         }
 
+        // Get currency code from currency relationship
+        $currency = $purchaseOrder->currency;
+        $currencyCode = $currency ? $currency->code : 'TRY';
+
         // Create expense transaction with purchase order total
         $transaction = Transaction::create([
             'account_id' => $account->id,
             'transactionable_type' => PurchaseOrder::class,
             'transactionable_id' => $purchaseOrder->id,
-            'purchase_order_id' => $purchaseOrder->id, // Keep for backward compatibility
             'type' => TransactionType::EXPENSE,
             'category' => ExpenseCategory::PRODUCT_PURCHASE->value,
             'amount' => $purchaseOrder->total->getAmount(),
-            'currency' => $purchaseOrder->currency->code,
+            'currency' => $currencyCode,
             'currency_id' => $purchaseOrder->currency_id,
             'exchange_rate' => $exchangeRate,
             'description' => __('Expense for purchase order #:number from :supplier', [
@@ -101,7 +104,8 @@ class PurchaseOrderObserver
      */
     protected function hasExistingExpenseTransaction(PurchaseOrder $purchaseOrder): bool
     {
-        return Transaction::where('purchase_order_id', $purchaseOrder->id)
+        return Transaction::where('transactionable_type', PurchaseOrder::class)
+            ->where('transactionable_id', $purchaseOrder->id)
             ->where('type', TransactionType::EXPENSE)
             ->exists();
     }

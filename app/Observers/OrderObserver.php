@@ -91,11 +91,10 @@ class OrderObserver
             'account_id' => $account->id,
             'transactionable_type' => Order::class,
             'transactionable_id' => $order->id,
-            'order_id' => $order->id, // Keep for backward compatibility
             'type' => TransactionType::INCOME,
             'category' => $category->value,
             'amount' => $order->payment_payout_amount->getAmount(),
-            'currency' => $order->currency->code,
+            'currency' => $order->currency, // Currency is a string field
             'currency_id' => $order->currency_id,
             'exchange_rate' => $exchangeRate,
             'description' => __('Income from order :number (:channel)', [
@@ -120,7 +119,8 @@ class OrderObserver
      */
     protected function hasExistingIncomeTransaction(Order $order): bool
     {
-        return Transaction::where('order_id', $order->id)
+        return Transaction::where('transactionable_type', Order::class)
+            ->where('transactionable_id', $order->id)
             ->where('type', TransactionType::INCOME)
             ->exists();
     }

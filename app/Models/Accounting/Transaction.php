@@ -6,8 +6,6 @@ use App\Enums\Accounting\ExpenseCategory;
 use App\Enums\Accounting\IncomeCategory;
 use App\Enums\Accounting\TransactionType;
 use App\Models\Currency;
-use App\Models\Order\Order;
-use App\Models\Purchase\PurchaseOrder;
 use Cknow\Money\Casts\MoneyIntegerCast;
 use Cknow\Money\Money;
 use Illuminate\Database\Eloquent\Model;
@@ -20,8 +18,6 @@ class Transaction extends Model
         'account_id',
         'transactionable_type',
         'transactionable_id',
-        'order_id',
-        'purchase_order_id',
         'type',
         'category',
         'amount',
@@ -50,16 +46,6 @@ class Transaction extends Model
     public function currency(): BelongsTo
     {
         return $this->belongsTo(Currency::class);
-    }
-
-    public function order(): BelongsTo
-    {
-        return $this->belongsTo(Order::class);
-    }
-
-    public function purchaseOrder(): BelongsTo
-    {
-        return $this->belongsTo(PurchaseOrder::class);
     }
 
     /**

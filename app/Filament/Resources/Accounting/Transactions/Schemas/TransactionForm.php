@@ -7,7 +7,10 @@ use App\Enums\Accounting\IncomeCategory;
 use App\Enums\Accounting\TransactionType;
 use App\Forms\Components\MoneyInput;
 use App\Models\Currency;
+use App\Models\Order\Order;
+use App\Models\Purchase\PurchaseOrder;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\MorphToSelect;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Schemas\Components\Utilities\Get;
@@ -89,31 +92,19 @@ class TransactionForm
                     ->native(false)
                     ->columnSpan(1),
 
-                Select::make('order_id')
-                    ->relationship('order', 'order_number')
-                    ->label(__('Related Order'))
+                MorphToSelect::make('transactionable')
+                    ->label(__('Related To'))
+                    ->types([
+                        MorphToSelect\Type::make(Order::class)
+                            ->titleAttribute('order_number')
+                            ->label(__('Order')),
+                        MorphToSelect\Type::make(PurchaseOrder::class)
+                            ->titleAttribute('order_number')
+                            ->label(__('Purchase Order')),
+                    ])
                     ->searchable()
                     ->preload()
-                    ->visible(function (Get $get) {
-                        $type = $get('type');
-                        $typeValue = $type instanceof TransactionType ? $type->value : $type;
-
-                        return $typeValue === TransactionType::INCOME->value || $typeValue === 'income';
-                    })
-                    ->columnSpan(1),
-
-                Select::make('purchase_order_id')
-                    ->relationship('purchaseOrder', 'order_number')
-                    ->label(__('Related Purchase Order'))
-                    ->searchable()
-                    ->preload()
-                    ->visible(function (Get $get) {
-                        $type = $get('type');
-                        $typeValue = $type instanceof TransactionType ? $type->value : $type;
-
-                        return $typeValue === TransactionType::EXPENSE->value || $typeValue === 'expense';
-                    })
-                    ->columnSpan(1),
+                    ->columnSpanFull(),
 
                 Textarea::make('description')
                     ->label(__('Description'))
