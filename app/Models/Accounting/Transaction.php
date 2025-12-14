@@ -32,7 +32,7 @@ class Transaction extends Model
     {
         return [
             'type' => TransactionType::class,
-            'amount' => MoneyIntegerCast::class,
+            'amount' => MoneyIntegerCast::class.':currency',
             'exchange_rate' => 'decimal:8',
             'transaction_date' => 'date',
         ];

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Accounting\Transactions;
 use App\Filament\Resources\Accounting\Transactions\Pages\CreateTransaction;
 use App\Filament\Resources\Accounting\Transactions\Pages\EditTransaction;
 use App\Filament\Resources\Accounting\Transactions\Pages\ListTransactions;
+use App\Filament\Resources\Accounting\Transactions\Pages\ViewTransaction;
 use App\Filament\Resources\Accounting\Transactions\Schemas\TransactionForm;
 use App\Filament\Resources\Accounting\Transactions\Tables\TransactionsTable;
 use App\Models\Accounting\Transaction;
@@ -49,6 +50,7 @@ class TransactionResource extends Resource
         return [
             'index' => ListTransactions::route('/'),
             'create' => CreateTransaction::route('/create'),
+            'view' => ViewTransaction::route('/{record}'),
             'edit' => EditTransaction::route('/{record}/edit'),
         ];
     }
