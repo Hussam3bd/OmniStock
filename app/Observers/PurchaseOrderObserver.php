@@ -47,8 +47,9 @@ class PurchaseOrderObserver
      */
     protected function createExpenseTransaction(PurchaseOrder $purchaseOrder): void
     {
-        // Get default bank account or cash account
-        $account = Account::where('type', 'bank')->first()
+        // Use the purchase order's account if specified, otherwise get default bank/cash account
+        $account = $purchaseOrder->account
+            ?? Account::where('type', 'bank')->first()
             ?? Account::where('type', 'cash')->first();
 
         if (! $account) {

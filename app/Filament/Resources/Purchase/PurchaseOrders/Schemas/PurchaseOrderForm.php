@@ -4,6 +4,8 @@ namespace App\Filament\Resources\Purchase\PurchaseOrders\Schemas;
 
 use App\Enums\PurchaseOrderStatus;
 use App\Forms\Components\MoneyInput;
+use App\Models\Currency;
+use App\Models\ExchangeRate;
 use App\Models\Product\ProductVariant;
 use Filament\Actions\Action;
 use Filament\Forms;
@@ -55,6 +57,14 @@ class PurchaseOrderForm
                                     ->validateFor(),
                             ]),
 
+                        Forms\Components\Select::make('account_id')
+                            ->label(__('Payment Account'))
+                            ->relationship('account', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->helperText(__('Account to pay from (defaults to first bank/cash account if not specified)'))
+                            ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->name} ({$record->type->getLabel()})"),
+
                         Forms\Components\Select::make('location_id')
                             ->label(__('Destination Location'))
                             ->relationship('location', 'name')
@@ -70,16 +80,16 @@ class PurchaseOrderForm
                             ->required()
                             ->searchable()
                             ->preload()
-                            ->default(fn () => \App\Models\Currency::where('is_default', true)->first()?->id)
+                            ->default(fn () => Currency::where('is_default', true)->first()?->id)
                             ->reactive()
                             ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->code} ({$record->symbol})")
                             ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                 if ($state) {
-                                    $currency = \App\Models\Currency::find($state);
-                                    $defaultCurrency = \App\Models\Currency::where('is_default', true)->first();
+                                    $currency = Currency::find($state);
+                                    $defaultCurrency = Currency::where('is_default', true)->first();
 
                                     if ($currency && $defaultCurrency) {
-                                        $rate = \App\Models\ExchangeRate::getRateWithFallback(
+                                        $rate = ExchangeRate::getRateWithFallback(
                                             $currency->id,
                                             $defaultCurrency->id
                                         );
@@ -137,7 +147,7 @@ class PurchaseOrderForm
                                     return $quantity * $unitCost;
                                 });
 
-                                $currency = \App\Models\Currency::find($get('currency_id'));
+                                $currency = Currency::find($get('currency_id'));
                                 $currencyCode = $currency?->code ?? 'TRY';
 
                                 return number_format($subtotal, 2).' '.$currencyCode;
@@ -156,7 +166,7 @@ class PurchaseOrderForm
                                     return $subtotal * ($taxRate / 100);
                                 });
 
-                                $currency = \App\Models\Currency::find($get('currency_id'));
+                                $currency = Currency::find($get('currency_id'));
                                 $currencyCode = $currency?->code ?? 'TRY';
 
                                 return number_format($tax, 2).' '.$currencyCode;
@@ -191,9 +201,9 @@ class PurchaseOrderForm
                                 $shipping = (float) ($get('shipping_cost') ?? 0);
                                 $total = $subtotal + $tax + $shipping;
 
-                                $currency = \App\Models\Currency::find($get('currency_id'));
+                                $currency = Currency::find($get('currency_id'));
                                 $currencyCode = $currency?->code ?? 'TRY';
-                                $defaultCurrency = \App\Models\Currency::where('is_default', true)->first();
+                                $defaultCurrency = Currency::where('is_default', true)->first();
 
                                 $display = number_format($total, 2).' '.$currencyCode;
 
@@ -279,7 +289,7 @@ class PurchaseOrderForm
                                         $tax = $subtotal * ($taxRate / 100);
                                         $total = $subtotal + $tax;
 
-                                        $currency = \App\Models\Currency::find($get('../../currency_id'));
+                                        $currency = Currency::find($get('../../currency_id'));
                                         $currencyCode = $currency?->code ?? 'TRY';
 
                                         return number_format($total, 2).' '.$currencyCode;

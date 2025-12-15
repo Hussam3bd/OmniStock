@@ -74,7 +74,7 @@ class TransactionsTable
                     ->label(__('Description'))
                     ->limit(50)
                     ->searchable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('transactionable.order_number')
                     ->label(__('Related'))

@@ -3,6 +3,7 @@
 namespace App\Models\Purchase;
 
 use App\Enums\PurchaseOrderStatus;
+use App\Models\Accounting\Account;
 use App\Models\Currency;
 use App\Models\Inventory\Location;
 use App\Models\Supplier\Supplier;
@@ -16,6 +17,7 @@ class PurchaseOrder extends Model
     protected $fillable = [
         'order_number',
         'supplier_id',
+        'account_id',
         'location_id',
         'currency_id',
         'exchange_rate',
@@ -48,6 +50,11 @@ class PurchaseOrder extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(Account::class);
     }
 
     public function location(): BelongsTo
