@@ -80,8 +80,8 @@ class MoneyInput extends TextInput
         });
 
         $this->dehydrateStateUsing(function (MoneyInput $component, null|int|string $state) {
-            if (! $state) {
-                return null;
+            if (! $state || $state === '' || $state === '0') {
+                return 0;
             }
 
             // Update currency from currency field before dehydrating
