@@ -4,6 +4,7 @@ namespace App\Models\Purchase;
 
 use App\Enums\PurchaseOrderStatus;
 use App\Models\Accounting\Account;
+use App\Models\Concerns\HasCurrencyCode;
 use App\Models\Currency;
 use App\Models\Inventory\Location;
 use App\Models\Supplier\Supplier;
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PurchaseOrder extends Model
 {
+    use HasCurrencyCode;
+
     protected $fillable = [
         'order_number',
         'supplier_id',
@@ -48,19 +51,6 @@ class PurchaseOrder extends Model
             'shipping_cost' => MoneyIntegerCast::class.':currency_code',
             'total' => MoneyIntegerCast::class.':currency_code',
         ];
-    }
-
-    protected static function booted(): void
-    {
-        // Automatically sync currency_code when currency_id changes
-        static::saving(function (PurchaseOrder $order) {
-            if ($order->isDirty('currency_id') && $order->currency_id) {
-                $currency = Currency::find($order->currency_id);
-                if ($currency) {
-                    $order->currency_code = $currency->code;
-                }
-            }
-        });
     }
 
     public function supplier(): BelongsTo
