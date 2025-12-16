@@ -6,10 +6,13 @@ use App\Enums\PurchaseOrderStatus;
 use App\Forms\Components\MoneyInput;
 use App\Models\Currency;
 use App\Models\ExchangeRate;
+use App\Models\Product\Product;
 use App\Models\Product\ProductVariant;
+use Cknow\Money\Money;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Infolists;
+use Filament\Notifications\Notification;
 use Filament\Schemas;
 use Filament\Schemas\Schema;
 use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
@@ -63,7 +66,8 @@ class PurchaseOrderForm
                             ->searchable()
                             ->preload()
                             ->helperText(__('Account to pay from (defaults to first bank/cash account if not specified)'))
-                            ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->name} ({$record->type->getLabel()})"),
+                            ->getOptionLabelFromRecordUsing(fn ($record
+                            ) => "{$record->name} ({$record->type->getLabel()})"),
 
                         Forms\Components\Select::make('location_id')
                             ->label(__('Destination Location'))
@@ -80,7 +84,17 @@ class PurchaseOrderForm
                             ->required()
                             ->searchable()
                             ->preload()
-                            ->default(fn () => Currency::where('is_default', true)->first()?->id)
+                            ->default(function (callable $set) {
+                                $defaultCurrency = Currency::where('is_default', true)->first();
+                                if ($defaultCurrency) {
+                                    // Set currency_code for default currency
+                                    $set('currency_code', $defaultCurrency->code);
+
+                                    return $defaultCurrency->id;
+                                }
+
+                                return null;
+                            })
                             ->reactive()
                             ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->code} ({$record->symbol})")
                             ->afterStateUpdated(function ($state, callable $set, callable $get) {
@@ -94,9 +108,16 @@ class PurchaseOrderForm
                                             $defaultCurrency->id
                                         );
                                         $set('exchange_rate', $rate ?? 1.0);
+                                        // Set currency_code so Money casts use the correct currency
+                                        $set('currency_code', $currency->code);
                                     }
                                 }
                             }),
+
+                        Forms\Components\Hidden::make('currency_code'),
+
+                        Forms\Components\Hidden::make('status')
+                            ->default(PurchaseOrderStatus::Draft),
 
                         Forms\Components\TextInput::make('exchange_rate')
                             ->label(__('Exchange Rate'))
@@ -106,13 +127,6 @@ class PurchaseOrderForm
                             ->helperText(fn ($get) => $get('currency_id')
                                 ? __('Rate to default currency at order time')
                                 : null),
-
-                        Forms\Components\Select::make('status')
-                            ->label(__('Status'))
-                            ->options(PurchaseOrderStatus::class)
-                            ->default(PurchaseOrderStatus::Draft)
-                            ->required()
-                            ->native(false),
 
                         Forms\Components\DatePicker::make('order_date')
                             ->label(__('Order Date'))
@@ -220,6 +234,130 @@ class PurchaseOrderForm
                     ->columnSpan(1),
 
                 Schemas\Components\Section::make(__('Order Items'))
+                    ->headerActions([
+                        Action::make('addAllVariants')
+                            ->label(__('Add All Variants'))
+                            ->icon('heroicon-o-plus-circle')
+                            ->color('success')
+                            ->form([
+                                Forms\Components\Select::make('product_id')
+                                    ->label(__('Select Product'))
+                                    ->options(
+                                        Product::query()
+                                            ->orderBy('title')
+                                            ->get()
+                                            ->mapWithKeys(fn ($product) => [
+                                                $product->id => $product->title.($product->model_code ? ' ('.$product->model_code.')' : ''),
+                                            ])
+                                    )
+                                    ->required()
+                                    ->searchable()
+                                    ->preload()
+                                    ->helperText(__('All variants of this product will be added to the order')),
+
+                                Forms\Components\TextInput::make('number_of_sets')
+                                    ->label(__('Number of Sets'))
+                                    ->numeric()
+                                    ->default(1)
+                                    ->minValue(1)
+                                    ->required()
+                                    ->helperText(__('Quantity will be calculated based on size distribution per set')),
+
+                                Forms\Components\TextInput::make('bulk_unit_cost')
+                                    ->label(__('Unit Cost (for all variants)'))
+                                    ->numeric()
+                                    ->step(0.01)
+                                    ->suffix(fn ($livewire) => Currency::find($livewire->data['currency_id'] ?? null)?->code ?? 'TRY')
+                                    ->helperText(__('Leave empty to use each variant\'s cost price')),
+                            ])
+                            ->action(function (array $data, $livewire) {
+                                $productId = $data['product_id'];
+                                $numberOfSets = (int) ($data['number_of_sets'] ?? 1);
+                                $bulkUnitCost = ! empty($data['bulk_unit_cost']) ? (float) $data['bulk_unit_cost'] : null;
+
+                                // Get the currency for this purchase order
+                                $currencyId = $livewire->data['currency_id'] ?? null;
+                                $currency = $currencyId ? Currency::find($currencyId) : Currency::where('is_default', true)->first();
+                                $currencyCode = $currency?->code ?? 'TRY';
+
+                                $variants = ProductVariant::where('product_id', $productId)
+                                    ->with(['product', 'optionValues.variantOption'])
+                                    ->get();
+
+                                // Get current form state to preserve all data
+                                $formState = $livewire->form->getRawState();
+                                $currentItems = $formState['items'] ?? [];
+                                $existingVariantIds = collect($currentItems)->pluck('product_variant_id')->filter()->values()->toArray();
+
+                                // Define size-based quantity mapping for one set
+                                $sizeQuantityMap = function ($size) {
+                                    $size = (string) $size;
+                                    // Sizes 37, 38, 39 get 2 pieces per set
+                                    if (in_array($size, ['37', '38', '39'])) {
+                                        return 2;
+                                    }
+
+                                    // All other sizes (36, 40, etc.) get 1 piece per set
+                                    return 1;
+                                };
+
+                                $addedCount = 0;
+                                foreach ($variants as $variant) {
+                                    // Skip if variant already exists in items
+                                    if (in_array($variant->id, $existingVariantIds)) {
+                                        continue;
+                                    }
+
+                                    // Find the size option value for this variant
+                                    $sizeValue = $variant->optionValues
+                                        ->first(fn ($optionValue) => $optionValue->variantOption?->type === 'size');
+
+                                    // Get base quantity for this size
+                                    $baseQuantity = $sizeValue
+                                        ? $sizeQuantityMap($sizeValue->value)
+                                        : 1;
+
+                                    // Calculate total quantity (base quantity × number of sets)
+                                    $quantity = $baseQuantity * $numberOfSets;
+
+                                    // Handle unit cost - create Money object
+                                    if ($bulkUnitCost !== null) {
+                                        // Create Money object from decimal value (Money::parse handles conversion)
+                                        $unitCost = Money::parse($bulkUnitCost, $currencyCode);
+                                    } else {
+                                        // Use variant's cost price (already a Money object or null)
+                                        $unitCost = $variant->cost_price ?? Money::parse(0, $currencyCode);
+                                    }
+
+                                    $currentItems[] = [
+                                        'product_variant_id' => $variant->id,
+                                        'quantity_ordered' => $quantity,
+                                        'unit_cost' => $unitCost,
+                                        'tax_rate' => 0,
+                                    ];
+                                    $addedCount++;
+                                }
+
+                                // Update the items in the component data directly
+                                $livewire->data['items'] = $currentItems;
+
+                                // Also update the form state
+                                $formState['items'] = $currentItems;
+                                $livewire->form->fill($formState);
+
+                                // Force Livewire to refresh
+                                $livewire->dispatch('$refresh');
+
+                                Notification::make()
+                                    ->success()
+                                    ->title(__('Variants Added'))
+                                    ->body(__(':count variants added to order (:sets sets)', ['count' => $addedCount, 'sets' => $numberOfSets]))
+                                    ->send();
+                            })
+                            ->modalHeading(__('Add All Variants of Product'))
+                            ->modalSubmitActionLabel(__('Add Variants'))
+                            ->modalWidth('md'),
+                    ])
                     ->schema([
                         Forms\Components\Repeater::make('items')
                             ->relationship('items')
@@ -229,7 +367,8 @@ class PurchaseOrderForm
                                     ->options(ProductVariant::query()
                                         ->with('product')
                                         ->get()
-                                        ->groupBy(fn ($variant) => $variant->product->title.($variant->product->model_code ? ' ('.$variant->product->model_code.')' : ''))
+                                        ->groupBy(fn ($variant
+                                        ) => $variant->product->title.($variant->product->model_code ? ' ('.$variant->product->model_code.')' : ''))
                                         ->map(fn ($variants) => $variants->mapWithKeys(fn ($variant) => [
                                             $variant->id => $variant->sku.($variant->title ? ' - '.$variant->title : ''),
                                         ])))
@@ -299,7 +438,8 @@ class PurchaseOrderForm
                             ->defaultItems(1)
                             ->reorderableWithButtons()
                             ->collapsible()
-                            ->itemLabel(fn (array $state): ?string => ProductVariant::find($state['product_variant_id'] ?? null)?->sku ?? __('New Item'))
+                            ->itemLabel(fn (array $state
+                            ): ?string => ProductVariant::find($state['product_variant_id'] ?? null)?->sku ?? __('New Item'))
                             ->addActionLabel(__('Add Item'))
                             ->deleteAction(
                                 fn (Action $action) => $action->requiresConfirmation()

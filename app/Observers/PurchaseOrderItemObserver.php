@@ -53,16 +53,19 @@ class PurchaseOrderItemObserver
             return;
         }
 
+        // Get the purchase order's currency
+        $currencyCode = $purchaseOrder->currency_code ?? $purchaseOrder->currency?->code ?? 'TRY';
+
         // Calculate subtotal from all items (sum returns integer, convert to Money)
         $subtotalAmount = $purchaseOrder->items()->sum('subtotal');
-        $purchaseOrder->subtotal = money($subtotalAmount);
+        $purchaseOrder->subtotal = money($subtotalAmount, $currencyCode);
 
         // Calculate tax from all items
         $taxAmount = $purchaseOrder->items()->sum('tax_amount');
-        $purchaseOrder->tax = money($taxAmount);
+        $purchaseOrder->tax = money($taxAmount, $currencyCode);
 
         // Calculate total (subtotal + tax + shipping_cost)
-        $shippingCost = $purchaseOrder->shipping_cost ?? money(0);
+        $shippingCost = $purchaseOrder->shipping_cost ?? money(0, $currencyCode);
         $purchaseOrder->total = $purchaseOrder->subtotal
             ->add($purchaseOrder->tax)
             ->add($shippingCost);

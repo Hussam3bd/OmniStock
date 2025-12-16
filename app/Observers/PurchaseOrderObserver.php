@@ -7,6 +7,7 @@ use App\Enums\Accounting\TransactionType;
 use App\Enums\PurchaseOrderStatus;
 use App\Models\Accounting\Account;
 use App\Models\Accounting\Transaction;
+use App\Models\Currency;
 use App\Models\Purchase\PurchaseOrder;
 
 class PurchaseOrderObserver
@@ -16,10 +17,19 @@ class PurchaseOrderObserver
      */
     public function saving(PurchaseOrder $purchaseOrder): void
     {
-        // Initialize money fields if null (new record)
-        $subtotal = $purchaseOrder->subtotal ?? money(0);
-        $tax = $purchaseOrder->tax ?? money(0);
-        $shippingCost = $purchaseOrder->shipping_cost ?? money(0);
+        // Get the currency code for this purchase order
+        // Load the currency relationship if needed to get the code
+        if ($purchaseOrder->currency_id && ! $purchaseOrder->currency_code) {
+            $currency = Currency::find($purchaseOrder->currency_id);
+            $currencyCode = $currency?->code ?? 'TRY';
+        } else {
+            $currencyCode = $purchaseOrder->currency_code ?? $purchaseOrder->currency?->code ?? 'TRY';
+        }
+
+        // Initialize money fields if null (new record) using PO's currency
+        $subtotal = $purchaseOrder->subtotal ?? money(0, $currencyCode);
+        $tax = $purchaseOrder->tax ?? money(0, $currencyCode);
+        $shippingCost = $purchaseOrder->shipping_cost ?? money(0, $currencyCode);
 
         // If shipping_cost changed, recalculate total
         if ($purchaseOrder->isDirty('shipping_cost')) {

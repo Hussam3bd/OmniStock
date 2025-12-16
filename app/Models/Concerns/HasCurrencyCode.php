@@ -12,7 +12,8 @@ trait HasCurrencyCode
     protected static function bootHasCurrencyCode(): void
     {
         static::saving(function ($model) {
-            if ($model->isDirty('currency_id') && $model->currency_id) {
+            // Sync currency_code when currency_id is set or changed
+            if ($model->currency_id && $model->isDirty('currency_id')) {
                 $currency = Currency::find($model->currency_id);
                 if ($currency) {
                     $model->currency_code = $currency->code;
