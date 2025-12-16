@@ -15,16 +15,32 @@ class Account extends Model
         'name',
         'type',
         'currency_id',
+        'currency_code',
         'balance',
         'description',
     ];
+
+    protected $with = ['currency'];
 
     protected function casts(): array
     {
         return [
             'type' => AccountType::class,
-            'balance' => MoneyIntegerCast::class,
+            'balance' => MoneyIntegerCast::class.':currency_code',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Automatically sync currency_code when currency_id changes
+        static::saving(function (Account $account) {
+            if ($account->isDirty('currency_id') && $account->currency_id) {
+                $currency = Currency::find($account->currency_id);
+                if ($currency) {
+                    $account->currency_code = $currency->code;
+                }
+            }
+        });
     }
 
     public function currency(): BelongsTo
