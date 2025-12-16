@@ -20,6 +20,7 @@ class PurchaseOrder extends Model
         'account_id',
         'location_id',
         'currency_id',
+        'currency_code',
         'exchange_rate',
         'status',
         'order_date',
@@ -32,6 +33,8 @@ class PurchaseOrder extends Model
         'notes',
     ];
 
+    protected $with = ['currency'];
+
     protected function casts(): array
     {
         return [
@@ -40,11 +43,24 @@ class PurchaseOrder extends Model
             'expected_delivery_date' => 'date',
             'received_date' => 'date',
             'exchange_rate' => 'decimal:8',
-            'subtotal' => MoneyIntegerCast::class,
-            'tax' => MoneyIntegerCast::class,
-            'shipping_cost' => MoneyIntegerCast::class,
-            'total' => MoneyIntegerCast::class,
+            'subtotal' => MoneyIntegerCast::class.':currency_code',
+            'tax' => MoneyIntegerCast::class.':currency_code',
+            'shipping_cost' => MoneyIntegerCast::class.':currency_code',
+            'total' => MoneyIntegerCast::class.':currency_code',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Automatically sync currency_code when currency_id changes
+        static::saving(function (PurchaseOrder $order) {
+            if ($order->isDirty('currency_id') && $order->currency_id) {
+                $currency = Currency::find($order->currency_id);
+                if ($currency) {
+                    $order->currency_code = $currency->code;
+                }
+            }
+        });
     }
 
     public function supplier(): BelongsTo
