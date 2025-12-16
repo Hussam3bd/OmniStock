@@ -142,15 +142,19 @@ class ReturnRequestMapper extends BaseReturnsMapper
             'platform_data' => $shopifyReturn,
         ]);
 
-        // Create platform mapping
-        PlatformMapping::create([
-            'platform' => $this->getChannel()->value,
-            'platform_id' => $this->extractIdFromGraphQL($shopifyReturn['id'] ?? ''),
-            'entity_type' => OrderReturn::class,
-            'entity_id' => $return->id,
-            'platform_data' => $shopifyReturn,
-            'last_synced_at' => now(),
-        ]);
+        // Create or update platform mapping
+        PlatformMapping::updateOrCreate(
+            [
+                'platform' => $this->getChannel()->value,
+                'platform_id' => $this->extractIdFromGraphQL($shopifyReturn['id'] ?? ''),
+                'entity_type' => OrderReturn::class,
+            ],
+            [
+                'entity_id' => $return->id,
+                'platform_data' => $shopifyReturn,
+                'last_synced_at' => now(),
+            ]
+        );
 
         // Sync return items using variant matching
         $this->syncReturnItems($return, $shopifyReturn, $order);

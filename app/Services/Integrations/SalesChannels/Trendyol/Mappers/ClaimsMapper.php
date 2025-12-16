@@ -111,7 +111,7 @@ class ClaimsMapper extends BaseReturnsMapper
                     'return_tracking_url' => $claim['cargoTrackingLink'] ?? null,
                     'return_shipping_desi' => $claim['cargoDeci'] ?? $order->shipping_desi,
                     'carrier' => $returnShippingCosts['carrier'],
-                    'return_shipping_cost_excluding_vat' => $returnShippingCosts['return_shipping_cost_excluding_vat'],
+                    'return_shipping_cost' => $returnShippingCosts['return_shipping_cost'],
                     'return_shipping_vat_rate' => $returnShippingCosts['return_shipping_vat_rate'],
                     'return_shipping_vat_amount' => $returnShippingCosts['return_shipping_vat_amount'],
                     'return_shipping_rate_id' => $returnShippingCosts['return_shipping_rate_id'],
@@ -311,7 +311,7 @@ class ClaimsMapper extends BaseReturnsMapper
 
         $shippingData = [
             'carrier' => null,
-            'return_shipping_cost_excluding_vat' => null,
+            'return_shipping_cost' => null,
             'return_shipping_vat_rate' => 20.00,
             'return_shipping_vat_amount' => null,
             'return_shipping_rate_id' => null,
@@ -322,7 +322,7 @@ class ClaimsMapper extends BaseReturnsMapper
             // Fallback: use original order shipping costs if available
             if ($order->shipping_carrier && $order->shipping_desi) {
                 $shippingData['carrier'] = $order->shipping_carrier;
-                $shippingData['return_shipping_cost_excluding_vat'] = $order->shipping_cost_excluding_vat?->getAmount() ?? 0;
+                $shippingData['return_shipping_cost'] = $order->shipping_cost_excluding_vat?->getAmount() ?? 0;
                 $shippingData['return_shipping_vat_rate'] = $order->shipping_vat_rate ?? 20.00;
                 $shippingData['return_shipping_vat_amount'] = $order->shipping_vat_amount?->getAmount() ?? 0;
                 $shippingData['return_shipping_rate_id'] = $order->shipping_rate_id;
@@ -344,7 +344,7 @@ class ClaimsMapper extends BaseReturnsMapper
 
             // Fallback to order's carrier/costs
             if ($order->shipping_carrier && $order->shipping_desi) {
-                $shippingData['return_shipping_cost_excluding_vat'] = $order->shipping_cost_excluding_vat?->getAmount() ?? 0;
+                $shippingData['return_shipping_cost'] = $order->shipping_cost_excluding_vat?->getAmount() ?? 0;
                 $shippingData['return_shipping_vat_rate'] = $order->shipping_vat_rate ?? 20.00;
                 $shippingData['return_shipping_vat_amount'] = $order->shipping_vat_amount?->getAmount() ?? 0;
                 $shippingData['return_shipping_rate_id'] = $order->shipping_rate_id;
@@ -359,7 +359,7 @@ class ClaimsMapper extends BaseReturnsMapper
         $costCalculation = $this->shippingCostService->calculateCost($carrier, (float) $desi);
 
         if ($costCalculation) {
-            $shippingData['return_shipping_cost_excluding_vat'] = $costCalculation['cost_excluding_vat'];
+            $shippingData['return_shipping_cost'] = $costCalculation['cost_excluding_vat'];
             $shippingData['return_shipping_vat_rate'] = $costCalculation['vat_rate'];
             $shippingData['return_shipping_vat_amount'] = $costCalculation['vat_amount'];
             $shippingData['return_shipping_rate_id'] = $costCalculation['rate_id'];

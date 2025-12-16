@@ -2,20 +2,30 @@
 
 namespace App\Services\Integrations\SalesChannels\Shopify\Mappers;
 
+use App\Enums\Integration\IntegrationProvider;
+use App\Enums\Integration\IntegrationType;
 use App\Enums\Order\OrderChannel;
 use App\Enums\Order\OrderStatus;
+use App\Enums\Order\PaymentGateway;
 use App\Enums\Order\PaymentStatus;
 use App\Enums\Order\ReturnStatus;
+use App\Models\Integration\Integration;
 use App\Models\Order\Order;
 use App\Models\Order\OrderReturn;
 use App\Models\Order\ReturnRefund;
 use App\Models\Platform\PlatformMapping;
 use App\Services\Integrations\Concerns\BaseReturnsMapper;
+use App\Services\Integrations\ShippingProviders\BasitKargo\BasitKargoAdapter;
+use App\Services\Shipping\ShippingCostService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class ShopifyRefundMapper extends BaseReturnsMapper
 {
+    public function __construct(
+        protected ShippingCostService $shippingCostService
+    ) {}
+
     protected function getChannel(): OrderChannel
     {
         return OrderChannel::SHOPIFY;
@@ -125,7 +135,7 @@ class ShopifyRefundMapper extends BaseReturnsMapper
                 return null;
             }
 
-            // Check if return already exists
+            // Check if return already exists by refund ID
             $existingMapping = PlatformMapping::where('platform', $this->getChannel()->value)
                 ->where('platform_id', (string) $shopifyRefund['id'])
                 ->where('entity_type', OrderReturn::class)
@@ -140,7 +150,55 @@ class ShopifyRefundMapper extends BaseReturnsMapper
                     $existingMapping->delete();
                 }
 
-                $return = $this->createReturn($order, $shopifyRefund, $isCOD);
+                // Check if this refund is linked to a return request
+                // Shopify refunds have a 'return' field with the return ID when created from a return
+                $linkedReturnId = $shopifyRefund['return']['id'] ?? null;
+                $existingLinkedReturn = null;
+
+                if ($linkedReturnId) {
+                    // Find the return by the linked return ID
+                    $linkedReturnMapping = PlatformMapping::where('platform', $this->getChannel()->value)
+                        ->where('platform_id', (string) $linkedReturnId)
+                        ->where('entity_type', OrderReturn::class)
+                        ->first();
+
+                    if ($linkedReturnMapping && $linkedReturnMapping->entity) {
+                        $existingLinkedReturn = $linkedReturnMapping->entity;
+                    } elseif ($linkedReturnMapping) {
+                        // Clean up orphaned mapping (entity was deleted)
+                        $linkedReturnMapping->delete();
+                    }
+                }
+
+                // If no linked return found, check if the order has any return
+                // This handles cases where refund webhook arrives before return webhook
+                if (! $existingLinkedReturn) {
+                    $existingLinkedReturn = $order->returns()
+                        ->where('channel', $this->getChannel())
+                        ->first();
+                }
+
+                if ($existingLinkedReturn) {
+                    // Update existing return with refund data
+                    $return = $existingLinkedReturn;
+                    $this->updateReturn($return, $shopifyRefund, $order, $isCOD);
+
+                    // Update or create platform mapping for this refund ID
+                    PlatformMapping::updateOrCreate(
+                        [
+                            'platform' => $this->getChannel()->value,
+                            'platform_id' => (string) $shopifyRefund['id'],
+                            'entity_type' => OrderReturn::class,
+                        ],
+                        [
+                            'entity_id' => $return->id,
+                            'platform_data' => $shopifyRefund,
+                            'last_synced_at' => now(),
+                        ]
+                    );
+                } else {
+                    $return = $this->createReturn($order, $shopifyRefund, $isCOD);
+                }
             }
 
             // Sync refund transactions (only if there are transactions)
@@ -185,11 +243,23 @@ class ShopifyRefundMapper extends BaseReturnsMapper
     {
         $currency = $order->currency;
 
-        // Calculate total refund amount from refund line items
-        $totalRefundAmount = 0;
-        foreach ($shopifyRefund['refund_line_items'] ?? [] as $lineItem) {
-            $totalRefundAmount += (float) ($lineItem['subtotal'] ?? 0);
+        // Calculate actual refund amount from transactions (what customer received)
+        $actualRefundAmount = 0;
+        foreach ($shopifyRefund['transactions'] ?? [] as $transaction) {
+            if (($transaction['kind'] ?? null) === 'refund' && ($transaction['status'] ?? null) === 'success') {
+                $actualRefundAmount += (float) ($transaction['amount'] ?? 0);
+            }
         }
+
+        // Calculate item value from refund line items (original value)
+        $itemsValue = 0;
+        foreach ($shopifyRefund['refund_line_items'] ?? [] as $lineItem) {
+            $itemsValue += (float) ($lineItem['subtotal'] ?? 0);
+        }
+
+        // Calculate restocking fee (deducted from refund)
+        // This includes return shipping costs deducted by Shopify
+        $restockingFee = $itemsValue - $actualRefundAmount;
 
         // For COD rejected deliveries with no transactions, check if items were restocked
         $isRejectedDelivery = $isCOD && $this->hasNoRefundTransactions($shopifyRefund);
@@ -202,14 +272,14 @@ class ShopifyRefundMapper extends BaseReturnsMapper
             $status = $this->mapRefundStatus($shopifyRefund);
         }
 
-        // Get note
-        $note = $shopifyRefund['note'] ?? null;
-        if ($isRejectedDelivery && ! $note) {
-            $note = 'COD delivery rejected by customer';
-        }
+        // Get merchant's internal note from refund (NOT the customer's return reason)
+        $merchantNote = $shopifyRefund['note'] ?? null;
 
         // Calculate original shipping cost from order (total cost including VAT)
         $originalShippingCost = $order->total_shipping_cost?->getAmount() ?? 0;
+
+        // Calculate return shipping costs based on carrier and desi
+        $returnShippingCosts = $this->calculateReturnShippingCosts($order);
 
         // Calculate shipping refund amount (if any)
         $shippingRefundAmount = 0;
@@ -235,17 +305,20 @@ class ShopifyRefundMapper extends BaseReturnsMapper
                 ? Carbon::parse($shopifyRefund['processed_at'])
                 : null,
             'reason_code' => $isRejectedDelivery ? 'cod_rejected' : null,
-            'reason_name' => $note ?? 'Shopify Refund',
-            'customer_note' => $note,
-            'internal_note' => $isRejectedDelivery ? 'COD delivery rejected - items returned by shipping company' : null,
-            'total_refund_amount' => $this->convertToMinorUnits($totalRefundAmount, $currency),
+            'reason_name' => $isRejectedDelivery ? 'COD delivery rejected by customer' : 'Shopify Refund',
+            'customer_note' => null,
+            'internal_note' => $isRejectedDelivery ? 'COD delivery rejected - items returned by shipping company' : $merchantNote,
+            'total_refund_amount' => $this->convertToMinorUnits($actualRefundAmount, $currency),
             'original_shipping_cost' => $originalShippingCost,
-            'return_shipping_cost_excluding_vat' => $originalShippingCost, // Loss = outbound shipping cost (will be updated by BasitKargo sync)
+            'return_shipping_cost' => $returnShippingCosts['return_shipping_cost'],
+            'return_shipping_vat_rate' => $returnShippingCosts['return_shipping_vat_rate'],
+            'return_shipping_vat_amount' => $returnShippingCosts['return_shipping_vat_amount'],
+            'return_shipping_rate_id' => $returnShippingCosts['return_shipping_rate_id'],
             // For COD rejected deliveries, same shipment came back - copy tracking details
-            'return_shipping_carrier' => $isRejectedDelivery ? $order->shipping_carrier : null,
+            'return_shipping_carrier' => $isRejectedDelivery ? $order->shipping_carrier : $returnShippingCosts['carrier'],
             'return_tracking_number' => $isRejectedDelivery ? $order->shipping_tracking_number : null,
             'return_tracking_url' => $isRejectedDelivery ? $order->shipping_tracking_url : null,
-            'restocking_fee' => $this->convertToMinorUnits((float) ($shopifyRefund['restock'] ?? 0), $currency),
+            'restocking_fee' => $this->convertToMinorUnits($restockingFee, $currency),
             'currency' => $currency,
             'platform_data' => $shopifyRefund,
         ]);
@@ -270,11 +343,23 @@ class ShopifyRefundMapper extends BaseReturnsMapper
     {
         $currency = $order->currency;
 
-        // Calculate total refund amount
-        $totalRefundAmount = 0;
-        foreach ($shopifyRefund['refund_line_items'] ?? [] as $lineItem) {
-            $totalRefundAmount += (float) ($lineItem['subtotal'] ?? 0);
+        // Calculate actual refund amount from transactions (what customer received)
+        $actualRefundAmount = 0;
+        foreach ($shopifyRefund['transactions'] ?? [] as $transaction) {
+            if (($transaction['kind'] ?? null) === 'refund' && ($transaction['status'] ?? null) === 'success') {
+                $actualRefundAmount += (float) ($transaction['amount'] ?? 0);
+            }
         }
+
+        // Calculate item value from refund line items (original value)
+        $itemsValue = 0;
+        foreach ($shopifyRefund['refund_line_items'] ?? [] as $lineItem) {
+            $itemsValue += (float) ($lineItem['subtotal'] ?? 0);
+        }
+
+        // Calculate restocking fee (deducted from refund)
+        // This includes return shipping costs deducted by Shopify
+        $restockingFee = $itemsValue - $actualRefundAmount;
 
         // For COD rejected deliveries with no transactions, check if items were restocked
         $isRejectedDelivery = $isCOD && $this->hasNoRefundTransactions($shopifyRefund);
@@ -287,10 +372,8 @@ class ShopifyRefundMapper extends BaseReturnsMapper
             $status = $this->mapRefundStatus($shopifyRefund);
         }
 
-        $note = $shopifyRefund['note'] ?? null;
-        if ($isRejectedDelivery && ! $note) {
-            $note = 'COD delivery rejected by customer';
-        }
+        // Get merchant's internal note from refund (NOT the customer's return reason)
+        $merchantNote = $shopifyRefund['note'] ?? null;
 
         $updateData = [
             'status' => $status,
@@ -300,14 +383,26 @@ class ShopifyRefundMapper extends BaseReturnsMapper
             'completed_at' => $status === ReturnStatus::Completed && isset($shopifyRefund['processed_at'])
                 ? Carbon::parse($shopifyRefund['processed_at'])
                 : $return->completed_at,
-            'reason_name' => $note ?? $return->reason_name,
-            'customer_note' => $note ?? $return->customer_note,
-            'total_refund_amount' => $this->convertToMinorUnits($totalRefundAmount, $currency),
-            'restocking_fee' => $this->convertToMinorUnits((float) ($shopifyRefund['restock'] ?? 0), $currency),
+            // Preserve existing reason_name and customer_note (set by ReturnRequestMapper)
+            // Only update if currently empty
+            'reason_name' => $return->reason_name ?: ($isRejectedDelivery ? 'COD delivery rejected by customer' : 'Shopify Refund'),
+            'customer_note' => $return->customer_note,
+            'total_refund_amount' => $this->convertToMinorUnits($actualRefundAmount, $currency),
+            'restocking_fee' => $this->convertToMinorUnits($restockingFee, $currency),
             'platform_data' => $shopifyRefund,
         ];
 
-        // Add COD-specific fields
+        // Calculate and update return shipping costs if not already set or for updates
+        if (! $return->return_shipping_cost || $return->return_shipping_cost === 0) {
+            $returnShippingCosts = $this->calculateReturnShippingCosts($order);
+            $updateData['return_shipping_carrier'] = $returnShippingCosts['carrier'];
+            $updateData['return_shipping_cost'] = $returnShippingCosts['return_shipping_cost'];
+            $updateData['return_shipping_vat_rate'] = $returnShippingCosts['return_shipping_vat_rate'];
+            $updateData['return_shipping_vat_amount'] = $returnShippingCosts['return_shipping_vat_amount'];
+            $updateData['return_shipping_rate_id'] = $returnShippingCosts['return_shipping_rate_id'];
+        }
+
+        // Add COD-specific fields or merchant note
         if ($isRejectedDelivery) {
             $updateData['received_at'] = isset($shopifyRefund['processed_at'])
                 ? Carbon::parse($shopifyRefund['processed_at'])
@@ -319,13 +414,15 @@ class ShopifyRefundMapper extends BaseReturnsMapper
             if (! $return->original_shipping_cost || $return->original_shipping_cost === 0) {
                 $originalShippingCost = $order->total_shipping_cost?->getAmount() ?? 0;
                 $updateData['original_shipping_cost'] = $originalShippingCost;
-                $updateData['return_shipping_cost_excluding_vat'] = $originalShippingCost;
             }
 
             // For COD rejected deliveries, same shipment came back - copy tracking details
             $updateData['return_shipping_carrier'] = $order->shipping_carrier;
             $updateData['return_tracking_number'] = $order->shipping_tracking_number;
             $updateData['return_tracking_url'] = $order->shipping_tracking_url;
+        } elseif ($merchantNote && ! $return->internal_note) {
+            // Store merchant's refund note as internal note if not already set
+            $updateData['internal_note'] = $merchantNote;
         }
 
         $return->update($updateData);
@@ -441,7 +538,7 @@ class ShopifyRefundMapper extends BaseReturnsMapper
             $refundData = [
                 'amount' => $amount,
                 'currency' => $order->currency,
-                'method' => $this->mapPaymentMethod($transaction['gateway'] ?? null),
+                'method' => PaymentGateway::parse($transaction['gateway'] ?? null)?->value,
                 'status' => $status,
                 'payment_gateway' => $transaction['gateway'] ?? null,
                 'initiated_at' => isset($transaction['created_at'])
@@ -504,20 +601,6 @@ class ShopifyRefundMapper extends BaseReturnsMapper
         };
     }
 
-    protected function mapPaymentMethod(?string $gateway): string
-    {
-        if (! $gateway) {
-            return 'original_payment_method';
-        }
-
-        return match (true) {
-            str_contains(strtolower($gateway), 'bank') => 'bank_transfer',
-            str_contains(strtolower($gateway), 'credit') => 'credit_card',
-            str_contains(strtolower($gateway), 'cash') => 'cash',
-            default => 'original_payment_method',
-        };
-    }
-
     /**
      * Check if this refund is a void transaction (order cancellation)
      */
@@ -570,6 +653,184 @@ class ShopifyRefundMapper extends BaseReturnsMapper
         }
 
         return true;
+    }
+
+    /**
+     * Calculate return shipping costs from order carrier and desi
+     * For Shopify: Try to get actual costs from BasitKargo first, fallback to rate table
+     */
+    protected function calculateReturnShippingCosts(Order $order): array
+    {
+        $shippingData = [
+            'carrier' => null,
+            'return_shipping_cost' => null,
+            'return_shipping_vat_rate' => 20.00,
+            'return_shipping_vat_amount' => null,
+            'return_shipping_rate_id' => null,
+        ];
+
+        // Try to get actual costs from BasitKargo first (if order has tracking number)
+        if ($order->shipping_tracking_number) {
+            $actualCosts = $this->getActualCostsFromBasitKargo($order);
+            if ($actualCosts) {
+                return $actualCosts;
+            }
+        }
+
+        // Fallback to rate table calculation
+        $carrier = $order->shipping_carrier;
+        $desi = $order->shipping_desi;
+
+        // If missing carrier or desi, use order's existing shipping costs
+        if (! $carrier || ! $desi) {
+            if ($order->shipping_cost_excluding_vat) {
+                $shippingData['carrier'] = $carrier;
+                $shippingData['return_shipping_cost'] = $order->shipping_cost_excluding_vat?->getAmount() ?? 0;
+                $shippingData['return_shipping_vat_rate'] = $order->shipping_vat_rate ?? 20.00;
+                $shippingData['return_shipping_vat_amount'] = $order->shipping_vat_amount?->getAmount() ?? 0;
+                $shippingData['return_shipping_rate_id'] = $order->shipping_rate_id;
+            }
+
+            return $shippingData;
+        }
+
+        $shippingData['carrier'] = $carrier;
+
+        // Calculate shipping cost using ShippingCostService (rate table)
+        $costCalculation = $this->shippingCostService->calculateCost($carrier, (float) $desi);
+
+        if ($costCalculation) {
+            $shippingData['return_shipping_cost'] = $costCalculation['cost_excluding_vat'];
+            $shippingData['return_shipping_vat_rate'] = $costCalculation['vat_rate'];
+            $shippingData['return_shipping_vat_amount'] = $costCalculation['vat_amount'];
+            $shippingData['return_shipping_rate_id'] = $costCalculation['rate_id'];
+        } else {
+            // Final fallback to order costs if rate table calculation fails
+            activity()
+                ->withProperties([
+                    'order_id' => $order->id,
+                    'carrier' => $carrier->value ?? null,
+                    'desi' => $desi,
+                ])
+                ->log('shopify_return_shipping_cost_calculation_failed');
+
+            $shippingData['return_shipping_cost'] = $order->shipping_cost_excluding_vat?->getAmount() ?? 0;
+            $shippingData['return_shipping_vat_rate'] = $order->shipping_vat_rate ?? 20.00;
+            $shippingData['return_shipping_vat_amount'] = $order->shipping_vat_amount?->getAmount() ?? 0;
+            $shippingData['return_shipping_rate_id'] = $order->shipping_rate_id;
+        }
+
+        return $shippingData;
+    }
+
+    /**
+     * Get actual shipping costs from BasitKargo API
+     * Returns actual costs paid, not estimates from rate table
+     */
+    protected function getActualCostsFromBasitKargo(Order $order): ?array
+    {
+        try {
+            // Get active BasitKargo integration
+            $integration = Integration::where('type', IntegrationType::SHIPPING_PROVIDER)
+                ->where('provider', IntegrationProvider::BASIT_KARGO)
+                ->where('is_active', true)
+                ->first();
+
+            if (! $integration) {
+                return null;
+            }
+
+            // Create adapter and fetch shipment details
+            $adapter = new BasitKargoAdapter($integration);
+            $shipmentData = $adapter->trackShipment($order->shipping_tracking_number);
+
+            if (! $shipmentData) {
+                return null;
+            }
+
+            // Extract price info
+            $priceInfo = $shipmentData['raw_data']['priceInfo'] ?? null;
+            if (! $priceInfo) {
+                return null;
+            }
+
+            $outboundCost = (float) ($priceInfo['shipmentFee'] ?? 0); // Outbound shipping cost
+            $totalCost = (float) ($priceInfo['totalCost'] ?? 0); // Total (outbound + return if applicable)
+            $returnCost = $totalCost - $outboundCost; // Return shipping cost (if shipment was returned)
+
+            // For returns, assume the return cost equals outbound cost if not explicitly returned
+            // This is a reasonable estimate: return shipping typically costs the same as outbound
+            $returnShippingCost = $returnCost > 0 ? $returnCost : $outboundCost;
+
+            // Convert to minor units (cents)
+            $returnShippingCostMinor = (int) round($returnShippingCost * 100);
+
+            // VAT calculation
+            $vatIncluded = $integration->settings['vat_included'] ?? true;
+            $vatRate = 20.00;
+
+            if ($vatIncluded) {
+                // Price includes VAT - extract it
+                $priceExcludingVat = (int) round($returnShippingCostMinor / 1.20);
+                $vatAmount = $returnShippingCostMinor - $priceExcludingVat;
+            } else {
+                // Price excludes VAT - add it
+                $priceExcludingVat = $returnShippingCostMinor;
+                $vatAmount = (int) round($returnShippingCostMinor * 0.20);
+            }
+
+            // Parse carrier from BasitKargo response
+            $carrier = $order->shipping_carrier;
+            if (isset($shipmentData['carrier_code'])) {
+                $carrier = $this->mapBasitKargoCodeToCarrier($shipmentData['carrier_code']) ?? $carrier;
+            }
+
+            activity()
+                ->performedOn($order)
+                ->withProperties([
+                    'tracking_number' => $order->shipping_tracking_number,
+                    'source' => 'basitkargo_api',
+                    'outbound_cost' => $outboundCost,
+                    'return_cost' => $returnCost,
+                    'used_return_cost' => $returnShippingCost,
+                ])
+                ->log('shopify_return_shipping_cost_from_basitkargo');
+
+            return [
+                'carrier' => $carrier,
+                'return_shipping_cost' => $priceExcludingVat,
+                'return_shipping_vat_rate' => $vatRate,
+                'return_shipping_vat_amount' => $vatAmount,
+                'return_shipping_rate_id' => null, // No rate table used
+            ];
+        } catch (\Exception $e) {
+            activity()
+                ->performedOn($order)
+                ->withProperties([
+                    'tracking_number' => $order->shipping_tracking_number,
+                    'error' => $e->getMessage(),
+                ])
+                ->log('shopify_return_basitkargo_fetch_failed');
+
+            return null;
+        }
+    }
+
+    /**
+     * Map BasitKargo carrier codes to our ShippingCarrier enum
+     */
+    protected function mapBasitKargoCodeToCarrier(string $code): ?\App\Enums\Shipping\ShippingCarrier
+    {
+        return match (strtoupper($code)) {
+            'MNG' => null, // MNG not in our enum
+            'YURTICI' => \App\Enums\Shipping\ShippingCarrier::YURTICI,
+            'ARAS' => \App\Enums\Shipping\ShippingCarrier::ARAS,
+            'SURAT' => \App\Enums\Shipping\ShippingCarrier::SURAT,
+            'PTT' => \App\Enums\Shipping\ShippingCarrier::PTT,
+            'DHL' => \App\Enums\Shipping\ShippingCarrier::DHL,
+            'HEPSIJET' => \App\Enums\Shipping\ShippingCarrier::HEPSIJET,
+            default => null,
+        };
     }
 
     /**

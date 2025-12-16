@@ -67,7 +67,7 @@ class OrderReturnsTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('return_shipping_cost_excluding_vat')
+                TextColumn::make('return_shipping_cost')
                     ->label('Return Shipping (excl. VAT)')
                     ->money(fn ($record) => $record->currency)
                     ->sortable()

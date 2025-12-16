@@ -6,6 +6,7 @@ use App\Enums\Integration\IntegrationProvider;
 use App\Models\Integration\Integration;
 use App\Services\Integrations\SalesChannels\Trendyol\Mappers\ClaimsMapper;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 
 class SyncTrendyolClaims extends Command
@@ -69,7 +70,7 @@ class SyncTrendyolClaims extends Command
         return self::SUCCESS;
     }
 
-    protected function fetchAllClaims(Integration $integration, int $size): \Illuminate\Support\Collection
+    protected function fetchAllClaims(Integration $integration, int $size): Collection
     {
         $allClaims = collect();
         $page = 0;

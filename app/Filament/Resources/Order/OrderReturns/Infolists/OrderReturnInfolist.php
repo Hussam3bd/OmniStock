@@ -72,11 +72,11 @@ class OrderReturnInfolist
                             ->money(fn ($record) => $record->currency)
                             ->color('warning'),
 
-                        Infolists\Components\TextEntry::make('return_shipping_cost_excluding_vat')
+                        Infolists\Components\TextEntry::make('return_shipping_cost')
                             ->label(__('Return Shipping (excl. VAT)'))
                             ->money(fn ($record) => $record->currency)
                             ->color('warning')
-                            ->visible(fn ($record) => $record->return_shipping_cost_excluding_vat),
+                            ->visible(fn ($record) => $record->return_shipping_cost),
 
                         Infolists\Components\TextEntry::make('return_shipping_vat_amount')
                             ->label(__('Return Shipping VAT'))

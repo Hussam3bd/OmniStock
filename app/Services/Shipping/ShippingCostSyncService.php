@@ -146,7 +146,7 @@ class ShippingCostSyncService
         if ($return && $isRejectedDelivery) {
             $return->update([
                 'original_shipping_cost' => $orderShippingCostMinor,
-                'return_shipping_cost_excluding_vat' => $returnCostMinor,
+                'return_shipping_cost' => $returnCostMinor,
                 // For COD rejected, same shipment came back - copy tracking details
                 'return_shipping_carrier' => $carrier?->value ?? $order->shipping_carrier,
                 'return_tracking_number' => $order->shipping_tracking_number,
@@ -347,7 +347,7 @@ class ShippingCostSyncService
         $desi = $basitkargo_order['content']['totalDesiKg'] ?? null;
         $handlerCode = $basitkargo_order['shipmentInfo']['handler']['code'] ?? null;
 
-        if (! $price || ! $desi) {
+        if ($price === null || $desi === null) {
             return [
                 'order_id' => $order->id,
                 'synced' => false,
