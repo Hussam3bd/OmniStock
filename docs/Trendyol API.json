@@ -1,0 +1,2027 @@
+{
+    "collection": {
+        "info": {
+            "_postman_id": "f299f4ac-3cc4-4046-9265-3ca292b35deb",
+            "name": "Trendyol STAGE- TR Marketplace-APIGW",
+            "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+            "updatedAt": "2025-03-13T06:39:59.000Z",
+            "createdAt": "2025-03-13T06:39:59.000Z",
+            "lastUpdatedBy": "36945960",
+            "uid": "36945960-f299f4ac-3cc4-4046-9265-3ca292b35deb"
+        },
+        "item": [
+            {
+                "name": "Product Integration (Ürün Entegrasyonu)",
+                "item": [
+                    {
+                        "name": "Return and Shipping Address Information (İade ve Sevkiyat Adres Bilgileri)",
+                        "id": "87f7522d-4cab-4f95-a3ba-1b6dabda22e7",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "auth": {
+                                "type": "basic",
+                                "basic": [
+                                    {
+                                        "key": "password",
+                                        "value": "QqfFXiUat1x82D4vdSbS",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "key": "username",
+                                        "value": "3xATCK5OkR6p8LBohvse",
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/sellers/2738/addresses",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "sellers",
+                                    "2738",
+                                    "addresses"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-87f7522d-4cab-4f95-a3ba-1b6dabda22e7"
+                    },
+                    {
+                        "name": "TY Brand List (Trendyol Marka Listesi)",
+                        "id": "7686c07b-a6de-4c5b-850b-800ada900e5a",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/product/brands",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "product",
+                                    "brands"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-7686c07b-a6de-4c5b-850b-800ada900e5a"
+                    },
+                    {
+                        "name": "Trendyol Category List (Trendyol Kategori Listesi)",
+                        "id": "f5536f39-c9d8-4eb1-97e5-040556abc091",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/product/product-categories",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "product",
+                                    "product-categories"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-f5536f39-c9d8-4eb1-97e5-040556abc091"
+                    },
+                    {
+                        "name": "Trendyol Category-Attribute List (Trendyol Kategori - Özellik Listesi)",
+                        "id": "6888b88a-6ac0-4841-a702-41a521332423",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/product/product-categories/91266/attributes",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "product",
+                                    "product-categories",
+                                    "91266",
+                                    "attributes"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-6888b88a-6ac0-4841-a702-41a521332423"
+                    },
+                    {
+                        "name": "Product Create (Ürün Aktarma)",
+                        "id": "0bab44d5-38a6-4aab-a487-056ef20f6507",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "auth": {
+                                "type": "basic",
+                                "basic": [
+                                    {
+                                        "key": "password",
+                                        "value": "fqOwS0Up8HDO2ZGAFkup",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "key": "username",
+                                        "value": "icri6yUpwUtFDOXAcNNE",
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "method": "POST",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n    \"items\": [\n        {\n            \"barcode\": \"IntegratinTestProduct1\",\n            \"title\":   \"IntegratinTestProduct\",\n            \"productMainId\": \"IntegratinTestProduct2\",\n            \"brandId\": 187803,\n            \"categoryId\": 91266,\n            \"quantity\": 100,\n            \"stockCode\": \"STK-stokum-100\",\n            \"dimensionalWeight\": 2,\n            \"description\": \"ürün açıklaması\",\n            \"currencyType\": \"TRY\",\n            \"listPrice\": 100,\n            \"salePrice\": 100,\n            \"vatRate\": 10,\n            \"cargoCompanyId\": 10,\n            \"images\": [\n                {\n                    \"url\": \"https://mediaqa.store.alshaya.com/adobe/assets/urn:aaid:aem:32874588-8407-4410-9fb2-50c4a9116f45/as/EID-02f0927edc80d4efea1f0bf636359146149d55ec.jpg?\"\n                }\n            ],\n            \"attributes\": [\n                {\n                    \"attributeId\": 293,\n                    \"attributeValueId\": 2170846\n                },\n                {\n                    \"attributeId\": 47,\n                    \"customAttributeValue\": \"Sarı\"\n                }, \n                {\n                    \"attributeId\": 17620,\n                    \"customAttributeValue\": \"metal\"\n                },\n                {\n                    \"attributeId\": 294,\n                    \"attributeValueId\": 2878\n                },\n                {\n                    \"attributeId\": 296,\n                    \"attributeValueId\": 2873\n                }\n            ]\n        }\n    ]\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/product/sellers/2738/products",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "product",
+                                    "sellers",
+                                    "2738",
+                                    "products"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-0bab44d5-38a6-4aab-a487-056ef20f6507"
+                    },
+                    {
+                        "name": "Product Filter (Ürün Filtreleme)",
+                        "id": "8fc47739-1be3-441a-ad2e-220127179c22",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "auth": {
+                                "type": "basic",
+                                "basic": [
+                                    {
+                                        "key": "password",
+                                        "value": "fqOwS0Up8HDO2ZGAFkup",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "key": "username",
+                                        "value": "icri6yUpwUtFDOXAcNNE",
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/product/sellers/2738/products",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "product",
+                                    "sellers",
+                                    "2738",
+                                    "products"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-8fc47739-1be3-441a-ad2e-220127179c22"
+                    },
+                    {
+                        "name": "Check batchReuqesttId (Toplu İşlem Kontrolü)",
+                        "id": "5ae25272-e52c-468f-bb58-632915ba6212",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "auth": {
+                                "type": "basic",
+                                "basic": [
+                                    {
+                                        "key": "password",
+                                        "value": "QqfFXiUat1x82D4vdSbS",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "key": "username",
+                                        "value": "3xATCK5OkR6p8LBohvse",
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Basic M3hBVENLNU9rUjZwOExCb2h2c2U6UXFmRlhpVWF0MXg4MkQ0dmRTYlM="
+                                },
+                                {
+                                    "key": "Cookie",
+                                    "value": "__cf_bm=nF1RI8bCX_PyUIHNy.FfFXBI75F9YwpCfFEBI4WrMqE-1721724262-1.0.1.1-J9ZpThyfW0InnmMIxZvCH3xSPlR2I7hvl4EX4hwkCr.QuiIOz93oWHWSiJTnU06z2OQDTp.IQbA7fqCOatafaw; __cflb=02DiuEkjxji3pxUywYoPV6Dnwvnyf5wkpCuz9Rvdgaz3v"
+                                }
+                            ],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/product/sellers/2738/products/batch-requests/{batchRequestId}",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "product",
+                                    "sellers",
+                                    "2738",
+                                    "products",
+                                    "batch-requests",
+                                    "{batchRequestId}"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-5ae25272-e52c-468f-bb58-632915ba6212"
+                    },
+                    {
+                        "name": "Stock and Price Update (Stok ve Fiyat Güncelleme)",
+                        "id": "a5d15d1b-a0c3-42b4-a3bc-1203077c28b0",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "auth": {
+                                "type": "basic",
+                                "basic": [
+                                    {
+                                        "key": "password",
+                                        "value": "QqfFXiUat1x82D4vdSbS",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "key": "username",
+                                        "value": "3xATCK5OkR6p8LBohvse",
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "method": "POST",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"items\": [\n    {\n      \"barcode\": \"8680000000\",\n      \"quantity\": 100,\n      \"salePrice\": 112.85,\n      \"listPrice\": 113.85\n    }\n  ]\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/inventory/sellers/2738/products/price-and-inventory",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "inventory",
+                                    "sellers",
+                                    "2738",
+                                    "products",
+                                    "price-and-inventory"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-a5d15d1b-a0c3-42b4-a3bc-1203077c28b0"
+                    },
+                    {
+                        "name": "Product Update (Ürün Bilgisi Güncelleme)",
+                        "id": "00895b01-676a-4ce5-8386-c5a765830520",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "auth": {
+                                "type": "basic",
+                                "basic": [
+                                    {
+                                        "key": "password",
+                                        "value": "QqfFXiUat1x82D4vdSbS",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "key": "username",
+                                        "value": "3xATCK5OkR6p8LBohvse",
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n    \"items\": [\n        {\n            \"barcode\": \"IntegratinTestProduct1\",\n            \"title\":   \"IntegratinTestProduct\",\n            \"productMainId\": \"IntegratinTestProduct2\",\n            \"brandId\": 187803,\n            \"categoryId\": 91266,\n            \"quantity\": 100,\n            \"stockCode\": \"STK-stokum-100\",\n            \"dimensionalWeight\": 2,\n            \"description\": \"ürün açıklaması\",\n            \"currencyType\": \"TRY\",\n            \"listPrice\": 100,\n            \"salePrice\": 100,\n            \"vatRate\": 10,\n            \"cargoCompanyId\": 10,\n            \"images\": [\n                {\n                    \"url\": \"https://mediaqa.store.alshaya.com/adobe/assets/urn:aaid:aem:32874588-8407-4410-9fb2-50c4a9116f45/as/EID-02f0927edc80d4efea1f0bf636359146149d55ec.jpg?\"\n                }\n            ],\n            \"attributes\": [\n                {\n                    \"attributeId\": 293,\n                    \"attributeValueId\": 2170846\n                },\n                {\n                    \"attributeId\": 47,\n                    \"customAttributeValue\": \"Sarı\"\n                }, \n                {\n                    \"attributeId\": 17620,\n                    \"customAttributeValue\": \"metal\"\n                },\n                {\n                    \"attributeId\": 294,\n                    \"attributeValueId\": 2878\n                },\n                {\n                    \"attributeId\": 296,\n                    \"attributeValueId\": 2873\n                }\n            ]\n        }\n    ]\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/product/sellers/2738/products",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "product",
+                                    "sellers",
+                                    "2738",
+                                    "products"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-00895b01-676a-4ce5-8386-c5a765830520"
+                    },
+                    {
+                        "name": "Product Delete (Ürün Silme)",
+                        "id": "13bd1132-2826-47f4-a23c-7e0af77fc789",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "auth": {
+                                "type": "basic",
+                                "basic": [
+                                    {
+                                        "key": "password",
+                                        "value": "UVHLD3aGSnez4Y0vo5MK",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "key": "username",
+                                        "value": "sQTsTuR9UFBhfY37BluO",
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "method": "DELETE",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n    \"items\":[\n        {\n            \"barcode\": \"test123\"\n        },\n        {\n            \"barcode\": \"test456\"\n        }\n    ]\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/product/sellers/2738/products",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "product",
+                                    "sellers",
+                                    "2738",
+                                    "products"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-13bd1132-2826-47f4-a23c-7e0af77fc789"
+                    }
+                ],
+                "id": "7fce79cb-07c1-45a0-8b00-ec2118f0827d",
+                "uid": "36945960-7fce79cb-07c1-45a0-8b00-ec2118f0827d"
+            },
+            {
+                "name": "Order Integration (Sipariş Entegrasyonu)",
+                "item": [
+                    {
+                        "name": "Create a Test Order (Test Siparişi Oluşturma)",
+                        "id": "c8093f31-dc99-4dc2-889d-72f2d32c7fef",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Basic RGdpdmI5a2V5RjVrWExyU29JVHg6dmR3czNIT25iNzZjNUhUVmI5Y0o="
+                                },
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "SellerID",
+                                    "value": "2738"
+                                },
+                                {
+                                    "key": "User-Agent",
+                                    "value": "2738 ",
+                                    "disabled": true
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\r\n  \"customer\": {\r\n    \"customerFirstName\": \"Adı\",\r\n    \"customerLastName\": \"Soyadı\"\r\n  },\r\n  \"invoiceAddress\": {\r\n    \"addressText\": \"test deneme adresi\",\r\n    \"city\": \"İzmir\",\r\n    \"company\": \"\",\r\n    \"district\": \"Bornova\",\r\n    \"invoiceFirstName\": \"Adı\",\r\n    \"invoiceLastName\": \"Soyadı\",\r\n    \"latitude\": \"string\",\r\n    \"longitude\": \"string\",\r\n    \"neighborhood\": \"\",\r\n    \"phone\": \"5000000000\",\r\n    \"postalCode\": \"\",\r\n    \"email\": \"musteri@email.com\",\r\n    \"invoiceTaxNumber\": \"Firma Tax Number\",\r\n    \"invoiceTaxOffice\": \"Firma Tax Office\"\r\n  },\r\n  \"lines\": [\r\n    {\r\n      \"barcode\": \"9900000000486\",\r\n      \"quantity\": 2,\r\n      \"discountPercentage\": 50\r\n    }\r\n  ],\r\n  \"seller\": {\r\n    \"sellerId\": 2738\r\n  },\r\n  \"shippingAddress\": {\r\n    \"addressText\": \"test deneme adresi\",\r\n    \"city\": \"İzmir\",\r\n    \"company\": \"\",\r\n    \"district\": \"Bornova\",\r\n    \"latitude\": \"string\",\r\n    \"longitude\": \"string\",\r\n    \"neighborhood\": \"\",\r\n    \"phone\": \"5000000000\",\r\n    \"postalCode\": \"\",\r\n    \"shippingFirstName\": \"Adı\",\r\n    \"shippingLastName\": \"Soyadı\",\r\n    \"email\": \"musteri@email.com\"\r\n  },\r\n   \"commercial\":false,\r\n   \"microRegion\": \"String\"\r\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/test/order/orders/core",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "test",
+                                    "order",
+                                    "orders",
+                                    "core"
+                                ]
+                            },
+                            "description": "Generated from cURL: curl --request POST \\\r\n  --url https://stageapi.trendyol.com/integration/oms/core/ \\\r\n  --header 'Authorization: Basic RGdpdmI5a2V5RjVrWExyU29JVHg6dmR3czNIT25iNzZjNUhUVmI5Y0o=' \\\r\n  --header 'Content-Type: application/json' \\\r\n  --header 'SellerID: 2738' \\\r\n  --header 'User-Agent: 2738 - Akinon' \\\r\n  --data '{\r\n  \"customer\": {\r\n    \"customerFirstName\": \"Koton Test\",\r\n    \"customerLastName\": \"Koton test\"\r\n  },\r\n  \"invoiceAddress\": {\r\n    \"addressText\": \"Koton test test test\",\r\n    \"city\": \"İzmir\",\r\n    \"company\": \"string\",\r\n    \"district\": \"Bornova\",\r\n    \"email\": \"test@koton.com\",\r\n    \"invoiceFirstName\": \"TEst\",\r\n    \"invoiceLastName\": \"TEst\",\r\n    \"latitude\": \"\",\r\n    \"longitude\": \"\",\r\n    \"neighborhood\": \"\",\r\n    \"phone\": \"5459666789\",\r\n    \"postalCode\": \"\"\r\n  },\r\n  \"lines\": [\r\n    {\r\n      \"barcode\": \"8683353387305\",\r\n      \"quantity\": 1\r\n    },\r\n    {\r\n      \"barcode\": \"8683353387312\",\r\n      \"quantity\": 1\r\n    },\r\n    {\r\n      \"barcode\": \"8683355790769\",\r\n      \"quantity\": 1\r\n    }\r\n  ],\r\n  \"seller\": {\r\n    \"sellerId\": 2738\r\n  },\r\n  \"shippingAddress\": {\r\n    \"addressText\": \"teste sdfs\",\r\n    \"city\": \"İzmir\",\r\n    \"company\": \"\",\r\n    \"district\": \"Bornova\",\r\n    \"email\": \"test@koton.com\",\r\n    \"latitude\": \"\",\r\n    \"longitude\": \"\",\r\n    \"neighborhood\": \"\",\r\n    \"phone\": \"5459666789\",\r\n    \"postalCode\": \"\",\r\n    \"shippingFirstName\": \"Test\",\r\n    \"shippingLastName\": \"Test\"\r\n  }\r\n}'"
+                        },
+                        "response": [],
+                        "uid": "36945960-c8093f31-dc99-4dc2-889d-72f2d32c7fef"
+                    },
+                    {
+                        "name": "Get Order Packages (Sipariş Paketlerini Çekme)",
+                        "id": "ace801a1-cbc6-46a2-9401-24f25eb58517",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "auth": {
+                                "type": "basic",
+                                "basic": [
+                                    {
+                                        "key": "password",
+                                        "value": "If0ojr6t09BfMJlTM9MC",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "key": "username",
+                                        "value": "X0akZA1z02rhkEbEB06o",
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/2738/orders",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "2738",
+                                    "orders"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-ace801a1-cbc6-46a2-9401-24f25eb58517"
+                    },
+                    {
+                        "name": "Get Order Packages on Awaiting Confirmation (Askıdaki Sipariş Paketlerini Çekme)",
+                        "id": "35afe85b-2224-4ecc-a426-473ddad8dd9c",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "auth": {
+                                "type": "basic",
+                                "basic": [
+                                    {
+                                        "key": "password",
+                                        "value": "0qzzIvjEJvxsQvaaRaiH",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "key": "username",
+                                        "value": "DyzkKgodx7VGJezsAwCy",
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/2738/orders?status=Awaiting",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "2738",
+                                    "orders"
+                                ],
+                                "query": [
+                                    {
+                                        "key": "status",
+                                        "value": "Awaiting"
+                                    }
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-35afe85b-2224-4ecc-a426-473ddad8dd9c"
+                    },
+                    {
+                        "name": "Update Shipping Code (Kargo Takip Kodu Bildirme)",
+                        "id": "1b81d1c9-e9c0-4fa8-8fe0-724eb356887b",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"trackingNumber\": \"string\"\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/2738/shipment-packages/{packageId}/update-tracking-number",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "2738",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "update-tracking-number"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-1b81d1c9-e9c0-4fa8-8fe0-724eb356887b"
+                    },
+                    {
+                        "name": "Notify Packages (Paket Statü Bildirimi)",
+                        "id": "790cff45-c97d-4c12-a559-72235bb0d47f",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n    \"lines\": [\n        {\n        \"lineId\": {lineId}, // long gönderilmelidir.\n        \"quantity\": 3 // int gönderilmelidir.\n        }\n    ],\n    \"params\": {},\n    \"status\": \"Picking\"\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/2738/shipment-packages/{packageId}",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "2738",
+                                    "shipment-packages",
+                                    "{packageId}"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-790cff45-c97d-4c12-a559-72235bb0d47f"
+                    },
+                    {
+                        "name": "Cancel Order Package Item (Tedarik Edememe Bildirimi)",
+                        "id": "54cba3e6-1eb2-4b66-82d3-6bbe4867570d",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n \"lines\": [\n   {\n     \"lineId\": 0,\n     \"quantity\": 0\n   }\n ],\n\"reasonId\":0\n }",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/2738/shipment-packages/{packageId}/items/unsupplied",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "2738",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "items",
+                                    "unsupplied"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-54cba3e6-1eb2-4b66-82d3-6bbe4867570d"
+                    },
+                    {
+                        "name": "Send Invoice Link (Fatura Linki Gönderme)",
+                        "id": "807039ec-1b92-4d74-9634-cfe8e42a8ac9",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"invoiceLink\": \"https://extfatura.faturaentegratoru.com/324523-34523-52345-3453245.pdf\",\n  \"shipmentPackageId\": 435346,\n  \"invoiceDateTime\": 1678788898,\n  \"invoiceNumber\": \"TY4874324\"\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/sellers/2738/seller-invoice-links",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "sellers",
+                                    "2738",
+                                    "seller-invoice-links"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-807039ec-1b92-4d74-9634-cfe8e42a8ac9"
+                    },
+                    {
+                        "name": "Delete Invoice Link (Fatura Linki Silme)",
+                        "id": "9ce6adb4-d7ca-4c2f-a79b-e1e227aa0a73",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"serviceSourceId\": 88787, // shipmentPackageId\n  \"channelId\": 1, // should be always send as 1\n  \"customerId\": 167878 // can be checked on get order packages service\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/sellers/2738/seller-invoice-links/delete",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "sellers",
+                                    "2738",
+                                    "seller-invoice-links",
+                                    "delete"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-9ce6adb4-d7ca-4c2f-a79b-e1e227aa0a73"
+                    },
+                    {
+                        "name": "POST splitMultiPackageByQuantity (Sipariş Paketlerini Bölme)",
+                        "id": "75cea660-29cf-401e-9308-7ebe32dabd93",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "\n{\n  \"splitPackages\": [\n    {\n      \"packageDetails\": [\n        {\n          \"orderLineId\": 12345,\n          \"quantities\": 2\n        },\n        {\n          \"orderLineId\": 123456,\n          \"quantities\": 1\n        }\n      ]\n    },\n    {\n      \"packageDetails\": [\n        {\n          \"orderLineId\": 123,\n          \"quantities\": 1\n        },\n        {\n          \"orderLineId\": 1234,\n          \"quantities\": 1\n        }\n      ]\n    }\n  ]\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/split-packages",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "split-packages"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-75cea660-29cf-401e-9308-7ebe32dabd93"
+                    },
+                    {
+                        "name": "POST splitShipmentPackage (Sipariş Paketlerini Bölme)",
+                        "id": "268a6f8b-6def-45fd-98c9-688a6f151864",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n \"orderLineIds\": [{orderLineId}]\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/split",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "split"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-268a6f8b-6def-45fd-98c9-688a6f151864"
+                    },
+                    {
+                        "name": "POST splitShipmentPackage (Sipariş Paketlerini Bölme)",
+                        "id": "0b7bd1f8-f649-40d2-9165-00f415910b45",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n    \"splitGroups\": [{\n            \"orderLineIds\": [\n                3, 5, 6\n            ]\n        },\n        {\n            \"orderLineIds\": [\n                7, 8, 9\n            ]\n        }\n\n    ]\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/multi-split",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "multi-split"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-0b7bd1f8-f649-40d2-9165-00f415910b45"
+                    },
+                    {
+                        "name": "POST splitShipmentPackageByQuantity (Sipariş Paketlerini Bölme)",
+                        "id": "8f6bee8c-3cc1-41b1-824a-bd6777304f67",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"quantitySplit\": [\n    {\n      \"orderLineId\": 0,\n      \"quantities\": [\n       2,2\n       ]\n    }\n  ]\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/quantity-split",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "quantity-split"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-8f6bee8c-3cc1-41b1-824a-bd6777304f67"
+                    },
+                    {
+                        "name": "Notify Deci and Box Quantity Information (Desi ve Koli Bilgisi Bildirimi)",
+                        "id": "0dea087c-4041-4552-a879-dedeb5914b7c",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"boxQuantity\": 4,\n  \"deci\": 4.4\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/box-info",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "box-info"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-0dea087c-4041-4552-a879-dedeb5914b7c"
+                    },
+                    {
+                        "name": "Delivery by Service (Yetkili Servis İle Gönderim)",
+                        "id": "363ed2ea-3274-4ab8-bd8d-cc854c1f620a",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/delivered-by-service",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "delivered-by-service"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-363ed2ea-3274-4ab8-bd8d-cc854c1f620a"
+                    },
+                    {
+                        "name": "Change Cargo Provider (Paket Kargo Firması Değiştirme)",
+                        "id": "cdfc1a2e-6bc6-430c-9559-e662074815f0",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"cargoProvider\": \"string\"\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/cargo-providers",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "cargo-providers"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-cdfc1a2e-6bc6-430c-9559-e662074815f0"
+                    },
+                    {
+                        "name": "Update Warehouse Information (Depo Bilgisi Güncelleme)",
+                        "id": "45f7c2cd-7a2e-4a49-a5c0-741cef02e6d2",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n    \"warehouseId\": int\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/warehouse",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "warehouse"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-45f7c2cd-7a2e-4a49-a5c0-741cef02e6d2"
+                    },
+                    {
+                        "name": "Additional Supply Time Definition (Ek Tedarik Süresi Tanımlama)",
+                        "id": "9087512d-d8e5-483c-8bc4-dced48abc09f",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"extendedDayCount\" : 1 // 1,2,3 değerlerinden birini alabilir.\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/extended-agreed-delivery-date",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "extended-agreed-delivery-date"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-9087512d-d8e5-483c-8bc4-dced48abc09f"
+                    },
+                    {
+                        "name": "Status Updates on Test Orders (Test Siparişlerinde Statü Güncellemeleri)",
+                        "id": "eaeebd82-ab29-4de1-8e37-8b1bab844bbf",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "auth": {
+                                "type": "basic",
+                                "basic": [
+                                    {
+                                        "key": "password",
+                                        "value": "QqfFXiUat1x82D4vdSbS",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "key": "username",
+                                        "value": "3xATCK5OkR6p8LBohvse",
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n    \"lines\": [\n        {\n            \"lineId\": 4944785,\n            \"quantity\": 1\n        }\n    ],\n    \"params\": {\n    },\n    \"status\": \"Delivered\"\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/test/order/sellers/{sellerId}/shipment-packages/{packageId}/status",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "test",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "status"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-eaeebd82-ab29-4de1-8e37-8b1bab844bbf"
+                    },
+                    {
+                        "name": "Return Test Orders to WaitingInAction Status (İade Test Siparişlerini WaitingInAction Statüsüne Çekme)",
+                        "id": "e20679ec-cc8a-4a15-87d3-1aa6bfb49ed7",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "auth": {
+                                "type": "basic",
+                                "basic": [
+                                    {
+                                        "key": "password",
+                                        "value": "QqfFXiUat1x82D4vdSbS",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "key": "username",
+                                        "value": "3xATCK5OkR6p8LBohvse",
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n    \"shipmentPackageId\": 56526451 // getClaims servisinden dönen \"orderShipmentPackageId\" değerine karşılık gelmektedir,\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/test/order/sellers/{sellerId}/claims/waiting-in-action",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "test",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "claims",
+                                    "waiting-in-action"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-e20679ec-cc8a-4a15-87d3-1aa6bfb49ed7"
+                    },
+                    {
+                        "name": "AlternativeDelivery (Shipping with Cargo Link) (Alternatif Teslimat Kargo Linki ile Gönderim)",
+                        "id": "fb6b485b-a99c-4e73-9f4c-6fbe5cc3a298",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n\"isPhoneNumber\": false,\n\"trackingInfo\": \"http://tex....\",\n\"params\": {}\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/alternative-delivery",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "alternative-delivery"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-fb6b485b-a99c-4e73-9f4c-6fbe5cc3a298"
+                    },
+                    {
+                        "name": "AlternativeDelivery (Shipping by Phone Number) (Alternatif Teslimat Telefon Numarası ile Gönderim)",
+                        "id": "b373b7bf-e28b-44a7-b125-31f7129f0bc0",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n\"isPhoneNumber\": true,\n\"trackingInfo\": \"5555555555\",\n\"params\":{},\n\"boxQuantity\": 1,\n\"deci\": 1.4\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/alternative-delivery",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "alternative-delivery"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-b373b7bf-e28b-44a7-b125-31f7129f0bc0"
+                    },
+                    {
+                        "name": "manualDeliver (Delivering a Package Sent by Alternate Delivery) (Alternatif Teslimat ile Gönderilmiş Paketi Teslim Etme)",
+                        "id": "28c92d05-f84f-4f10-b161-c07597c7ea7f",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/manual-deliver/{cargoTrackingNumber}",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "manual-deliver",
+                                    "{cargoTrackingNumber}"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-28c92d05-f84f-4f10-b161-c07597c7ea7f"
+                    },
+                    {
+                        "name": "manualReturn (Returning Package Sent with Alternate Delivery) (Alternatif Teslimat ile Gönderilmiş Paketin Iade Edilmesi)",
+                        "id": "79f999bf-5ec7-43ab-99af-097c2b942988",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/manual-return/{cargoTrackingNumber}",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "manual-return",
+                                    "{cargoTrackingNumber}"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-79f999bf-5ec7-43ab-99af-097c2b942988"
+                    },
+                    {
+                        "name": "processAlternativeDelivery (Digital Product Delivery) (Alternatif Teslimat İle Dijital Ürün Gönderimi)",
+                        "id": "858afb02-fcb1-49e6-b87e-c23b5aaae18e",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n\"isPhoneNumber\": true,\n\"trackingInfo\": \"5555555555\",\n\"params\":\n{\"digitalCode\": \"AX4567fasdf\"}\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/alternative-delivery",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "alternative-delivery"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-858afb02-fcb1-49e6-b87e-c23b5aaae18e"
+                    },
+                    {
+                        "name": "Country Information (Ülke Bilgisi)",
+                        "id": "ecb27fd4-3ca5-4627-bac7-3ae1c036ee43",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/member/countries",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "member",
+                                    "countries"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-ecb27fd4-3ca5-4627-bac7-3ae1c036ee43"
+                    },
+                    {
+                        "name": "City Information for region GULF and CEE (GULF ve CEE Ülkeleri İçin İl Bilgisi)",
+                        "id": "f84f2276-2cfc-44da-a829-9800eab545ee",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/member/countries/{CountryCode}/cities",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "member",
+                                    "countries",
+                                    "{CountryCode}",
+                                    "cities"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-f84f2276-2cfc-44da-a829-9800eab545ee"
+                    },
+                    {
+                        "name": "City Information for Azerbaijan (Azerbaycan Şehir Bilgisi)",
+                        "id": "7c3fd04e-f038-444e-bbf6-249f97ffa6f7",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/member/countries/domestic/AZ/cities",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "member",
+                                    "countries",
+                                    "domestic",
+                                    "AZ",
+                                    "cities"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-7c3fd04e-f038-444e-bbf6-249f97ffa6f7"
+                    },
+                    {
+                        "name": "City Information for Turkey (Türkiye Şehir Bilgisi)",
+                        "id": "7f898963-c4d4-4056-981d-a50584c225eb",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/member/countries/domestic/TR/cities",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "member",
+                                    "countries",
+                                    "domestic",
+                                    "TR",
+                                    "cities"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-7f898963-c4d4-4056-981d-a50584c225eb"
+                    },
+                    {
+                        "name": "Update Labor Cost (İşçilik Bedeli Tutarı Gönderme)",
+                        "id": "c28e2da4-fac1-4a9f-85d5-0a1591ad83f3",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "[\n    {\n    orderLineId: 3653527482,\n    laborCostPerItem: 32.12,\n    },\n    {\n    orderLineId: 3653527483,\n    laborCostPerItem: 78.65,\n    }\n]",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/shipment-packages/{packageId}/labor-costs",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "shipment-packages",
+                                    "{packageId}",
+                                    "labor-costs"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-c28e2da4-fac1-4a9f-85d5-0a1591ad83f3"
+                    }
+                ],
+                "id": "a4148918-4861-4c8a-9c97-745c2645af6a",
+                "uid": "36945960-a4148918-4861-4c8a-9c97-745c2645af6a"
+            },
+            {
+                "name": "Common Label Integration (Ortak Etiket Entegrasyonu)",
+                "item": [
+                    {
+                        "name": "Barcode Request (Barkod Talebi)",
+                        "id": "ebb93670-55b4-4501-903b-730e467924cd",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n        \"format\": \"\"ZPL\"\", //required\n        \"boxQuantity\": 5,\n        \"volumetricHeight\": 3.5\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/sellers/{sellerId}/common-label/{cargoTrackingNumber}",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "common-label",
+                                    "{cargoTrackingNumber}"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-ebb93670-55b4-4501-903b-730e467924cd"
+                    },
+                    {
+                        "name": "Getting Created Common Label (Oluşan Barkodun Alınması)",
+                        "id": "4edbf61e-a076-48a3-92c5-8035cc7f39c6",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/sellers/{sellerId}/common-label/{cargoTrackingNumber}",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "common-label",
+                                    "{cargoTrackingNumber}"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-4edbf61e-a076-48a3-92c5-8035cc7f39c6"
+                    }
+                ],
+                "id": "533c66ab-9dd5-4048-92fc-d2215cd1bf46",
+                "uid": "36945960-533c66ab-9dd5-4048-92fc-d2215cd1bf46"
+            },
+            {
+                "name": "Returned Orders Integration (İade Entegrasyonu)",
+                "item": [
+                    {
+                        "name": "Getting Returned Orders ( İadesi Oluşturulan Siparişleri Çekme)",
+                        "id": "fad07131-7bb9-4043-9546-bc4824bb0b10",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/claims",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "claims"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-fad07131-7bb9-4043-9546-bc4824bb0b10"
+                    },
+                    {
+                        "name": "Approve Returned Orders (İade Siparişleri Onaylama)",
+                        "id": "487a530d-f40a-4013-a1bc-b0015b12f4cb",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "PUT",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"claimLineItemIdList\": [\n    \"f9da2317-876b-4b86-b8f7-0535c3b65731\"\n  ],\n  \"params\": {}\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/claims/{claimId}/items/approve",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "claims",
+                                    "{claimId}",
+                                    "items",
+                                    "approve"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-487a530d-f40a-4013-a1bc-b0015b12f4cb"
+                    },
+                    {
+                        "name": "Create a Rejection Request on Returned Orders (İade Siparişlerinde Ret Talebi Oluşturma)",
+                        "id": "1b66984e-ca08-439e-adc5-7aa123c938ff",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/claims/{claimId}/issue?claimIssueReasonId={claimIssueReasonId}&claimItemIdList={claimItemIdList}&description={test}",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "claims",
+                                    "{claimId}",
+                                    "issue"
+                                ],
+                                "query": [
+                                    {
+                                        "key": "claimIssueReasonId",
+                                        "value": "{claimIssueReasonId}"
+                                    },
+                                    {
+                                        "key": "claimItemIdList",
+                                        "value": "{claimItemIdList}"
+                                    },
+                                    {
+                                        "key": "description",
+                                        "value": "{test}"
+                                    }
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-1b66984e-ca08-439e-adc5-7aa123c938ff"
+                    },
+                    {
+                        "name": "Claim Issue Reasons (İade Red Sebeplerini Çekme)",
+                        "id": "a9d3b8f9-e745-4874-93c5-92c767b6be8c",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/claim-issue-reasons",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "claim-issue-reasons"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-a9d3b8f9-e745-4874-93c5-92c767b6be8c"
+                    },
+                    {
+                        "name": "Get Claim Audit Information (İade Audit Bilgilerini Çekme)",
+                        "id": "5dff17c5-dd06-49b7-a2b0-f10dc016934b",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/order/sellers/{sellerId}/claims/items/{claimItemsId}/audit",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "order",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "claims",
+                                    "items",
+                                    "{claimItemsId}",
+                                    "audit"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-5dff17c5-dd06-49b7-a2b0-f10dc016934b"
+                    }
+                ],
+                "id": "232cc463-c9f1-461c-aa72-340394509d38",
+                "uid": "36945960-232cc463-c9f1-461c-aa72-340394509d38"
+            },
+            {
+                "name": "Question&Answer Integration (Soru Cevap Entegrasyonu)",
+                "item": [
+                    {
+                        "name": "Getting Customer Questions (Müşteri Sorularını Çekme)",
+                        "id": "e6030eff-218b-42f1-8d77-27d76b46cc3a",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "auth": {
+                                "type": "basic",
+                                "basic": [
+                                    {
+                                        "key": "password",
+                                        "value": "HWenHmwE2dVTlzaucNzC",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "key": "username",
+                                        "value": "qjdVQzTGX3hRL0dp3QfJ",
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/qna/sellers/{sellerId}/questions/filter",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "qna",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "questions",
+                                    "filter"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-e6030eff-218b-42f1-8d77-27d76b46cc3a"
+                    },
+                    {
+                        "name": "Answering Customer Questions (Müşteri Sorularını Cevaplama)",
+                        "id": "f777f54e-3f88-45ee-8a94-1d79dddb915c",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"text\": \"string\"\n}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/qna/sellers/{sellerId}/questions/{id}/answers",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "qna",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "questions",
+                                    "{id}",
+                                    "answers"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-f777f54e-3f88-45ee-8a94-1d79dddb915c"
+                    }
+                ],
+                "id": "452e64b6-1e6d-487b-a2aa-efc5598c89be",
+                "uid": "36945960-452e64b6-1e6d-487b-a2aa-efc5598c89be"
+            },
+            {
+                "name": "Trendyol Accounting and Finance Integration (Trendyol Muhasebe Ve Finans Entegrasyonu)",
+                "item": [
+                    {
+                        "name": "Current Account Statement Integration (Cari Hesap Ekstresi Entegrasyonu)",
+                        "id": "dc6e423c-63ea-4db6-9966-4cdab5f26c6c",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/finance/che/sellers/{sellerId}/settlements",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "finance",
+                                    "che",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "settlements"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-dc6e423c-63ea-4db6-9966-4cdab5f26c6c"
+                    },
+                    {
+                        "name": "Cargo Invoice Details (Kargo Faturası Detayları)",
+                        "id": "6552056e-33f8-441a-835c-e682f1d11f11",
+                        "protocolProfileBehavior": {
+                            "disableBodyPruning": true
+                        },
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "https://stageapigw.trendyol.com/integration/finance/che/sellers/{sellerId}/cargo-invoice/{invoiceSerialNumber}/items",
+                                "protocol": "https",
+                                "host": [
+                                    "stageapigw",
+                                    "trendyol",
+                                    "com"
+                                ],
+                                "path": [
+                                    "integration",
+                                    "finance",
+                                    "che",
+                                    "sellers",
+                                    "{sellerId}",
+                                    "cargo-invoice",
+                                    "{invoiceSerialNumber}",
+                                    "items"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "uid": "36945960-6552056e-33f8-441a-835c-e682f1d11f11"
+                    }
+                ],
+                "id": "2114a648-0d0f-47b8-b8d1-614097f2c53d",
+                "uid": "36945960-2114a648-0d0f-47b8-b8d1-614097f2c53d"
+            }
+        ]
+    }
+}
