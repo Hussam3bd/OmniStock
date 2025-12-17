@@ -290,6 +290,34 @@ class PurchaseOrderForm
                                     })
                                     ->helperText(__('Leave empty to add all colors')),
 
+                                Forms\Components\Select::make('size_values')
+                                    ->label(__('Select Sizes (Optional)'))
+                                    ->multiple()
+                                    ->searchable()
+                                    ->options(function (callable $get) {
+                                        $productIds = $get('product_ids') ?? [];
+
+                                        if (empty($productIds)) {
+                                            return [];
+                                        }
+
+                                        // Get all unique size values from selected products' variants
+                                        $sizes = ProductVariant::whereIn('product_id', $productIds)
+                                            ->with(['optionValues.variantOption'])
+                                            ->get()
+                                            ->flatMap(function ($variant) {
+                                                return $variant->optionValues
+                                                    ->filter(fn ($optionValue) => $optionValue->variantOption?->type === 'size')
+                                                    ->pluck('value');
+                                            })
+                                            ->unique()
+                                            ->sort()
+                                            ->mapWithKeys(fn ($size) => [$size => $size]);
+
+                                        return $sizes;
+                                    })
+                                    ->helperText(__('Leave empty to add all sizes')),
+
                                 Forms\Components\TextInput::make('number_of_sets')
                                     ->label(__('Number of Sets'))
                                     ->numeric()
@@ -308,6 +336,7 @@ class PurchaseOrderForm
                             ->action(function (array $data, $livewire) {
                                 $productIds = $data['product_ids'] ?? [];
                                 $selectedColors = $data['color_values'] ?? [];
+                                $selectedSizes = $data['size_values'] ?? [];
                                 $numberOfSets = (int) ($data['number_of_sets'] ?? 1);
                                 $bulkUnitCost = ! empty($data['bulk_unit_cost']) ? (float) $data['bulk_unit_cost'] : null;
 
@@ -361,6 +390,14 @@ class PurchaseOrderForm
                                         // Find the size option value for this variant
                                         $sizeValue = $variant->optionValues
                                             ->first(fn ($optionValue) => $optionValue->variantOption?->type === 'size');
+
+                                        // Filter by selected sizes if specified
+                                        if (! empty($selectedSizes)) {
+                                            // Skip variant if its size is not in the selected sizes
+                                            if (! $sizeValue || ! in_array($sizeValue->value, $selectedSizes)) {
+                                                continue;
+                                            }
+                                        }
 
                                         // Get base quantity for this size
                                         $baseQuantity = $sizeValue
