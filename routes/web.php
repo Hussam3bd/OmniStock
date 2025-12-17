@@ -6,6 +6,6 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::webhooks('webhooks/trendyol', 'trendyol');
+Route::webhooks('webhooks/ty', 'trendyol');
 Route::webhooks('webhooks/shopify', 'shopify');
 Route::webhooks('webhooks/basitkargo', 'basitkargo');

@@ -385,6 +385,8 @@ class TrendyolAdapter implements SalesChannelAdapter
 
     public function registerWebhooks(): bool
     {
+        // Using 'ty' route (webhooks/ty) instead of 'trendyol'
+        // because Trendyol rejects webhook URLs containing 'trendyol', 'dolap', or 'localhost'
         $webhookUrl = route('webhook-client-trendyol');
 
         $webhookConfig = $this->integration->config['webhook'] ?? null;
