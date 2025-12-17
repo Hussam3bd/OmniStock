@@ -26,6 +26,7 @@ use App\Observers\PurchaseOrderObserver;
 use App\Observers\TransactionObserver;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Opcodes\LogViewer\Facades\LogViewer;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -56,5 +57,9 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(OrderItemCreated::class, DeductInventoryForOrderItem::class);
         Event::listen(OrderCancelled::class, RestoreInventoryForCancellation::class);
         Event::listen(OrderReturnCompleted::class, RestoreInventoryForReturn::class);
+
+        LogViewer::auth(function ($request) {
+            return !!$request?->user();
+        });
     }
 }
