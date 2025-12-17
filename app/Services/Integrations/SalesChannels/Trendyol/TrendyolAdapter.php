@@ -405,6 +405,7 @@ class TrendyolAdapter implements SalesChannelAdapter
         }
 
         $providedApiKey = $request->header('X-Trendyol-Api-Key')
+            ?? $request->header('x-api-key')
             ?? $request->input('apiKey')
             ?? $request->bearerToken();
 
