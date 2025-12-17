@@ -10,7 +10,7 @@ return [
             'webhook_profile' => \App\Services\Integrations\SalesChannels\Trendyol\Webhooks\WebhookProfile::class,
             'webhook_response' => \Spatie\WebhookClient\WebhookResponse\DefaultRespondsTo::class,
             'webhook_model' => \Spatie\WebhookClient\Models\WebhookCall::class,
-            'store_headers' => ['*'],
+            'store_headers' => '*',
             'process_webhook_job' => \App\Jobs\ProcessTrendyolWebhook::class,
         ],
         [
@@ -21,7 +21,7 @@ return [
             'webhook_profile' => \App\Services\Integrations\SalesChannels\Shopify\Webhooks\WebhookProfile::class,
             'webhook_response' => \Spatie\WebhookClient\WebhookResponse\DefaultRespondsTo::class,
             'webhook_model' => \Spatie\WebhookClient\Models\WebhookCall::class,
-            'store_headers' => ['*'],
+            'store_headers' => '*',
             'process_webhook_job' => \App\Jobs\ProcessShopifyWebhook::class,
         ],
         [
@@ -32,7 +32,7 @@ return [
             'webhook_profile' => \App\Services\Integrations\ShippingProviders\BasitKargo\Webhooks\WebhookProfile::class,
             'webhook_response' => \Spatie\WebhookClient\WebhookResponse\DefaultRespondsTo::class,
             'webhook_model' => \Spatie\WebhookClient\Models\WebhookCall::class,
-            'store_headers' => ['*'],
+            'store_headers' => '*',
             'process_webhook_job' => \App\Jobs\ProcessBasitKargoWebhook::class,
         ],
     ],
