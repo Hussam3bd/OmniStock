@@ -22,7 +22,7 @@ class RemoveCancelledOrderMovements extends Command
      *
      * @var string
      */
-    protected $description = 'Remove sale and cancellation movements for orders that were imported already cancelled';
+    protected $description = 'Remove inventory movements (sale/cancellation) for orders that are cancelled';
 
     /**
      * Execute the console command.
@@ -34,7 +34,7 @@ class RemoveCancelledOrderMovements extends Command
         $this->info('🔍 Finding cancelled orders with inventory movements...');
         $this->newLine();
 
-        // Find cancelled orders that have both sale and cancellation movements
+        // Find cancelled orders that have sale movements (with or without cancellation movements)
         $cancelledOrders = DB::table('orders as o')
             ->select('o.id', 'o.order_number')
             ->where('o.order_status', 'cancelled')
@@ -44,12 +44,6 @@ class RemoveCancelledOrderMovements extends Command
                     ->whereColumn('im1.order_id', 'o.id')
                     ->where('im1.type', InventoryMovementType::Sale->value);
             })
-            ->whereExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('inventory_movements as im2')
-                    ->whereColumn('im2.order_id', 'o.id')
-                    ->where('im2.type', InventoryMovementType::Cancellation->value);
-            })
             ->get();
 
         if ($cancelledOrders->isEmpty()) {
@@ -58,7 +52,7 @@ class RemoveCancelledOrderMovements extends Command
             return self::SUCCESS;
         }
 
-        $this->warn('Found '.$cancelledOrders->count().' cancelled orders with both sale and cancellation movements');
+        $this->warn('Found '.$cancelledOrders->count().' cancelled orders with inventory movements');
         $this->newLine();
 
         // Count total movements to delete
