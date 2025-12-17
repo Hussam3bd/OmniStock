@@ -167,6 +167,9 @@ php artisan inventory:process-cancellations [--dry-run]
 
 # Remove movements from orders imported already cancelled
 php artisan inventory:remove-cancelled-movements [--dry-run]
+
+# Remove duplicate return movements (for orders with both cancellation AND return)
+php artisan inventory:remove-duplicate-returns [--dry-run]
 ```
 
 ## Production Deployment Commands
@@ -186,10 +189,13 @@ php artisan inventory:process-returns
 # 4. Remove movements from orders imported already cancelled
 php artisan inventory:remove-cancelled-movements
 
-# 5. Recalculate all before/after values in movement history
+# 5. Remove duplicate return movements (orders with both cancellation AND return)
+php artisan inventory:remove-duplicate-returns
+
+# 6. Recalculate all before/after values in movement history
 php artisan inventory:recalculate-history
 
-# 6. Verify everything is correct
+# 7. Verify everything is correct
 php artisan inventory:verify
 ```
 
@@ -199,6 +205,7 @@ php artisan inventory:verify
 php artisan inventory:cleanup-duplicates --dry-run
 php artisan inventory:process-returns --dry-run
 php artisan inventory:remove-cancelled-movements --dry-run
+php artisan inventory:remove-duplicate-returns --dry-run
 php artisan inventory:recalculate-history --dry-run
 ```
 
