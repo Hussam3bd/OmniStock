@@ -240,9 +240,9 @@ class PurchaseOrderForm
                             ->label(__('Add All Variants'))
                             ->icon('heroicon-o-plus-circle')
                             ->color('success')
-                            ->form([
-                                Forms\Components\Select::make('product_id')
-                                    ->label(__('Select Product'))
+                            ->schema([
+                                Forms\Components\Select::make('product_ids')
+                                    ->label(__('Select Products'))
                                     ->options(
                                         Product::query()
                                             ->orderBy('title')
@@ -252,9 +252,10 @@ class PurchaseOrderForm
                                             ])
                                     )
                                     ->required()
+                                    ->multiple()
                                     ->searchable()
                                     ->preload()
-                                    ->helperText(__('All variants of this product will be added to the order')),
+                                    ->helperText(__('All variants of selected products will be added to the order')),
 
                                 Forms\Components\TextInput::make('number_of_sets')
                                     ->label(__('Number of Sets'))
@@ -272,7 +273,7 @@ class PurchaseOrderForm
                                     ->helperText(__('Leave empty to use each variant\'s cost price')),
                             ])
                             ->action(function (array $data, $livewire) {
-                                $productId = $data['product_id'];
+                                $productIds = $data['product_ids'] ?? [];
                                 $numberOfSets = (int) ($data['number_of_sets'] ?? 1);
                                 $bulkUnitCost = ! empty($data['bulk_unit_cost']) ? (float) $data['bulk_unit_cost'] : null;
 
@@ -280,10 +281,6 @@ class PurchaseOrderForm
                                 $currencyId = $livewire->data['currency_id'] ?? null;
                                 $currency = $currencyId ? Currency::find($currencyId) : Currency::where('is_default', true)->first();
                                 $currencyCode = $currency?->code ?? 'TRY';
-
-                                $variants = ProductVariant::where('product_id', $productId)
-                                    ->with(['product', 'optionValues.variantOption'])
-                                    ->get();
 
                                 // Get current form state to preserve all data
                                 $formState = $livewire->form->getRawState();
@@ -302,41 +299,49 @@ class PurchaseOrderForm
                                     return 1;
                                 };
 
-                                $addedCount = 0;
-                                foreach ($variants as $variant) {
-                                    // Skip if variant already exists in items
-                                    if (in_array($variant->id, $existingVariantIds)) {
-                                        continue;
+                                $totalAddedCount = 0;
+
+                                // Loop through each selected product
+                                foreach ($productIds as $productId) {
+                                    $variants = ProductVariant::where('product_id', $productId)
+                                        ->with(['product', 'optionValues.variantOption'])
+                                        ->get();
+
+                                    foreach ($variants as $variant) {
+                                        // Skip if variant already exists in items
+                                        if (in_array($variant->id, $existingVariantIds)) {
+                                            continue;
+                                        }
+
+                                        // Find the size option value for this variant
+                                        $sizeValue = $variant->optionValues
+                                            ->first(fn ($optionValue) => $optionValue->variantOption?->type === 'size');
+
+                                        // Get base quantity for this size
+                                        $baseQuantity = $sizeValue
+                                            ? $sizeQuantityMap($sizeValue->value)
+                                            : 1;
+
+                                        // Calculate total quantity (base quantity × number of sets)
+                                        $quantity = $baseQuantity * $numberOfSets;
+
+                                        // Handle unit cost - create Money object
+                                        if ($bulkUnitCost !== null) {
+                                            // Create Money object from decimal value (Money::parse handles conversion)
+                                            $unitCost = Money::parse($bulkUnitCost, $currencyCode);
+                                        } else {
+                                            // Use variant's cost price (already a Money object or null)
+                                            $unitCost = $variant->cost_price ?? Money::parse(0, $currencyCode);
+                                        }
+
+                                        $currentItems[] = [
+                                            'product_variant_id' => $variant->id,
+                                            'quantity_ordered' => $quantity,
+                                            'unit_cost' => $unitCost,
+                                            'tax_rate' => 0,
+                                        ];
+                                        $totalAddedCount++;
                                     }
-
-                                    // Find the size option value for this variant
-                                    $sizeValue = $variant->optionValues
-                                        ->first(fn ($optionValue) => $optionValue->variantOption?->type === 'size');
-
-                                    // Get base quantity for this size
-                                    $baseQuantity = $sizeValue
-                                        ? $sizeQuantityMap($sizeValue->value)
-                                        : 1;
-
-                                    // Calculate total quantity (base quantity × number of sets)
-                                    $quantity = $baseQuantity * $numberOfSets;
-
-                                    // Handle unit cost - create Money object
-                                    if ($bulkUnitCost !== null) {
-                                        // Create Money object from decimal value (Money::parse handles conversion)
-                                        $unitCost = Money::parse($bulkUnitCost, $currencyCode);
-                                    } else {
-                                        // Use variant's cost price (already a Money object or null)
-                                        $unitCost = $variant->cost_price ?? Money::parse(0, $currencyCode);
-                                    }
-
-                                    $currentItems[] = [
-                                        'product_variant_id' => $variant->id,
-                                        'quantity_ordered' => $quantity,
-                                        'unit_cost' => $unitCost,
-                                        'tax_rate' => 0,
-                                    ];
-                                    $addedCount++;
                                 }
 
                                 // Update the items in the component data directly
@@ -352,10 +357,14 @@ class PurchaseOrderForm
                                 Notification::make()
                                     ->success()
                                     ->title(__('Variants Added'))
-                                    ->body(__(':count variants added to order (:sets sets)', ['count' => $addedCount, 'sets' => $numberOfSets]))
+                                    ->body(__(':count variants from :products products added to order (:sets sets)', [
+                                        'count' => $totalAddedCount,
+                                        'products' => count($productIds),
+                                        'sets' => $numberOfSets,
+                                    ]))
                                     ->send();
                             })
-                            ->modalHeading(__('Add All Variants of Product'))
+                            ->modalHeading(__('Add All Variants of Products'))
                             ->modalSubmitActionLabel(__('Add Variants'))
                             ->modalWidth('md'),
                     ])
