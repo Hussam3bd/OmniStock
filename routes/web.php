@@ -8,3 +8,4 @@ Route::get('/', function () {
 
 Route::webhooks('webhooks/trendyol', 'trendyol');
 Route::webhooks('webhooks/shopify', 'shopify');
+Route::webhooks('webhooks/basitkargo', 'basitkargo');
