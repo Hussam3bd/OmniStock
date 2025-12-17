@@ -183,15 +183,16 @@ class ShopifyRefundMapper extends BaseReturnsMapper
                     $return = $existingLinkedReturn;
                     $this->updateReturn($return, $shopifyRefund, $order, $isCOD);
 
-                    // Update or create platform mapping for this refund ID
+                    // Update existing platform mapping for this return
+                    // Use entity_id in WHERE clause to update existing mapping (changes platform_id from return ID to refund ID)
                     PlatformMapping::updateOrCreate(
                         [
                             'platform' => $this->getChannel()->value,
-                            'platform_id' => (string) $shopifyRefund['id'],
                             'entity_type' => OrderReturn::class,
+                            'entity_id' => $return->id,
                         ],
                         [
-                            'entity_id' => $return->id,
+                            'platform_id' => (string) $shopifyRefund['id'],
                             'platform_data' => $shopifyRefund,
                             'last_synced_at' => now(),
                         ]
@@ -323,15 +324,20 @@ class ShopifyRefundMapper extends BaseReturnsMapper
             'platform_data' => $shopifyRefund,
         ]);
 
-        // Create platform mapping
-        PlatformMapping::create([
-            'platform' => $this->getChannel()->value,
-            'platform_id' => (string) $shopifyRefund['id'],
-            'entity_type' => OrderReturn::class,
-            'entity_id' => $return->id,
-            'platform_data' => $shopifyRefund,
-            'last_synced_at' => now(),
-        ]);
+        // Create or update platform mapping
+        // Use entity_id in WHERE clause to update existing mapping if return was created by ReturnRequestMapper
+        PlatformMapping::updateOrCreate(
+            [
+                'platform' => $this->getChannel()->value,
+                'entity_type' => OrderReturn::class,
+                'entity_id' => $return->id,
+            ],
+            [
+                'platform_id' => (string) $shopifyRefund['id'],
+                'platform_data' => $shopifyRefund,
+                'last_synced_at' => now(),
+            ]
+        );
 
         // Sync return items
         $this->syncReturnItems($return, $shopifyRefund, $order);
