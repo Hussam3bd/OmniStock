@@ -44,7 +44,7 @@ class MoneyInput extends TextInput
 
             // Handle Money object
             if ($state instanceof Money) {
-                if (!$this->currencyField) {
+                if (! $this->currencyField) {
                     $this->currency = $state->getCurrency();
                 }
                 $this->updatePrefix();
@@ -58,7 +58,7 @@ class MoneyInput extends TextInput
 
                 if (isset($moneyArray['amount'], $moneyArray['currency'])) {
                     $money = money($moneyArray['amount'], $moneyArray['currency']);
-                    if (!$this->currencyField) {
+                    if (! $this->currencyField) {
                         $this->currency = $money->getCurrency();
                     }
 
@@ -70,7 +70,7 @@ class MoneyInput extends TextInput
             }
 
             // Fallback: try to get from record
-            if ($record && !$this->currencyField) {
+            if ($record && ! $this->currencyField) {
                 $originalState = $record->getAttribute(
                     str($this->getStatePath())->after('data.')->toString()
                 );
@@ -87,7 +87,7 @@ class MoneyInput extends TextInput
         });
 
         $this->dehydrateStateUsing(function (MoneyInput $component, null|int|string $state) {
-            if (!$state || $state === '' || $state === '0') {
+            if (! $state || $state === '' || $state === '0') {
                 return 0;
             }
 
@@ -96,7 +96,9 @@ class MoneyInput extends TextInput
                 $this->updateCurrencyFromField();
             }
 
-            return Money::parse($state, $this->currency)->multiply(100);
+            // Money::parse already converts decimal to cents (e.g., "10.50" -> 1050)
+            // No need to multiply by 100 again
+            return Money::parse($state, $this->currency);
         });
 
         $this
@@ -110,7 +112,7 @@ class MoneyInput extends TextInput
      */
     protected function updateCurrencyFromField(): void
     {
-        if (!$this->currencyField) {
+        if (! $this->currencyField) {
             return;
         }
 
