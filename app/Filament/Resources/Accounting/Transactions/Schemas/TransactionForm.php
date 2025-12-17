@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Accounting\Transactions\Schemas;
 
+use App\Enums\Accounting\CapitalCategory;
 use App\Enums\Accounting\ExpenseCategory;
 use App\Enums\Accounting\IncomeCategory;
 use App\Enums\Accounting\TransactionType;
@@ -47,6 +48,7 @@ class TransactionForm
                         return match ($typeValue) {
                             TransactionType::INCOME->value, 'income' => IncomeCategory::class,
                             TransactionType::EXPENSE->value, 'expense' => ExpenseCategory::class,
+                            TransactionType::CAPITAL->value, 'capital' => CapitalCategory::class,
                             default => [],
                         };
                     })
@@ -57,8 +59,10 @@ class TransactionForm
                         return in_array($typeValue, [
                             TransactionType::INCOME->value,
                             TransactionType::EXPENSE->value,
+                            TransactionType::CAPITAL->value,
                             'income',
                             'expense',
+                            'capital',
                         ]);
                     })
                     ->visible(function (Get $get) {
@@ -68,8 +72,10 @@ class TransactionForm
                         return in_array($typeValue, [
                             TransactionType::INCOME->value,
                             TransactionType::EXPENSE->value,
+                            TransactionType::CAPITAL->value,
                             'income',
                             'expense',
+                            'capital',
                         ]);
                     })
                     ->columnSpan(1),

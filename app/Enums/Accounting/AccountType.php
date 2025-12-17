@@ -10,6 +10,7 @@ enum AccountType: string implements HasLabel
     case CASH = 'cash';
     case CREDIT_CARD = 'credit_card';
     case PAYMENT_GATEWAY = 'payment_gateway';
+    case EQUITY = 'equity';
 
     public function getLabel(): string
     {
@@ -18,6 +19,7 @@ enum AccountType: string implements HasLabel
             self::CASH => __('Cash'),
             self::CREDIT_CARD => __('Credit Card'),
             self::PAYMENT_GATEWAY => __('Payment Gateway'),
+            self::EQUITY => __('Owner\'s Equity'),
         };
     }
 }

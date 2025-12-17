@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Accounting\Accounts\Schemas;
 
 use App\Enums\Accounting\AccountType;
+use App\Forms\Components\MoneyInput;
 use App\Models\Currency;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -34,12 +35,11 @@ class AccountForm
                     ->required()
                     ->default(fn () => Currency::where('code', config('money.defaultCurrency'))->first()?->id),
 
-                TextInput::make('balance')
+                MoneyInput::make('balance')
                     ->label(__('Initial Balance'))
                     ->required()
                     ->numeric()
-                    ->default(0.0)
-                    ->prefix(fn ($get) => Currency::find($get('currency_id'))?->code ?? 'TRY'),
+                    ->default(0.0),
 
                 Textarea::make('description')
                     ->label(__('Description'))

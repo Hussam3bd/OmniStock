@@ -10,6 +10,7 @@ enum TransactionType: string implements HasColor, HasLabel
     case INCOME = 'income';
     case EXPENSE = 'expense';
     case TRANSFER = 'transfer';
+    case CAPITAL = 'capital';
 
     public function getLabel(): string
     {
@@ -17,6 +18,7 @@ enum TransactionType: string implements HasColor, HasLabel
             self::INCOME => __('Income'),
             self::EXPENSE => __('Expense'),
             self::TRANSFER => __('Transfer'),
+            self::CAPITAL => __('Capital Contribution/Withdrawal'),
         };
     }
 
@@ -26,6 +28,7 @@ enum TransactionType: string implements HasColor, HasLabel
             self::INCOME => 'success',
             self::EXPENSE => 'danger',
             self::TRANSFER => 'info',
+            self::CAPITAL => 'warning',
         };
     }
 }

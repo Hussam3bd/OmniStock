@@ -2,9 +2,11 @@
 
 namespace App\Models\Accounting;
 
+use App\Enums\Accounting\CapitalCategory;
 use App\Enums\Accounting\ExpenseCategory;
 use App\Enums\Accounting\IncomeCategory;
 use App\Enums\Accounting\TransactionType;
+use App\Models\Concerns\HasCurrencyCode;
 use App\Models\Currency;
 use Cknow\Money\Casts\MoneyIntegerCast;
 use Cknow\Money\Money;
@@ -14,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class Transaction extends Model
 {
+    use HasCurrencyCode;
+
     protected $fillable = [
         'account_id',
         'transactionable_type',
@@ -59,7 +63,7 @@ class Transaction extends Model
     /**
      * Get category as enum based on transaction type
      */
-    public function getCategoryEnumAttribute(): ExpenseCategory|IncomeCategory|null
+    public function getCategoryEnumAttribute(): ExpenseCategory|IncomeCategory|CapitalCategory|null
     {
         if (! $this->category) {
             return null;
@@ -68,6 +72,7 @@ class Transaction extends Model
         return match ($this->type) {
             TransactionType::INCOME => IncomeCategory::tryFrom($this->category),
             TransactionType::EXPENSE => ExpenseCategory::tryFrom($this->category),
+            TransactionType::CAPITAL => CapitalCategory::tryFrom($this->category),
             default => null,
         };
     }

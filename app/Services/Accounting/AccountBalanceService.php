@@ -2,6 +2,7 @@
 
 namespace App\Services\Accounting;
 
+use App\Enums\Accounting\CapitalCategory;
 use App\Enums\Accounting\TransactionType;
 use App\Models\Accounting\Account;
 use App\Models\Accounting\Transaction;
@@ -27,6 +28,7 @@ class AccountBalanceService
         match ($transaction->type) {
             TransactionType::INCOME => $this->increaseBalance($account, $amount),
             TransactionType::EXPENSE => $this->decreaseBalance($account, $amount),
+            TransactionType::CAPITAL => $this->applyCapitalTransaction($transaction, $account, $amount),
             TransactionType::TRANSFER => null, // Transfers are handled separately
         };
 
@@ -59,6 +61,7 @@ class AccountBalanceService
         match ($transaction->type) {
             TransactionType::INCOME => $this->decreaseBalance($account, $amount),
             TransactionType::EXPENSE => $this->increaseBalance($account, $amount),
+            TransactionType::CAPITAL => $this->reverseCapitalTransaction($transaction, $account, $amount),
             TransactionType::TRANSFER => null,
         };
 
@@ -72,6 +75,34 @@ class AccountBalanceService
                 'new_balance' => $account->balance->getAmount(),
             ])
             ->log('account_balance_reversed');
+    }
+
+    /**
+     * Apply capital transaction (contribution increases, withdrawal decreases)
+     */
+    protected function applyCapitalTransaction(Transaction $transaction, Account $account, Money $amount): void
+    {
+        $category = CapitalCategory::tryFrom($transaction->category);
+
+        if ($category === CapitalCategory::OWNER_CONTRIBUTION) {
+            $this->increaseBalance($account, $amount);
+        } elseif (in_array($category, [CapitalCategory::OWNER_WITHDRAWAL, CapitalCategory::PROFIT_DISTRIBUTION])) {
+            $this->decreaseBalance($account, $amount);
+        }
+    }
+
+    /**
+     * Reverse capital transaction
+     */
+    protected function reverseCapitalTransaction(Transaction $transaction, Account $account, Money $amount): void
+    {
+        $category = CapitalCategory::tryFrom($transaction->category);
+
+        if ($category === CapitalCategory::OWNER_CONTRIBUTION) {
+            $this->decreaseBalance($account, $amount);
+        } elseif (in_array($category, [CapitalCategory::OWNER_WITHDRAWAL, CapitalCategory::PROFIT_DISTRIBUTION])) {
+            $this->increaseBalance($account, $amount);
+        }
     }
 
     /**
