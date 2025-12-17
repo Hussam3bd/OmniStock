@@ -6,6 +6,7 @@ use App\Models\Currency;
 use Cknow\Money\Money;
 use Filament\Forms\Components\TextInput;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 
 class MoneyInput extends TextInput
 {
@@ -43,7 +44,7 @@ class MoneyInput extends TextInput
 
             // Handle Money object
             if ($state instanceof Money) {
-                if (! $this->currencyField) {
+                if (!$this->currencyField) {
                     $this->currency = $state->getCurrency();
                 }
                 $this->updatePrefix();
@@ -52,18 +53,24 @@ class MoneyInput extends TextInput
             }
 
             // Handle serialized Money (Livewire converts Money objects to arrays)
-            if (is_array($state) && isset($state['amount'], $state['currency'])) {
-                $money = money($state['amount'], $state['currency']);
-                if (! $this->currencyField) {
-                    $this->currency = $money->getCurrency();
-                }
-                $this->updatePrefix();
+            if (is_array($state)) {
+                $moneyArray = Arr::get($state, 'state', $state);
 
-                return $money->divide(100)->getAmount();
+                if (isset($moneyArray['amount'], $moneyArray['currency'])) {
+                    $money = money($moneyArray['amount'], $moneyArray['currency']);
+                    if (!$this->currencyField) {
+                        $this->currency = $money->getCurrency();
+                    }
+
+                    $this->updatePrefix();
+
+                    // Use PHP division to preserve decimals, not Money's divide method
+                    return number_format($moneyArray['amount'] / 100, 2, '.', '');
+                }
             }
 
             // Fallback: try to get from record
-            if ($record && ! $this->currencyField) {
+            if ($record && !$this->currencyField) {
                 $originalState = $record->getAttribute(
                     str($this->getStatePath())->after('data.')->toString()
                 );
@@ -80,7 +87,7 @@ class MoneyInput extends TextInput
         });
 
         $this->dehydrateStateUsing(function (MoneyInput $component, null|int|string $state) {
-            if (! $state || $state === '' || $state === '0') {
+            if (!$state || $state === '' || $state === '0') {
                 return 0;
             }
 
@@ -103,7 +110,7 @@ class MoneyInput extends TextInput
      */
     protected function updateCurrencyFromField(): void
     {
-        if (! $this->currencyField) {
+        if (!$this->currencyField) {
             return;
         }
 
