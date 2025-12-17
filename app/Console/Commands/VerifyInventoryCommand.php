@@ -113,9 +113,16 @@ class VerifyInventoryCommand extends Command
 
         $result['statistics']['expected_sales'] = $expectedSales;
 
-        // Count actual sale movements
+        // Count actual sale movements (excluding those with corresponding cancellation movements)
         $actualSales = InventoryMovement::where('product_variant_id', $variant->id)
             ->where('type', InventoryMovementType::Sale->value)
+            ->whereNotExists(function ($query) use ($variant) {
+                $query->select(DB::raw(1))
+                    ->from('inventory_movements as cancellations')
+                    ->whereColumn('cancellations.order_id', 'inventory_movements.order_id')
+                    ->where('cancellations.product_variant_id', $variant->id)
+                    ->where('cancellations.type', InventoryMovementType::Cancellation->value);
+            })
             ->sum(DB::raw('ABS(quantity)'));
 
         $result['statistics']['actual_sales'] = $actualSales;

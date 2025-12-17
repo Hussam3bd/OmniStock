@@ -27,6 +27,23 @@ class InventoryService
                 return;
             }
 
+            // Check if movement already exists (idempotency)
+            $existingMovement = InventoryMovement::where('order_id', $order->id)
+                ->where('product_variant_id', $variant->id)
+                ->where('type', InventoryMovementType::Sale->value)
+                ->first();
+
+            if ($existingMovement) {
+                Log::info('Inventory movement already exists for order item, skipping', [
+                    'order_id' => $order->id,
+                    'order_item_id' => $orderItem->id,
+                    'variant_id' => $variant->id,
+                    'existing_movement_id' => $existingMovement->id,
+                ]);
+
+                return;
+            }
+
             // Get location from order's integration or fall back to default
             $location = $this->getLocationForOrder($order, $variant);
 
