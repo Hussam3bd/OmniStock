@@ -33,6 +33,13 @@ class ProductsTable
                     ->sortable()
                     ->alignCenter(),
 
+                TextColumn::make('supplier.name')
+                    ->label(__('Supplier'))
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder(__('No supplier'))
+                    ->toggleable(),
+
                 TextColumn::make('status')
                     ->label(__('Status'))
                     ->badge()

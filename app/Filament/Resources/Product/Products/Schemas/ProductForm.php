@@ -53,6 +53,13 @@ class ProductForm
                             ->required()
                             ->native(false),
 
+                        Select::make('supplier_id')
+                            ->label(__('Supplier'))
+                            ->relationship('supplier', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->helperText(__('Select the supplier for this product')),
+
                         Select::make('status')
                             ->label(__('Status'))
                             ->options([
