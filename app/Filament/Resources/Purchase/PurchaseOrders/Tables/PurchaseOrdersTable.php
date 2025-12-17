@@ -66,6 +66,35 @@ class PurchaseOrdersTable
                     ->color('gray')
                     ->toggleable(),
 
+                Tables\Columns\TextColumn::make('received')
+                    ->label(__('Received'))
+                    ->state(function ($record) {
+                        $totalOrdered = $record->items->sum('quantity_ordered');
+                        $totalReceived = $record->items->sum('quantity_received');
+
+                        return $totalReceived.' / '.$totalOrdered;
+                    })
+                    ->badge()
+                    ->color(function ($record) {
+                        $totalOrdered = $record->items->sum('quantity_ordered');
+                        $totalReceived = $record->items->sum('quantity_received');
+
+                        if ($totalReceived == 0) {
+                            return 'gray';
+                        }
+
+                        if ($totalReceived < $totalOrdered) {
+                            return 'warning';
+                        }
+
+                        if ($totalReceived == $totalOrdered) {
+                            return 'success';
+                        }
+
+                        return 'danger';
+                    })
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('subtotal')
                     ->label(__('Subtotal'))
                     ->money('TRY', divideBy: 100)
