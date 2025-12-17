@@ -26,6 +26,15 @@ class TransactionForm
                 Select::make('account_id')
                     ->relationship('account', 'name')
                     ->required()
+                    ->live()
+                    ->afterStateUpdated(function ($state, callable $set) {
+                        if ($state) {
+                            $account = \App\Models\Accounting\Account::find($state);
+                            if ($account) {
+                                $set('currency_id', $account->currency_id);
+                            }
+                        }
+                    })
                     ->columnSpan(1),
 
                 Select::make('type')
@@ -82,12 +91,14 @@ class TransactionForm
 
                 MoneyInput::make('amount')
                     ->required()
+                    ->currencyField('data.currency_id')
                     ->columnSpan(1),
 
                 Select::make('currency_id')
-                    ->relationship('account.currency', 'code')
+                    ->relationship('currency', 'code')
                     ->label(__('Currency'))
                     ->required()
+                    ->live()
                     ->default(fn () => Currency::where('code', 'TRY')->first()?->id)
                     ->columnSpan(1),
 

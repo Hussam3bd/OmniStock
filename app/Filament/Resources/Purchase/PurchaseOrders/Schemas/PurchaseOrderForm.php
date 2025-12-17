@@ -6,6 +6,7 @@ use App\Enums\PurchaseOrderStatus;
 use App\Forms\Components\MoneyInput;
 use App\Models\Currency;
 use App\Models\ExchangeRate;
+use App\Models\Inventory\Location;
 use App\Models\Product\Product;
 use App\Models\Product\ProductVariant;
 use Cknow\Money\Money;
@@ -75,7 +76,7 @@ class PurchaseOrderForm
                             ->required()
                             ->searchable()
                             ->preload()
-                            ->default(fn () => \App\Models\Inventory\Location::where('is_default', true)->first()?->id)
+                            ->default(fn () => Location::where('is_default', true)->first()?->id)
                             ->helperText(__('Where this order will be received')),
 
                         Forms\Components\Select::make('currency_id')

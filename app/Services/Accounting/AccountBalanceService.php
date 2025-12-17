@@ -129,7 +129,7 @@ class AccountBalanceService
      */
     protected function convertAmount(Transaction $transaction, Account $account): Money
     {
-        $transactionCurrency = $transaction->currency;
+        $transactionCurrency = $transaction->currency_code;
         $accountCurrency = $account->currency->code;
 
         // If same currency, no conversion needed

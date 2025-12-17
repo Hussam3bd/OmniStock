@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Accounting\Transaction;
+use App\Models\Currency;
 use App\Services\Accounting\AccountBalanceService;
 
 class TransactionObserver
@@ -10,6 +11,20 @@ class TransactionObserver
     public function __construct(
         protected AccountBalanceService $balanceService
     ) {}
+
+    /**
+     * Handle the Transaction "saving" event.
+     * Set currency_code from currency_id before the cast tries to use it
+     */
+    public function saving(Transaction $transaction): void
+    {
+        // Get the currency code for this transaction
+        // This must happen before the MoneyIntegerCast tries to use currency_code
+        if ($transaction->currency_id && ! $transaction->currency_code) {
+            $currency = Currency::find($transaction->currency_id);
+            $transaction->currency_code = $currency?->code ?? 'TRY';
+        }
+    }
 
     /**
      * Handle the Transaction "created" event.

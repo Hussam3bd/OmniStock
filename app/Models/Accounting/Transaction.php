@@ -25,7 +25,7 @@ class Transaction extends Model
         'type',
         'category',
         'amount',
-        'currency',
+        'currency_code',
         'currency_id',
         'exchange_rate',
         'description',
@@ -36,7 +36,7 @@ class Transaction extends Model
     {
         return [
             'type' => TransactionType::class,
-            'amount' => MoneyIntegerCast::class.':currency',
+            'amount' => MoneyIntegerCast::class.':currency_code',
             'exchange_rate' => 'decimal:8',
             'transaction_date' => 'date',
         ];
@@ -87,7 +87,7 @@ class Transaction extends Model
         }
 
         // If same currency, no conversion needed
-        if ($this->currency === $this->account->currency->code) {
+        if ($this->currency_code === $this->account->currency->code) {
             return $this->amount;
         }
 
@@ -126,7 +126,7 @@ class Transaction extends Model
             return false;
         }
 
-        return $this->currency !== $this->account->currency->code;
+        return $this->currency_code !== $this->account->currency->code;
     }
 
     /**
