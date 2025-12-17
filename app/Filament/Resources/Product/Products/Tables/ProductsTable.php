@@ -2,11 +2,15 @@
 
 namespace App\Filament\Resources\Product\Products\Tables;
 
+use App\Forms\Components\MoneyInput;
+use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 
 class ProductsTable
 {
@@ -60,8 +64,41 @@ class ProductsTable
             ->recordActions([
                 EditAction::make(),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 BulkActionGroup::make([
+                    BulkAction::make('update_cost_price')
+                        ->label(__('Update Cost Price'))
+                        ->icon('heroicon-o-currency-dollar')
+                        ->color('warning')
+                        ->schema([
+                            MoneyInput::make('cost_price')
+                                ->label(__('Cost Price'))
+                                ->helperText(__('This will update the cost price for all variants of the selected products'))
+                                ->required(),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            $totalVariants = 0;
+                            $costPrice = $data['cost_price']->multiply(100)->getAmount();
+
+                            foreach ($records as $product) {
+                                $variantsCount = $product->variants()->count();
+                                $product->variants()->update([
+                                    'cost_price' => $costPrice,
+                                ]);
+                                $totalVariants += $variantsCount;
+                            }
+
+                            Notification::make()
+                                ->success()
+                                ->title(__('Cost price updated successfully'))
+                                ->body(__('Updated cost price for :count variants across :products products', [
+                                    'count' => $totalVariants,
+                                    'products' => $records->count(),
+                                ]))
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
                     DeleteBulkAction::make(),
                 ]),
             ])
