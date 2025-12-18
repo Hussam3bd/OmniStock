@@ -57,13 +57,6 @@ class SignatureValidator implements SignatureValidatorInterface
         // Store integration ID in request for use in webhook processing
         $request->merge(['_basitkargo_integration_id' => $integration->id]);
 
-        activity()
-            ->performedOn($integration)
-            ->withProperties([
-                'webhook_validated' => true,
-            ])
-            ->log('basitkargo_webhook_validated');
-
         return true;
     }
 }
