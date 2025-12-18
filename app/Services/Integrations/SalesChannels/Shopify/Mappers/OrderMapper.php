@@ -152,7 +152,8 @@ class OrderMapper extends BaseOrderMapper
             ? Carbon::parse($firstFulfillment['created_at'])
             : null;
 
-        $deliveredAt = $firstFulfillment && isset($firstFulfillment['updated_at']) && ($firstFulfillment['status'] ?? null) === 'success'
+        // Check shipment_status for actual delivery (not just fulfillment success)
+        $deliveredAt = $firstFulfillment && ($firstFulfillment['shipment_status'] ?? null) === 'delivered' && isset($firstFulfillment['updated_at'])
             ? Carbon::parse($firstFulfillment['updated_at'])
             : null;
 
@@ -278,7 +279,8 @@ class OrderMapper extends BaseOrderMapper
             ? Carbon::parse($firstFulfillment['created_at'])
             : null;
 
-        $deliveredAt = $firstFulfillment && isset($firstFulfillment['updated_at']) && ($firstFulfillment['status'] ?? null) === 'success'
+        // Check shipment_status for actual delivery (not just fulfillment success)
+        $deliveredAt = $firstFulfillment && ($firstFulfillment['shipment_status'] ?? null) === 'delivered' && isset($firstFulfillment['updated_at'])
             ? Carbon::parse($firstFulfillment['updated_at'])
             : null;
 
@@ -518,6 +520,26 @@ class OrderMapper extends BaseOrderMapper
             return FulfillmentStatus::CANCELLED;
         }
 
+        // Check shipment_status from first fulfillment for more accurate status
+        $fulfillments = $shopifyOrder['fulfillments'] ?? [];
+        $firstFulfillment = $fulfillments[0] ?? null;
+        $shipmentStatus = $firstFulfillment['shipment_status'] ?? null;
+
+        // Map actual carrier shipment status to our fulfillment status
+        if ($shipmentStatus) {
+            $mappedStatus = match (strtolower($shipmentStatus)) {
+                'delivered' => FulfillmentStatus::DELIVERED,
+                'out_for_delivery' => FulfillmentStatus::OUT_FOR_DELIVERY,
+                'in_transit' => FulfillmentStatus::IN_TRANSIT,
+                default => null,
+            };
+
+            if ($mappedStatus) {
+                return $mappedStatus;
+            }
+        }
+
+        // Fall back to Shopify's fulfillment_status
         return match ($fulfillmentStatus) {
             'FULFILLED' => FulfillmentStatus::FULFILLED,
             'PARTIAL' => FulfillmentStatus::PARTIALLY_FULFILLED,
