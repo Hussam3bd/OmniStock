@@ -22,7 +22,7 @@ class RemoveDuplicateReturnMovements extends Command
      *
      * @var string
      */
-    protected $description = 'Remove return movements for orders that already have cancellation movements (prevents double restoration)';
+    protected $description = 'Remove duplicate inventory restorations (keeps return movements, removes cancellations when both exist)';
 
     /**
      * Execute the console command.
@@ -31,41 +31,43 @@ class RemoveDuplicateReturnMovements extends Command
     {
         $dryRun = $this->option('dry-run');
 
-        $this->info('🔍 Finding return movements for orders that already have cancellation movements...');
+        $this->info('🔍 Finding duplicate restoration movements (return + cancellation)...');
         $this->newLine();
 
-        // Find orders that have BOTH cancellation and return movements
-        $duplicateReturns = DB::table('inventory_movements as cancellation')
+        // Find orders that have BOTH return and cancellation movements
+        // Strategy: Keep return movements (real goods), delete cancellation movements (status change)
+        $duplicateCancellations = DB::table('inventory_movements as return_movement')
             ->select(
-                'cancellation.order_id',
-                'cancellation.product_variant_id',
-                'return_movement.id as return_movement_id',
-                'return_movement.quantity as return_quantity',
-                'return_movement.reference as return_reference'
+                'return_movement.order_id',
+                'return_movement.product_variant_id',
+                'cancellation.id as cancellation_movement_id',
+                'cancellation.quantity as cancellation_quantity',
+                'cancellation.reference as cancellation_reference',
+                'cancellation.created_at as cancellation_created_at'
             )
-            ->join('inventory_movements as return_movement', function ($join) {
-                $join->on('cancellation.order_id', '=', 'return_movement.order_id')
-                    ->on('cancellation.product_variant_id', '=', 'return_movement.product_variant_id');
+            ->join('inventory_movements as cancellation', function ($join) {
+                $join->on('return_movement.order_id', '=', 'cancellation.order_id')
+                    ->on('return_movement.product_variant_id', '=', 'cancellation.product_variant_id');
             })
-            ->where('cancellation.type', InventoryMovementType::Cancellation->value)
             ->where('return_movement.type', InventoryMovementType::Return->value)
+            ->where('cancellation.type', InventoryMovementType::Cancellation->value)
             ->get();
 
-        if ($duplicateReturns->isEmpty()) {
-            $this->info('✅ No duplicate return movements found');
+        if ($duplicateCancellations->isEmpty()) {
+            $this->info('✅ No duplicate restoration movements found');
 
             return self::SUCCESS;
         }
 
-        $this->warn('Found '.$duplicateReturns->count().' return movements that duplicate cancellation restorations');
+        $this->warn('Found '.$duplicateCancellations->count().' cancellation movements that duplicate return restorations');
         $this->newLine();
 
         if ($dryRun) {
             $this->warn('🔸 DRY RUN MODE - No changes will be made');
             $this->newLine();
 
-            foreach ($duplicateReturns as $duplicate) {
-                $this->line("Would delete return movement #{$duplicate->return_movement_id}: {$duplicate->return_reference} (qty: {$duplicate->return_quantity})");
+            foreach ($duplicateCancellations as $duplicate) {
+                $this->line("Would delete cancellation movement #{$duplicate->cancellation_movement_id}: {$duplicate->cancellation_reference} (created: {$duplicate->cancellation_created_at})");
             }
 
             $this->newLine();
@@ -80,20 +82,20 @@ class RemoveDuplicateReturnMovements extends Command
             return self::FAILURE;
         }
 
-        $this->info('🗑️  Deleting duplicate return movements...');
+        $this->info('🗑️  Deleting duplicate cancellation movements...');
 
-        DB::transaction(function () use ($duplicateReturns) {
+        DB::transaction(function () use ($duplicateCancellations) {
             // Get affected variants before deletion
-            $affectedVariants = $duplicateReturns
+            $affectedVariants = $duplicateCancellations
                 ->pluck('product_variant_id')
                 ->unique()
                 ->toArray();
 
-            // Delete the return movements
-            $returnMovementIds = $duplicateReturns->pluck('return_movement_id')->toArray();
-            $deleted = InventoryMovement::whereIn('id', $returnMovementIds)->delete();
+            // Delete the cancellation movements (keep returns)
+            $cancellationMovementIds = $duplicateCancellations->pluck('cancellation_movement_id')->toArray();
+            $deleted = InventoryMovement::whereIn('id', $cancellationMovementIds)->delete();
 
-            $this->info("✅ Deleted {$deleted} duplicate return movements");
+            $this->info("✅ Deleted {$deleted} duplicate cancellation movements");
             $this->newLine();
 
             // Recalculate inventory for affected variants

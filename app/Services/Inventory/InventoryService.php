@@ -259,6 +259,23 @@ class InventoryService
                     continue;
                 }
 
+                // Check if inventory was already restored via return
+                // Prevents double restoration when order has a completed return AND gets cancelled
+                $returnMovement = InventoryMovement::where('order_id', $order->id)
+                    ->where('product_variant_id', $variant->id)
+                    ->where('type', InventoryMovementType::Return->value)
+                    ->first();
+
+                if ($returnMovement) {
+                    Log::info('Inventory already restored via return, skipping cancellation movement', [
+                        'order_id' => $order->id,
+                        'variant_id' => $variant->id,
+                        'return_movement_id' => $returnMovement->id,
+                    ]);
+
+                    continue;
+                }
+
                 // Restore quantity
                 $quantityToRestore = $item->quantity;
 
