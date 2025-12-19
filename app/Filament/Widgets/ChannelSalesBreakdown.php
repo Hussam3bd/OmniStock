@@ -131,11 +131,21 @@ class ChannelSalesBreakdown extends TableWidget
         foreach ($channels as $channel) {
             $channelValue = $channel->value;
 
-            // Total sales
+            // Total sales count (all orders for the channel)
             $totalSalesCount = Order::where('channel', $channelValue)->count();
-            $totalSalesAmount = Order::where('channel', $channelValue)
-                ->where('order_status', OrderStatus::COMPLETED)
-                ->sum('total_amount') / 100;
+
+            // For Shopify: Sales amount = collected payments (excluding cancelled/rejected)
+            // For marketplaces: Sales amount = completed orders
+            if ($channelValue === OrderChannel::SHOPIFY->value) {
+                $totalSalesAmount = Order::where('channel', $channelValue)
+                    ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                    ->whereNotIn('order_status', [OrderStatus::CANCELLED, OrderStatus::REJECTED])
+                    ->sum('total_amount') / 100;
+            } else {
+                $totalSalesAmount = Order::where('channel', $channelValue)
+                    ->where('order_status', OrderStatus::COMPLETED)
+                    ->sum('total_amount') / 100;
+            }
 
             // Cancelled orders
             $cancelledCount = Order::where('channel', $channelValue)
@@ -214,14 +224,9 @@ class ChannelSalesBreakdown extends TableWidget
                     ->whereNotIn('order_status', [OrderStatus::CANCELLED, OrderStatus::REJECTED])
                     ->sum('total_product_cost') / 100;
 
-                // Collected payment amount (only paid orders, excluding cancelled/rejected)
-                $collectedAmount = Order::where('channel', $channelValue)
-                    ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
-                    ->whereNotIn('order_status', [OrderStatus::CANCELLED, OrderStatus::REJECTED])
-                    ->sum('total_amount') / 100;
-
                 // Net Profit = Revenue - COGS - Outbound Shipping - Payment Gateway Fees - Refunds - Return Shipping
-                $netProfit = $collectedAmount - $totalProductCost - $shippingCost - $commissionAmount - $returnsAmount - $totalReturnShippingCost;
+                // Revenue is already calculated as collected amount ($totalSalesAmount)
+                $netProfit = $totalSalesAmount - $totalProductCost - $shippingCost - $commissionAmount - $returnsAmount - $totalReturnShippingCost;
             } else {
                 // Calculate actual shipping costs paid to carriers (not what customer paid)
                 $shippingCostExVat = Order::where('channel', $channelValue)
