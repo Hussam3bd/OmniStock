@@ -148,8 +148,8 @@ class RecalculatePaymentFees extends Command
                 $order->channel->getLabel(),
                 $order->payment_gateway,
                 substr($order->payment_transaction_id, 0, 20).'...',
-                $order->payment_gateway_fee ? '₺'.number_format($order->payment_gateway_fee / 100, 2) : 'null',
-                $order->payment_gateway_commission_amount ? '₺'.number_format($order->payment_gateway_commission_amount / 100, 2) : 'null',
+                $order->payment_gateway_fee ? $order->payment_gateway_fee->format() : 'null',
+                $order->payment_gateway_commission_amount ? $order->payment_gateway_commission_amount->format() : 'null',
             ])
         );
 
