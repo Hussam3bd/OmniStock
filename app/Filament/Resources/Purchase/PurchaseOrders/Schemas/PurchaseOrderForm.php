@@ -318,12 +318,19 @@ class PurchaseOrderForm
                                     })
                                     ->helperText(__('Leave empty to add all sizes')),
 
+                                Forms\Components\Toggle::make('only_negative_stock')
+                                    ->label(__('Only Negative Stock'))
+                                    ->helperText(__('Add only variants with negative stock and auto-fill quantities to bring stock to zero'))
+                                    ->default(false)
+                                    ->reactive(),
+
                                 Forms\Components\TextInput::make('number_of_sets')
                                     ->label(__('Number of Sets'))
                                     ->numeric()
                                     ->default(1)
                                     ->minValue(1)
                                     ->required()
+                                    ->visible(fn (callable $get) => ! $get('only_negative_stock'))
                                     ->helperText(__('Quantity will be calculated based on size distribution per set')),
 
                                 Forms\Components\TextInput::make('bulk_unit_cost')
@@ -339,6 +346,7 @@ class PurchaseOrderForm
                                 $selectedSizes = $data['size_values'] ?? [];
                                 $numberOfSets = (int) ($data['number_of_sets'] ?? 1);
                                 $bulkUnitCost = ! empty($data['bulk_unit_cost']) ? (float) $data['bulk_unit_cost'] : null;
+                                $onlyNegativeStock = $data['only_negative_stock'] ?? false;
 
                                 // Get the currency for this purchase order
                                 $currencyId = $livewire->data['currency_id'] ?? null;
@@ -367,7 +375,7 @@ class PurchaseOrderForm
                                 // Loop through each selected product
                                 foreach ($productIds as $productId) {
                                     $variants = ProductVariant::where('product_id', $productId)
-                                        ->with(['product', 'optionValues.variantOption'])
+                                        ->with(['product', 'optionValues.variantOption', 'locations'])
                                         ->get();
 
                                     foreach ($variants as $variant) {
@@ -399,13 +407,27 @@ class PurchaseOrderForm
                                             }
                                         }
 
-                                        // Get base quantity for this size
-                                        $baseQuantity = $sizeValue
-                                            ? $sizeQuantityMap($sizeValue->value)
-                                            : 1;
+                                        // Check stock quantity if only adding negative stock variants
+                                        if ($onlyNegativeStock) {
+                                            // Get total stock across all locations
+                                            $stockQuantity = $variant->locations->sum('pivot.quantity');
 
-                                        // Calculate total quantity (base quantity × number of sets)
-                                        $quantity = $baseQuantity * $numberOfSets;
+                                            // Skip variants with zero or positive stock
+                                            if ($stockQuantity >= 0) {
+                                                continue;
+                                            }
+
+                                            // Use absolute value to bring stock to zero
+                                            $quantity = abs($stockQuantity);
+                                        } else {
+                                            // Get base quantity for this size
+                                            $baseQuantity = $sizeValue
+                                                ? $sizeQuantityMap($sizeValue->value)
+                                                : 1;
+
+                                            // Calculate total quantity (base quantity × number of sets)
+                                            $quantity = $baseQuantity * $numberOfSets;
+                                        }
 
                                         // Handle unit cost - create Money object
                                         if ($bulkUnitCost !== null) {
@@ -436,15 +458,34 @@ class PurchaseOrderForm
                                 // Force Livewire to refresh
                                 $livewire->dispatch('$refresh');
 
-                                Notification::make()
-                                    ->success()
-                                    ->title(__('Variants Added'))
-                                    ->body(__(':count variants from :products products added to order (:sets sets)', [
-                                        'count' => $totalAddedCount,
-                                        'products' => count($productIds),
-                                        'sets' => $numberOfSets,
-                                    ]))
-                                    ->send();
+                                if ($onlyNegativeStock) {
+                                    if ($totalAddedCount === 0) {
+                                        Notification::make()
+                                            ->warning()
+                                            ->title(__('No Negative Stock'))
+                                            ->body(__('No variants with negative stock found for the selected products/colors/sizes'))
+                                            ->send();
+                                    } else {
+                                        Notification::make()
+                                            ->success()
+                                            ->title(__('Negative Stock Variants Added'))
+                                            ->body(__(':count variant(s) with negative stock added from :products product(s)', [
+                                                'count' => $totalAddedCount,
+                                                'products' => count($productIds),
+                                            ]))
+                                            ->send();
+                                    }
+                                } else {
+                                    Notification::make()
+                                        ->success()
+                                        ->title(__('Variants Added'))
+                                        ->body(__(':count variants from :products products added to order (:sets sets)', [
+                                            'count' => $totalAddedCount,
+                                            'products' => count($productIds),
+                                            'sets' => $numberOfSets,
+                                        ]))
+                                        ->send();
+                                }
                             })
                             ->modalHeading(__('Add All Variants of Products'))
                             ->modalSubmitActionLabel(__('Add Variants'))
