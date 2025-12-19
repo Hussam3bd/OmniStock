@@ -138,7 +138,9 @@ class RecalculatePaymentFees extends Command
      */
     protected function displaySampleOrders($query): void
     {
-        $samples = $query->limit(5)->get();
+        // Clone the query to avoid modifying the original with limit()
+        $samples = clone $query;
+        $samples = $samples->limit(5)->get();
 
         $this->table(
             ['ID', 'Order #', 'Channel', 'Payment Gateway', 'Transaction ID', 'Current Fee', 'Current Commission'],
