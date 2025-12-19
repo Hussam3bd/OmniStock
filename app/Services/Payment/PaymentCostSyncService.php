@@ -122,8 +122,13 @@ class PaymentCostSyncService
         $actualMerchantCost = $totalIyzicoFee - $merchantCommissionRateAmount;
 
         // Split merchant cost into fixed fee + commission
-        $merchantCommissionRate = $transaction['merchant_commission_rate'];
         $merchantCommissionAmount = $actualMerchantCost - $iyzicoCommissionFee;
+
+        // Calculate commission rate as percentage of total order amount
+        // Example: If commission is 110.34 TRY on 2572.02 TRY order, rate = 4.29%
+        $merchantCommissionRate = $price > 0
+            ? round(($merchantCommissionAmount / $price) * 100, 4)
+            : 0;
 
         // Update order with payment costs
         $order->update([
@@ -149,6 +154,7 @@ class PaymentCostSyncService
                 'customer_paid_installment_fee' => $merchantCommissionRateAmount / 100,
                 'synced_fields' => [
                     'payment_gateway_fee' => $iyzicoCommissionFee / 100,
+                    'payment_gateway_commission_rate' => $merchantCommissionRate,
                     'payment_gateway_commission_amount' => $merchantCommissionAmount / 100,
                     'payment_payout_amount' => $merchantPayoutAmount / 100,
                 ],
