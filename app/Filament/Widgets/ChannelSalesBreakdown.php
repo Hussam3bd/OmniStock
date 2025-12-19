@@ -177,15 +177,18 @@ class ChannelSalesBreakdown extends TableWidget
             }
 
             // For Shopify: calculate shipping/commission/profit only from collected payments (PAID, PARTIALLY_PAID)
+            // Exclude cancelled/rejected orders even if paid (refunded orders)
             // For other channels: use completed orders
             if ($channelValue === OrderChannel::SHOPIFY->value) {
                 // Calculate actual shipping costs paid to carriers (not what customer paid)
                 $shippingCostExVat = Order::where('channel', $channelValue)
                     ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                    ->whereNotIn('order_status', [OrderStatus::CANCELLED, OrderStatus::REJECTED])
                     ->sum('shipping_cost_excluding_vat') / 100;
 
                 $shippingVat = Order::where('channel', $channelValue)
                     ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                    ->whereNotIn('order_status', [OrderStatus::CANCELLED, OrderStatus::REJECTED])
                     ->sum('shipping_vat_amount') / 100;
 
                 $shippingCost = $shippingCostExVat + $shippingVat;
@@ -193,23 +196,28 @@ class ChannelSalesBreakdown extends TableWidget
                 // For Shopify: use payment gateway fees/commission (Iyzico, Stripe, etc.)
                 $commissionAmount = Order::where('channel', $channelValue)
                     ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                    ->whereNotIn('order_status', [OrderStatus::CANCELLED, OrderStatus::REJECTED])
                     ->sum('payment_gateway_commission_amount') / 100;
 
                 // Fallback to payment_gateway_fee if commission_amount is not set
                 if ($commissionAmount == 0) {
                     $commissionAmount = Order::where('channel', $channelValue)
                         ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                        ->whereNotIn('order_status', [OrderStatus::CANCELLED, OrderStatus::REJECTED])
                         ->sum('payment_gateway_fee') / 100;
                 }
 
-                // Calculate total product cost (COGS)
+                // Calculate total product cost (COGS) - only for orders that were actually fulfilled
+                // Exclude cancelled/rejected orders (COGS never incurred if not shipped)
                 $totalProductCost = Order::where('channel', $channelValue)
                     ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                    ->whereNotIn('order_status', [OrderStatus::CANCELLED, OrderStatus::REJECTED])
                     ->sum('total_product_cost') / 100;
 
-                // Collected payment amount (only paid orders)
+                // Collected payment amount (only paid orders, excluding cancelled/rejected)
                 $collectedAmount = Order::where('channel', $channelValue)
                     ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                    ->whereNotIn('order_status', [OrderStatus::CANCELLED, OrderStatus::REJECTED])
                     ->sum('total_amount') / 100;
 
                 // Net Profit = Revenue - COGS - Outbound Shipping - Payment Gateway Fees - Refunds - Return Shipping
