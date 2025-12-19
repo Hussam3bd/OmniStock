@@ -5,6 +5,7 @@ namespace App\Models\Accounting;
 use App\Enums\Accounting\CapitalCategory;
 use App\Enums\Accounting\ExpenseCategory;
 use App\Enums\Accounting\IncomeCategory;
+use App\Enums\Accounting\RefundType;
 use App\Enums\Accounting\TransactionType;
 use App\Models\Concerns\HasCurrencyCode;
 use App\Models\Currency;
@@ -30,6 +31,10 @@ class Transaction extends Model
         'exchange_rate',
         'description',
         'transaction_date',
+        'is_refund',
+        'refund_type',
+        'linked_transaction_id',
+        'is_internal_transfer',
     ];
 
     protected function casts(): array
@@ -39,6 +44,9 @@ class Transaction extends Model
             'amount' => MoneyIntegerCast::class.':currency_code',
             'exchange_rate' => 'decimal:8',
             'transaction_date' => 'date',
+            'refund_type' => RefundType::class,
+            'is_refund' => 'boolean',
+            'is_internal_transfer' => 'boolean',
         ];
     }
 
@@ -58,6 +66,22 @@ class Transaction extends Model
     public function transactionable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * Get the linked transaction (refund pair or transfer pair)
+     */
+    public function linkedTransaction(): BelongsTo
+    {
+        return $this->belongsTo(Transaction::class, 'linked_transaction_id');
+    }
+
+    /**
+     * Get the imported transaction record
+     */
+    public function importedTransaction(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ImportedTransaction::class);
     }
 
     /**

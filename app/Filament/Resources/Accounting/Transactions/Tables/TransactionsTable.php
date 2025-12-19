@@ -2,14 +2,18 @@
 
 namespace App\Filament\Resources\Accounting\Transactions\Tables;
 
+use App\Enums\Accounting\CapitalCategory;
 use App\Enums\Accounting\ExpenseCategory;
 use App\Enums\Accounting\IncomeCategory;
 use App\Enums\Accounting\TransactionType;
 use App\Models\Accounting\Transaction;
+use App\Models\Accounting\TransactionCategoryMapping;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Notifications\Notification;
+use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -35,26 +39,17 @@ class TransactionsTable
                     ->sortable()
                     ->searchable(),
 
-                TextColumn::make('category')
+                SelectColumn::make('category')
                     ->label(__('Category'))
-                    ->badge()
-                    ->formatStateUsing(function ($record, $state) {
-                        if (! $state) {
-                            return '-';
-                        }
-
-                        $enum = $record->category_enum;
-
-                        return $enum?->getLabel() ?? $state;
+                    ->options(function (Transaction $record) {
+                        return [
+                            '' => '-- '.__('Uncategorized'),
+                        ] + static::getCategoryOptions($record->type);
                     })
-                    ->color(function ($record, $state) {
-                        if (! $state) {
-                            return 'gray';
-                        }
-
-                        $enum = $record->category_enum;
-
-                        return $enum?->getColor() ?? 'gray';
+                    ->selectablePlaceholder(false)
+                    ->afterStateUpdated(function (Transaction $record, $state) {
+                        // Auto-create category mapping when user manually categorizes
+                        static::createCategoryMapping($record, $state);
                     })
                     ->sortable()
                     ->searchable(),
@@ -134,5 +129,126 @@ class TransactionsTable
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /**
+     * Get category options based on transaction type
+     */
+    protected static function getCategoryOptions(TransactionType $type): array
+    {
+        return match ($type) {
+            TransactionType::INCOME => collect(IncomeCategory::cases())
+                ->mapWithKeys(fn ($case) => [$case->value => $case->getLabel()])
+                ->toArray(),
+            TransactionType::EXPENSE => collect(ExpenseCategory::cases())
+                ->mapWithKeys(fn ($case) => [$case->value => $case->getLabel()])
+                ->toArray(),
+            TransactionType::CAPITAL => collect(CapitalCategory::cases())
+                ->mapWithKeys(fn ($case) => [$case->value => $case->getLabel()])
+                ->toArray(),
+        };
+    }
+
+    /**
+     * Create category mapping from manual categorization
+     */
+    protected static function createCategoryMapping(Transaction $record, ?string $category): void
+    {
+        if (! $category || ! $record->description) {
+            return;
+        }
+
+        // Only create mappings for imported transactions (not order/purchase order transactions)
+        if ($record->transactionable_type) {
+            return;
+        }
+
+        // Extract a clean pattern from description (first meaningful word or phrase)
+        $pattern = static::extractPattern($record->description);
+
+        if (! $pattern) {
+            return;
+        }
+
+        // Check if a similar mapping already exists
+        $existingMapping = TransactionCategoryMapping::where('pattern', $pattern)
+            ->where('type', $record->type)
+            ->where('category', $category)
+            ->first();
+
+        if ($existingMapping) {
+            return; // Mapping already exists
+        }
+
+        // Get the highest priority (lowest number) to place this new rule at top
+        $highestPriority = TransactionCategoryMapping::min('priority') ?? 0;
+        $newPriority = $highestPriority > 0 ? 0 : $highestPriority - 1;
+
+        // Create the mapping
+        TransactionCategoryMapping::create([
+            'pattern' => $pattern,
+            'type' => $record->type,
+            'category' => $category,
+            'account_id' => $record->account_id,
+            'is_active' => true,
+            'priority' => $newPriority,
+        ]);
+
+        // Notify user
+        Notification::make()
+            ->title(__('Category Mapping Created'))
+            ->body(__('Auto-categorization rule created for pattern: :pattern', ['pattern' => $pattern]))
+            ->success()
+            ->send();
+    }
+
+    /**
+     * Extract a meaningful pattern from transaction description
+     */
+    protected static function extractPattern(string $description): ?string
+    {
+        // Clean the description
+        $cleaned = trim($description);
+
+        if (empty($cleaned)) {
+            return null;
+        }
+
+        // Try to extract merchant name or key identifier
+        // Common patterns in Turkish bank statements:
+        // "FACEBK *3948785YQ2 DUBLIN" -> "FACEBK"
+        // "APPLE.COM/BILL CORK" -> "APPLE"
+        // "PARAM/ /TRENDYOL PAZARY ISTANBUL" -> "TRENDYOL"
+        // "K.Kartı Ödeme 5289 **** **** 6015" -> "K.KARTI ÖDEME"
+
+        // If it starts with a recognizable pattern, use that
+        $patterns = [
+            '/^(FACEBK)/i',
+            '/^(APPLE\.COM)/i',
+            '/^(GOOGLE)/i',
+            '/^(TRENDYOL)/i',
+            '/^(IYZICO)/i',
+            '/^(PAYTR)/i',
+            '/^(PAYCELL)/i',
+            '/^(PARAM)/i',
+            '/^(TURHOST)/i',
+            '/^(K\.KARTI? ÖDEME)/i',
+            '/^(HAVALE)/i',
+            '/^(EFT)/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $cleaned, $matches)) {
+                return strtoupper($matches[1]);
+            }
+        }
+
+        // Otherwise, take the first word/phrase (up to space or special char)
+        if (preg_match('/^([A-Z0-9]+)/i', $cleaned, $matches)) {
+            return strtoupper($matches[1]);
+        }
+
+        // As fallback, take first 20 characters
+        return strtoupper(substr($cleaned, 0, 20));
     }
 }
