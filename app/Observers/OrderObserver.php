@@ -18,6 +18,19 @@ use App\Models\Order\Order;
 class OrderObserver
 {
     /**
+     * Handle the Order "created" event.
+     */
+    public function created(Order $order): void
+    {
+        // Auto-sync payment fees for orders created with PAID status and transaction ID
+        // This handles orders synced from Shopify/external platforms that are already paid
+        if ($order->payment_status === PaymentStatus::PAID &&
+            $order->payment_transaction_id) {
+            SyncOrderPaymentFees::dispatch($order);
+        }
+    }
+
+    /**
      * Handle the Order "updated" event.
      */
     public function updated(Order $order): void
