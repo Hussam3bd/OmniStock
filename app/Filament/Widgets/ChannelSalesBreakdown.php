@@ -91,6 +91,13 @@ class ChannelSalesBreakdown extends TableWidget
                     })
                     ->sortable(query: fn ($query, $direction) => $query),
 
+                Tables\Columns\TextColumn::make('product_cost')
+                    ->label(__('Product Cost (COGS)'))
+                    ->money('TRY')
+                    ->sortable()
+                    ->color('gray')
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('shipping_cost')
                     ->label(__('Outbound Shipping'))
                     ->money('TRY')
@@ -183,17 +190,30 @@ class ChannelSalesBreakdown extends TableWidget
 
                 $shippingCost = $shippingCostExVat + $shippingVat;
 
+                // For Shopify: use payment gateway fees/commission (Iyzico, Stripe, etc.)
                 $commissionAmount = Order::where('channel', $channelValue)
                     ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
-                    ->sum('total_commission') / 100;
+                    ->sum('payment_gateway_commission_amount') / 100;
+
+                // Fallback to payment_gateway_fee if commission_amount is not set
+                if ($commissionAmount == 0) {
+                    $commissionAmount = Order::where('channel', $channelValue)
+                        ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                        ->sum('payment_gateway_fee') / 100;
+                }
+
+                // Calculate total product cost (COGS)
+                $totalProductCost = Order::where('channel', $channelValue)
+                    ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
+                    ->sum('total_product_cost') / 100;
 
                 // Collected payment amount (only paid orders)
                 $collectedAmount = Order::where('channel', $channelValue)
                     ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
                     ->sum('total_amount') / 100;
 
-                // Net Profit = Revenue - Outbound Shipping - Commission - Refunds - Return Shipping
-                $netProfit = $collectedAmount - $shippingCost - $commissionAmount - $returnsAmount - $totalReturnShippingCost;
+                // Net Profit = Revenue - COGS - Outbound Shipping - Payment Gateway Fees - Refunds - Return Shipping
+                $netProfit = $collectedAmount - $totalProductCost - $shippingCost - $commissionAmount - $returnsAmount - $totalReturnShippingCost;
             } else {
                 // Calculate actual shipping costs paid to carriers (not what customer paid)
                 $shippingCostExVat = Order::where('channel', $channelValue)
@@ -206,12 +226,18 @@ class ChannelSalesBreakdown extends TableWidget
 
                 $shippingCost = $shippingCostExVat + $shippingVat;
 
+                // For marketplaces: use total_commission (marketplace commission)
                 $commissionAmount = Order::where('channel', $channelValue)
                     ->where('order_status', OrderStatus::COMPLETED)
                     ->sum('total_commission') / 100;
 
-                // Net Profit = Revenue - Outbound Shipping - Commission - Refunds - Return Shipping
-                $netProfit = $totalSalesAmount - $shippingCost - $commissionAmount - $returnsAmount - $totalReturnShippingCost;
+                // Calculate total product cost (COGS)
+                $totalProductCost = Order::where('channel', $channelValue)
+                    ->where('order_status', OrderStatus::COMPLETED)
+                    ->sum('total_product_cost') / 100;
+
+                // Net Profit = Revenue - COGS - Outbound Shipping - Marketplace Commission - Refunds - Return Shipping
+                $netProfit = $totalSalesAmount - $totalProductCost - $shippingCost - $commissionAmount - $returnsAmount - $totalReturnShippingCost;
             }
 
             // Rates
@@ -232,6 +258,7 @@ class ChannelSalesBreakdown extends TableWidget
                     'returns_count' => $returnsCount,
                     'returns_amount' => $returnsAmount,
                     'return_rate' => $returnRate,
+                    'product_cost' => $totalProductCost,
                     'shipping_cost' => $shippingCost,
                     'return_shipping_cost' => $totalReturnShippingCost,
                     'commission_amount' => $commissionAmount,
