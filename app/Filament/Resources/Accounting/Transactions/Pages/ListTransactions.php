@@ -3,8 +3,10 @@
 namespace App\Filament\Resources\Accounting\Transactions\Pages;
 
 use App\Enums\Accounting\TransactionType;
+use App\Filament\Imports\TransactionImporter;
 use App\Filament\Resources\Accounting\Transactions\TransactionResource;
 use Filament\Actions\CreateAction;
+use Filament\Actions\ImportAction;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,6 +19,11 @@ class ListTransactions extends ListRecords
     {
         return [
             CreateAction::make(),
+
+            ImportAction::make('import_transactions')
+                ->label(__('Import Transactions'))
+                ->color('primary')
+                ->importer(TransactionImporter::class),
         ];
     }
 

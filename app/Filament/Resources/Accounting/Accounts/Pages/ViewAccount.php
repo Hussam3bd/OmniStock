@@ -2,8 +2,7 @@
 
 namespace App\Filament\Resources\Accounting\Accounts\Pages;
 
-use App\Filament\Imports\BankAccountTransactionImporter;
-use App\Filament\Imports\CreditCardTransactionImporter;
+use App\Filament\Imports\TransactionImporter;
 use App\Filament\Resources\Accounting\Accounts\AccountResource;
 use App\Services\Accounting\InternalTransferDetectionService;
 use App\Services\Accounting\RefundDetectionService;
@@ -28,19 +27,12 @@ class ViewAccount extends ViewRecord
         return [
             EditAction::make(),
 
-            ImportAction::make('import_credit_card')
-                ->label(__('Import Credit Card'))
-                ->color('info')
-                ->importer(CreditCardTransactionImporter::class)
+            ImportAction::make('import_transactions')
+                ->label(__('Import Transactions'))
+                ->color('primary')
+                ->importer(TransactionImporter::class)
                 ->options(['accountId' => $this->record->id])
-                ->modalDescription(__('Upload a CSV file with credit card transactions to import.')),
-
-            ImportAction::make('import_bank_account')
-                ->label(__('Import Bank Account'))
-                ->color('success')
-                ->importer(BankAccountTransactionImporter::class)
-                ->options(['accountId' => $this->record->id])
-                ->modalDescription(__('Upload a CSV file with bank account transactions to import.')),
+                ->modalDescription(__('Upload a CSV file with transactions to import.')),
 
             Action::make('detect_refunds')
                 ->label(__('Detect Refunds'))

@@ -13,10 +13,34 @@ use Carbon\Carbon;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
+use Filament\Forms\Components\Select;
 
-class CreditCardTransactionImporter extends Importer
+class TransactionImporter extends Importer
 {
     protected static ?string $model = Transaction::class;
+
+    public static function getOptionsFormComponents(): array
+    {
+        return [
+            Select::make('accountId')
+                ->label('Account')
+                ->required()
+                ->searchable()
+                ->options(Account::query()->pluck('name', 'id'))
+                ->helperText('Select the account these transactions belong to.'),
+
+            Select::make('sourceType')
+                ->label('Source Type')
+                ->required()
+                ->options([
+                    ImportSourceType::BANK_ACCOUNT->value => 'Bank Account',
+                    ImportSourceType::CREDIT_CARD->value => 'Credit Card',
+                    ImportSourceType::MANUAL->value => 'Manual Entry',
+                ])
+                ->default(ImportSourceType::BANK_ACCOUNT->value)
+                ->helperText('Select the type of transactions you are importing.'),
+        ];
+    }
 
     public static function getColumns(): array
     {
@@ -25,23 +49,32 @@ class CreditCardTransactionImporter extends Importer
                 ->label('Date')
                 ->requiredMapping()
                 ->rules(['required'])
-                ->guess(['Tarih', 'Date', 'tarih', 'date']),
+                ->guess(['Tarih', 'Date', 'tarih', 'date'])
+                ->example('18/12/2025'),
 
             ImportColumn::make('description')
                 ->label('Description')
                 ->requiredMapping()
                 ->rules(['required'])
-                ->guess(['Açıklama', 'Description', 'açıklama', 'description']),
-
-            ImportColumn::make('label')
-                ->label('Label')
-                ->guess(['Etiket', 'Label', 'etiket', 'label']),
+                ->guess(['Açıklama', 'Description', 'açıklama', 'description', 'İşlem'])
+                ->example('Payment to vendor'),
 
             ImportColumn::make('amount')
                 ->label('Amount')
                 ->requiredMapping()
                 ->rules(['required'])
-                ->guess(['Tutar', 'Amount', 'tutar', 'amount', 'Miktar', 'miktar']),
+                ->guess(['Tutar', 'Amount', 'tutar', 'amount', 'Miktar', 'miktar', 'Tutar(TL)'])
+                ->example('1,234.56'),
+
+            ImportColumn::make('reference')
+                ->label('Reference No')
+                ->guess(['Dekont No', 'Reference No', 'Reference', 'dekont no', 'reference'])
+                ->example('REF-123456'),
+
+            ImportColumn::make('label')
+                ->label('Label')
+                ->guess(['Etiket', 'Label', 'etiket', 'label'])
+                ->example('Business Expense'),
         ];
     }
 
@@ -83,8 +116,8 @@ class CreditCardTransactionImporter extends Importer
             return null;
         }
 
-        // Determine transaction type based on amount (negative = expense, positive = income/refund)
-        $type = $amount < 0 ? TransactionType::EXPENSE : TransactionType::INCOME;
+        // Determine transaction type based on amount (negative = expense, positive = income)
+        $type = $amount > 0 ? TransactionType::INCOME : TransactionType::EXPENSE;
         $absoluteAmount = abs($amount);
 
         // Auto-categorize based on description
@@ -95,17 +128,23 @@ class CreditCardTransactionImporter extends Importer
             'account_id' => $accountId,
             'type' => $type,
             'category' => $category,
-            'amount' => $absoluteAmount, // Money cast will convert to minor units automatically
+            'amount' => $absoluteAmount,
             'currency_code' => $account->currency->code,
             'currency_id' => $account->currency_id,
             'description' => $this->data['description'],
             'transaction_date' => $transactionDate,
         ]);
 
+        // Get source type from options or default to manual
+        $sourceType = isset($this->options['sourceType'])
+            ? ImportSourceType::from($this->options['sourceType'])
+            : ImportSourceType::MANUAL;
+
         // Create imported transaction record
         ImportedTransaction::create([
-            'source_type' => ImportSourceType::CREDIT_CARD,
+            'source_type' => $sourceType,
             'account_id' => $accountId,
+            'external_reference' => $this->data['reference'] ?? null,
             'transaction_hash' => $hash,
             'transaction_id' => $transaction->id,
             'imported_at' => now(),
@@ -114,9 +153,19 @@ class CreditCardTransactionImporter extends Importer
         return $transaction;
     }
 
+    public function saveRecord(): void
+    {
+        // Record is already saved in resolveRecord(), so we don't need to save it again
+        if ($this->record->exists) {
+            return;
+        }
+
+        parent::saveRecord();
+    }
+
     public static function getCompletedNotificationBody(Import $import): string
     {
-        $body = 'Your credit card transaction import has completed and '.number_format($import->successful_rows).' '.str('row')->plural($import->successful_rows).' imported.';
+        $body = 'Your transaction import has completed and '.number_format($import->successful_rows).' '.str('row')->plural($import->successful_rows).' imported.';
 
         if ($failedRowsCount = $import->getFailedRowsCount()) {
             $body .= ' '.number_format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to import.';
@@ -126,14 +175,20 @@ class CreditCardTransactionImporter extends Importer
     }
 
     /**
-     * Parse Turkish date format (DD/MM/YYYY)
+     * Parse date in multiple formats (DD/MM/YYYY, YYYY-MM-DD, etc.)
      */
     protected function parseDate(string $date): ?Carbon
     {
+        // Try Turkish format first (DD/MM/YYYY)
         try {
             return Carbon::createFromFormat('d/m/Y', $date)->startOfDay();
         } catch (\Exception $e) {
-            return null;
+            // Try other common formats
+            try {
+                return Carbon::parse($date)->startOfDay();
+            } catch (\Exception $e) {
+                return null;
+            }
         }
     }
 
