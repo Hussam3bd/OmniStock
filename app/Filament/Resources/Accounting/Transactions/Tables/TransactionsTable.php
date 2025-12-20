@@ -23,7 +23,7 @@ class TransactionsTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->defaultSort('created_at', 'desc')
+            ->defaultSort('transaction_date', 'desc')
             ->columns([
                 TextColumn::make('id')
                     ->label('#')
@@ -54,22 +54,22 @@ class TransactionsTable
                     ->sortable()
                     ->searchable(),
 
-                TextColumn::make('amount')
-                    ->label(__('Amount'))
-                    ->formatStateUsing(fn (Transaction $record) => $record->getDualCurrencyDisplay())
-                    ->sortable(),
-
                 TextColumn::make('account.name')
                     ->label(__('Account'))
                     ->badge()
                     ->sortable()
                     ->searchable(),
 
+                TextColumn::make('amount')
+                    ->label(__('Amount'))
+                    ->formatStateUsing(fn (Transaction $record) => $record->getDualCurrencyDisplay())
+                    ->sortable(),
+
                 TextColumn::make('description')
                     ->label(__('Description'))
                     ->limit(50)
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
 
                 TextColumn::make('transactionable.order_number')
                     ->label(__('Related'))

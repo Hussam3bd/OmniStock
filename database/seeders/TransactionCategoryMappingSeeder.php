@@ -208,6 +208,18 @@ class TransactionCategoryMappingSeeder extends Seeder
                 'priority' => 10,
             ],
             [
+                'pattern' => 'KARGOPEK',
+                'type' => TransactionType::EXPENSE,
+                'category' => ExpenseCategory::PACKAGING_MATERIALS->value,
+                'priority' => 10,
+            ],
+            [
+                'pattern' => 'PACKANYA',
+                'type' => TransactionType::EXPENSE,
+                'category' => ExpenseCategory::PACKAGING_MATERIALS->value,
+                'priority' => 10,
+            ],
+            [
                 'pattern' => 'BIDOLUBASKI',
                 'type' => TransactionType::EXPENSE,
                 'category' => ExpenseCategory::PACKAGING_MATERIALS->value,

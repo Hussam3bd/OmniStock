@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Accounting\TransactionCategoryMappings\TransactionCategoryMappings\Tables;
 
-use App\Enums\Accounting\TransactionType;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;

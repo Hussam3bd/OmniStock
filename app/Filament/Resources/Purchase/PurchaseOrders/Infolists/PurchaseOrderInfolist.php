@@ -74,46 +74,46 @@ class PurchaseOrderInfolist
                     return __('Order Items').' ('.$itemsCount.')';
                 })
                     ->schema([
-                    Infolists\Components\RepeatableEntry::make('items')
-                        ->label('')
-                        ->schema([
-                            Infolists\Components\TextEntry::make('productVariant.sku')
-                                ->label(__('SKU')),
+                        Infolists\Components\RepeatableEntry::make('items')
+                            ->label('')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('productVariant.sku')
+                                    ->label(__('SKU')),
 
-                            Infolists\Components\TextEntry::make('productVariant.product.name')
-                                ->label(__('Product')),
+                                Infolists\Components\TextEntry::make('productVariant.product.name')
+                                    ->label(__('Product')),
 
-                            Infolists\Components\TextEntry::make('quantity_ordered')
-                                ->label(__('Qty Ordered'))
-                                ->badge()
-                                ->color('gray'),
+                                Infolists\Components\TextEntry::make('quantity_ordered')
+                                    ->label(__('Qty Ordered'))
+                                    ->badge()
+                                    ->color('gray'),
 
-                            Infolists\Components\TextEntry::make('quantity_received')
-                                ->label(__('Qty Received'))
-                                ->badge()
-                                ->color(fn ($state, $record) => match (true) {
-                                    $state == 0 => 'gray',
-                                    $state < $record->quantity_ordered => 'warning',
-                                    $state == $record->quantity_ordered => 'success',
-                                    default => 'danger',
-                                }),
+                                Infolists\Components\TextEntry::make('quantity_received')
+                                    ->label(__('Qty Received'))
+                                    ->badge()
+                                    ->color(fn ($state, $record) => match (true) {
+                                        $state == 0 => 'gray',
+                                        $state < $record->quantity_ordered => 'warning',
+                                        $state == $record->quantity_ordered => 'success',
+                                        default => 'danger',
+                                    }),
 
-                            Infolists\Components\TextEntry::make('unit_cost')
-                                ->label(__('Unit Cost'))
-                                ->money('TRY', divideBy: 100),
+                                Infolists\Components\TextEntry::make('unit_cost')
+                                    ->label(__('Unit Cost'))
+                                    ->money('TRY', divideBy: 100),
 
-                            Infolists\Components\TextEntry::make('tax_rate')
-                                ->label(__('Tax Rate'))
-                                ->suffix('%'),
+                                Infolists\Components\TextEntry::make('tax_rate')
+                                    ->label(__('Tax Rate'))
+                                    ->suffix('%'),
 
-                            Infolists\Components\TextEntry::make('total')
-                                ->label(__('Total'))
-                                ->money('TRY', divideBy: 100)
-                                ->weight('medium'),
-                        ])
-                        ->columns(4)
-                        ->contained(false),
-                ]),
+                                Infolists\Components\TextEntry::make('total')
+                                    ->label(__('Total'))
+                                    ->money('TRY', divideBy: 100)
+                                    ->weight('medium'),
+                            ])
+                            ->columns(4)
+                            ->contained(false),
+                    ]),
 
                 Schemas\Components\Section::make(__('Notes'))
                     ->schema([
