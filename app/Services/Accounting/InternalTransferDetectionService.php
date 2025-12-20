@@ -15,10 +15,14 @@ class InternalTransferDetectionService
         'K.KARTI ÖDEME',
         'K.KARTL ÖDEME',
         'KART ÖDEME',
+        'KART ODEME',
+        'CEP ŞUBE',
+        'CEP SUBE',
         'HAVALE',
         'EFT',
         'TRANSFER',
         'VİRMAN',
+        'VIRMAN',
     ];
 
     /**
@@ -82,15 +86,38 @@ class InternalTransferDetectionService
      */
     protected function isTransferDescription(string $description): bool
     {
-        $upperDescription = strtoupper($description);
+        $normalizedDescription = $this->normalizeDescription($description);
 
         foreach ($this->transferPatterns as $pattern) {
-            if (str_contains($upperDescription, $pattern)) {
+            $normalizedPattern = $this->normalizeDescription($pattern);
+            if (str_contains($normalizedDescription, $normalizedPattern)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Normalize description for better Turkish character matching
+     */
+    protected function normalizeDescription(string $text): string
+    {
+        // Convert to uppercase
+        $text = mb_strtoupper($text, 'UTF-8');
+
+        // Normalize Turkish characters to their ASCII equivalents for pattern matching
+        $replacements = [
+            'İ' => 'I',
+            'I' => 'I',
+            'Ş' => 'S',
+            'Ğ' => 'G',
+            'Ü' => 'U',
+            'Ö' => 'O',
+            'Ç' => 'C',
+        ];
+
+        return str_replace(array_keys($replacements), array_values($replacements), $text);
     }
 
     /**
@@ -103,7 +130,7 @@ class InternalTransferDetectionService
 
         // Look for opposite transaction type (expense -> income, income -> expense)
         // in different accounts with same amount within date range
-        $oppositeType = $transaction->type === 'expense' ? 'income' : 'expense';
+        $oppositeType = $transaction->type->value === 'expense' ? 'income' : 'expense';
 
         $potentialMatches = Transaction::where('account_id', '!=', $transaction->account_id)
             ->where('type', $oppositeType)
@@ -125,7 +152,9 @@ class InternalTransferDetectionService
             }
 
             // Check if descriptions are similar
-            if (! $this->descriptionsMatch($transaction->description, $match->description)) {
+            // If both are transfer patterns, be more lenient with description matching
+            $bothAreTransfers = $this->isTransferDescription($match->description);
+            if (! $this->descriptionsMatch($transaction->description, $match->description, $bothAreTransfers)) {
                 continue;
             }
 
@@ -144,18 +173,28 @@ class InternalTransferDetectionService
     /**
      * Check if two descriptions match (similarity check)
      */
-    protected function descriptionsMatch(string $desc1, string $desc2): bool
+    protected function descriptionsMatch(string $desc1, string $desc2, bool $bothAreTransfers = false): bool
     {
         // Normalize descriptions
-        $desc1 = strtoupper(trim($desc1));
-        $desc2 = strtoupper(trim($desc2));
+        $desc1 = $this->normalizeDescription(trim($desc1));
+        $desc2 = $this->normalizeDescription(trim($desc2));
 
         // Exact match
         if ($desc1 === $desc2) {
             return true;
         }
 
-        // Calculate similarity percentage
+        // If both match transfer patterns, we can be more lenient
+        // (e.g., "K.Kartı Ödeme" and "Cep Şube Ödeme" are likely the same transfer)
+        if ($bothAreTransfers) {
+            // For transfers, only require 20% similarity since descriptions can vary
+            // We rely more on amount + date + type matching
+            similar_text($desc1, $desc2, $percent);
+
+            return $percent >= 20;
+        }
+
+        // Calculate similarity percentage for non-transfer matches
         similar_text($desc1, $desc2, $percent);
 
         // Consider it a match if 50% or more similar

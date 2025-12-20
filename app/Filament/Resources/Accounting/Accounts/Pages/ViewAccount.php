@@ -176,11 +176,4 @@ class ViewAccount extends ViewRecord
                     ]),
             ]);
     }
-
-    public function getRelationManagers(): array
-    {
-        return [
-            \App\Filament\Resources\Accounting\Accounts\RelationManagers\TransactionsRelationManager::class,
-        ];
-    }
 }

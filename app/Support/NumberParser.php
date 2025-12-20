@@ -12,7 +12,8 @@ class NumberParser
     public static function parseAmount(string $amount): ?float
     {
         try {
-            // Remove spaces
+            // Remove currency codes (TRY, USD, EUR, etc.) and spaces
+            $amount = preg_replace('/[A-Z]{3}\s*/', '', $amount);
             $amount = str_replace(' ', '', $amount);
 
             // Determine format by checking which comes last (decimal separator)

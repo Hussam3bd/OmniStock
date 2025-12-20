@@ -13,6 +13,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -86,8 +87,12 @@ class TransactionsTable
 
                 TextColumn::make('currency')
                     ->badge()
-                    ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
+
+                IconColumn::make('is_internal_transfer')
+                    ->boolean()
+                    ->sortable()
+                    ->toggleable(),
 
                 TextColumn::make('created_at')
                     ->label(__('Created'))

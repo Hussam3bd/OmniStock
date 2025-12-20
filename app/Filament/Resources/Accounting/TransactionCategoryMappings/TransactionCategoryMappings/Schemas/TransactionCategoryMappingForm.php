@@ -35,6 +35,7 @@ class TransactionCategoryMappingForm
 
                 Select::make('category')
                     ->required()
+                    ->live()
                     ->options(fn (Get $get) => static::getCategoryOptions($get('type')))
                     ->label(__('Category'))
                     ->helperText(__('Category to auto-assign when pattern matches')),
@@ -59,8 +60,10 @@ class TransactionCategoryMappingForm
             ]);
     }
 
-    protected static function getCategoryOptions(?string $type): array
+    protected static function getCategoryOptions($type): array
     {
+        $type = $type instanceof TransactionType ? $type->value : $type;
+
         if (! $type) {
             return [];
         }

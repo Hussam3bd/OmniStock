@@ -56,14 +56,14 @@ class TransactionImporter extends Importer
                 ->label('Description')
                 ->requiredMapping()
                 ->rules(['required'])
-                ->guess(['Açıklama', 'Description', 'açıklama', 'description', 'İşlem'])
+                ->guess(['Açıklama', 'Description', 'açıklama', 'description', 'İşlem', 'İşlem İsmi', 'Transaction Type'])
                 ->example('Payment to vendor'),
 
             ImportColumn::make('amount')
                 ->label('Amount')
                 ->requiredMapping()
                 ->rules(['required'])
-                ->guess(['Tutar', 'Amount', 'tutar', 'amount', 'Miktar', 'miktar', 'Tutar(TL)'])
+                ->guess(['Tutar', 'Amount', 'tutar', 'amount', 'Miktar', 'miktar', 'Tutar(TL)', 'Transaction Amount'])
                 ->example('1,234.56'),
 
             ImportColumn::make('reference')
@@ -179,7 +179,39 @@ class TransactionImporter extends Importer
      */
     protected function parseDate(string $date): ?Carbon
     {
-        // Try Turkish format first (DD/MM/YYYY)
+        // Handle Turkish date format: "Çarşamba, 17 Ara 2025 | 10:29"
+        if (str_contains($date, '|')) {
+            // Extract just the date part before the pipe
+            $datePart = trim(explode('|', $date)[0]);
+
+            // Remove day name (e.g., "Çarşamba, ")
+            if (str_contains($datePart, ',')) {
+                $datePart = trim(explode(',', $datePart, 2)[1]);
+            }
+
+            // Convert Turkish month abbreviations to numbers
+            $turkishMonths = [
+                'Oca' => '01', 'Şub' => '02', 'Mar' => '03', 'Nis' => '04',
+                'May' => '05', 'Haz' => '06', 'Tem' => '07', 'Ağu' => '08',
+                'Eyl' => '09', 'Eki' => '10', 'Kas' => '11', 'Ara' => '12',
+            ];
+
+            foreach ($turkishMonths as $turkish => $number) {
+                $datePart = str_replace($turkish, $number, $datePart);
+            }
+
+            // Now parse as "17 12 2025"
+            try {
+                $parts = preg_split('/\s+/', $datePart);
+                if (count($parts) === 3) {
+                    return Carbon::createFromFormat('d m Y', implode(' ', $parts))->startOfDay();
+                }
+            } catch (\Exception $e) {
+                // Continue to other formats
+            }
+        }
+
+        // Try Turkish format (DD/MM/YYYY)
         try {
             return Carbon::createFromFormat('d/m/Y', $date)->startOfDay();
         } catch (\Exception $e) {
