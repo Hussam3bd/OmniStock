@@ -217,14 +217,37 @@ class ChannelSalesBreakdown extends TableWidget
                         ->sum('payment_gateway_fee') / 100;
                 }
 
-                // Calculate total product cost (COGS) - only for orders that were actually fulfilled
-                // Exclude cancelled/rejected orders (COGS never incurred if not shipped)
-                $totalProductCost = Order::where('channel', $channelValue)
+                // Calculate effective COGS (total COGS - returned items COGS for inventory recovery)
+                $orders = Order::where('channel', $channelValue)
                     ->whereIn('payment_status', [PaymentStatus::PAID, PaymentStatus::PARTIALLY_PAID])
                     ->whereNotIn('order_status', [OrderStatus::CANCELLED, OrderStatus::REJECTED])
-                    ->sum('total_product_cost') / 100;
+                    ->with('items.returnItems.return')
+                    ->get();
 
-                // Net Profit = Revenue - COGS - Outbound Shipping - Payment Gateway Fees - Refunds - Return Shipping
+                $totalProductCost = 0;
+                foreach ($orders as $order) {
+                    // For rejected orders (COD refused), COGS is 0 (products came back)
+                    if ($order->order_status === OrderStatus::REJECTED) {
+                        continue;
+                    }
+
+                    $orderCogs = $order->total_product_cost?->getAmount() ?? 0;
+                    $returnedCogs = 0;
+
+                    foreach ($order->items as $item) {
+                        if ($item->unit_cost) {
+                            foreach ($item->returnItems as $returnItem) {
+                                if (in_array($returnItem->return->status, [ReturnStatus::Approved, ReturnStatus::Completed])) {
+                                    $returnedCogs += $item->unit_cost->getAmount() * $returnItem->quantity;
+                                }
+                            }
+                        }
+                    }
+
+                    $totalProductCost += ($orderCogs - $returnedCogs) / 100;
+                }
+
+                // Net Profit = Revenue - Effective COGS - Outbound Shipping - Payment Gateway Fees - Refunds - Return Shipping
                 // Revenue is already calculated as collected amount ($totalSalesAmount)
                 $netProfit = $totalSalesAmount - $totalProductCost - $shippingCost - $commissionAmount - $returnsAmount - $totalReturnShippingCost;
             } else {
@@ -244,12 +267,36 @@ class ChannelSalesBreakdown extends TableWidget
                     ->where('order_status', OrderStatus::COMPLETED)
                     ->sum('total_commission') / 100;
 
-                // Calculate total product cost (COGS)
-                $totalProductCost = Order::where('channel', $channelValue)
+                // Calculate effective COGS (total COGS - returned items COGS for inventory recovery)
+                $orders = Order::where('channel', $channelValue)
                     ->where('order_status', OrderStatus::COMPLETED)
-                    ->sum('total_product_cost') / 100;
+                    ->with('items.returnItems.return')
+                    ->get();
 
-                // Net Profit = Revenue - COGS - Outbound Shipping - Marketplace Commission - Refunds - Return Shipping
+                $totalProductCost = 0;
+                foreach ($orders as $order) {
+                    // For rejected orders (COD refused), COGS is 0 (products came back)
+                    if ($order->order_status === OrderStatus::REJECTED) {
+                        continue;
+                    }
+
+                    $orderCogs = $order->total_product_cost?->getAmount() ?? 0;
+                    $returnedCogs = 0;
+
+                    foreach ($order->items as $item) {
+                        if ($item->unit_cost) {
+                            foreach ($item->returnItems as $returnItem) {
+                                if (in_array($returnItem->return->status, [ReturnStatus::Approved, ReturnStatus::Completed])) {
+                                    $returnedCogs += $item->unit_cost->getAmount() * $returnItem->quantity;
+                                }
+                            }
+                        }
+                    }
+
+                    $totalProductCost += ($orderCogs - $returnedCogs) / 100;
+                }
+
+                // Net Profit = Revenue - Effective COGS - Outbound Shipping - Marketplace Commission - Refunds - Return Shipping
                 $netProfit = $totalSalesAmount - $totalProductCost - $shippingCost - $commissionAmount - $returnsAmount - $totalReturnShippingCost;
             }
 

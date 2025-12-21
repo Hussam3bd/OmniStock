@@ -6,7 +6,6 @@ use App\Enums\Order\OrderChannel;
 use App\Enums\Order\OrderStatus;
 use App\Models\Order\Order;
 use Filament\Widgets\ChartWidget;
-use Illuminate\Support\Facades\DB;
 
 class RevenueByChannelChart extends ChartWidget
 {
@@ -16,12 +15,6 @@ class RevenueByChannelChart extends ChartWidget
 
     protected function getData(): array
     {
-        $revenueByChannel = Order::select('channel', DB::raw('SUM(total_amount) / 100 as revenue'))
-            ->where('order_status', OrderStatus::COMPLETED)
-            ->groupBy('channel')
-            ->pluck('revenue', 'channel')
-            ->toArray();
-
         $labels = [];
         $data = [];
         $colors = [];
@@ -34,11 +27,31 @@ class RevenueByChannelChart extends ChartWidget
             'wholesale' => '#ec4899',   // pink
         ];
 
-        foreach ($revenueByChannel as $channel => $revenue) {
-            $channelEnum = OrderChannel::tryFrom($channel);
-            $labels[] = $channelEnum?->getLabel() ?? ucfirst($channel);
-            $data[] = round($revenue, 2);
-            $colors[] = $channelColors[$channel] ?? '#6b7280'; // default gray
+        // Calculate revenue using the same logic as ChannelSalesBreakdown
+        $channels = OrderChannel::cases();
+
+        foreach ($channels as $channel) {
+            $channelValue = $channel->value;
+
+            // For Shopify: Sales amount = collected payments (excluding cancelled/rejected)
+            // For marketplaces: Sales amount = completed orders
+            if ($channelValue === OrderChannel::SHOPIFY->value) {
+                $revenue = Order::where('channel', $channelValue)
+                    ->whereIn('payment_status', [\App\Enums\Order\PaymentStatus::PAID, \App\Enums\Order\PaymentStatus::PARTIALLY_PAID])
+                    ->whereNotIn('order_status', [OrderStatus::CANCELLED, OrderStatus::REJECTED])
+                    ->sum('total_amount') / 100;
+            } else {
+                $revenue = Order::where('channel', $channelValue)
+                    ->where('order_status', OrderStatus::COMPLETED)
+                    ->sum('total_amount') / 100;
+            }
+
+            // Only add channels with revenue
+            if ($revenue > 0) {
+                $labels[] = $channel->getLabel();
+                $data[] = round($revenue, 2);
+                $colors[] = $channelColors[$channelValue] ?? '#6b7280';
+            }
         }
 
         return [

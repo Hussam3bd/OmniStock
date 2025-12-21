@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Filament\Widgets\ChannelSalesBreakdown;
 use App\Filament\Widgets\NetProfitByChannelChart;
 use App\Filament\Widgets\OrdersByChannelChart;
+use App\Filament\Widgets\OrdersOverTimeChart;
 use App\Filament\Widgets\OrderStatsOverview;
 use App\Filament\Widgets\ReturnsByChannelChart;
 use App\Filament\Widgets\ReturnsStatsWidget;
@@ -48,6 +49,7 @@ class OrdersReport extends Page
     {
         return [
             ChannelSalesBreakdown::class,
+            OrdersOverTimeChart::class,
             RevenueChartWidget::class,
             OrdersByChannelChart::class,
             RevenueByChannelChart::class,
