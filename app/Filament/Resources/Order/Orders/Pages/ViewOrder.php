@@ -16,6 +16,14 @@ class ViewOrder extends ViewRecord
 {
     protected static string $resource = OrderResource::class;
 
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        // Eager load items for effective_product_cost calculation
+        $this->record->load('items');
+    }
+
     public function infolist(Schema $schema): Schema
     {
         return OrderInfolist::configure($schema);

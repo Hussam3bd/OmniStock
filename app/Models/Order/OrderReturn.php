@@ -260,32 +260,8 @@ class OrderReturn extends Model implements HasMedia
 
     protected function updateOrderReturnStatus(): void
     {
-        $order = $this->order;
-
-        $totalItemsInOrder = $order->items->sum('quantity');
-        $totalItemsReturned = $order->returns()
-            ->whereIn('status', [ReturnStatus::Approved, ReturnStatus::Completed])
-            ->get()
-            ->flatMap->items
-            ->sum('quantity');
-
-        if ($totalItemsReturned === 0) {
-            $returnStatus = 'none';
-            $orderStatus = null; // Don't change order status
-        } elseif ($totalItemsReturned >= $totalItemsInOrder) {
-            $returnStatus = 'full';
-            $orderStatus = \App\Enums\Order\OrderStatus::REFUNDED;
-        } else {
-            $returnStatus = 'partial';
-            $orderStatus = \App\Enums\Order\OrderStatus::PARTIALLY_REFUNDED;
-        }
-
-        $updateData = ['return_status' => $returnStatus];
-        if ($orderStatus !== null) {
-            $updateData['order_status'] = $orderStatus;
-        }
-
-        $order->update($updateData);
+        $action = app(\App\Actions\Order\UpdateOrderReturnStatusAction::class);
+        $action->execute($this->order);
     }
 
     // Auto-generate return number

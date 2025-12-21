@@ -311,6 +311,10 @@ class OrderMapper extends BaseOrderMapper
 
         $order->update($updateData);
 
+        // Recalculate return status after sync (returns may have been processed locally)
+        // This ensures order_status/return_status reflect local return state
+        $this->recalculateOrderReturnStatus($order);
+
         $order->platformMappings()
             ->where('platform', $this->getChannel()->value)
             ->update([
@@ -425,6 +429,16 @@ class OrderMapper extends BaseOrderMapper
         $order->update([
             'total_product_cost' => $totalCost,
         ]);
+    }
+
+    /**
+     * Recalculate order return status based on local return data
+     * This ensures that local returns override Trendyol's order status
+     */
+    protected function recalculateOrderReturnStatus(Order $order): void
+    {
+        $action = app(\App\Actions\Order\UpdateOrderReturnStatusAction::class);
+        $action->execute($order, forceRecalculate: true);
     }
 
     protected function findProductVariant(array $line): ?ProductVariant

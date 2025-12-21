@@ -220,9 +220,26 @@ class OrderInfolist
 
                         Infolists\Components\TextEntry::make('effective_product_cost')
                             ->label(__('Product Cost (COGS)'))
-                            ->helperText(fn ($record) => $record->order_status === \App\Enums\Order\OrderStatus::REJECTED
-                                ? __('Product returned - no cost')
-                                : __('Cost of goods sold'))
+                            ->helperText(function ($record) {
+                                if ($record->order_status === \App\Enums\Order\OrderStatus::REJECTED) {
+                                    return __('Product returned - no cost');
+                                }
+
+                                // Check if any items were returned
+                                $hasReturns = false;
+                                if ($record->relationLoaded('items')) {
+                                    foreach ($record->items as $item) {
+                                        if ($item->getReturnedQuantity() > 0) {
+                                            $hasReturns = true;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                return $hasReturns
+                                    ? __('Cost of goods sold (adjusted for returns)')
+                                    : __('Cost of goods sold');
+                            })
                             ->money(fn ($record) => $record->currency)
                             ->color(fn ($record) => $record->order_status === \App\Enums\Order\OrderStatus::REJECTED ? 'success' : 'danger')
                             ->visible(fn ($record) => $record->total_product_cost),

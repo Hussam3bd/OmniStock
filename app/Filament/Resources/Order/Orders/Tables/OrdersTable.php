@@ -55,6 +55,9 @@ class OrdersTable
                 TextColumn::make('payment_status')
                     ->badge()
                     ->sortable(),
+                TextColumn::make('fulfillment_status')
+                    ->badge()
+                    ->sortable(),
                 TextColumn::make('payment_gateway')
                     ->label('Payment Method')
                     ->formatStateUsing(function ($record) {
@@ -76,9 +79,6 @@ class OrdersTable
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
-                TextColumn::make('fulfillment_status')
-                    ->badge()
-                    ->sortable(),
                 TextColumn::make('subtotal')
                     ->label('Subtotal')
                     ->money(fn ($record) => $record->currency)
@@ -176,7 +176,32 @@ class OrdersTable
 
                         return null;
                     })
-                    ->sortable()
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query
+                            ->leftJoin('order_items as oi_sort', 'orders.id', '=', 'oi_sort.order_id')
+                            ->leftJoin('return_items as ri_sort', 'oi_sort.id', '=', 'ri_sort.order_item_id')
+                            ->selectRaw('orders.*')
+                            ->selectRaw('
+                                (orders.total_amount
+                                - CASE
+                                    WHEN orders.order_status = \'rejected\' THEN 0
+                                    ELSE COALESCE(orders.total_product_cost, 0)
+                                        - COALESCE((
+                                            SELECT SUM(oi.unit_cost * ri.quantity)
+                                            FROM return_items ri
+                                            JOIN order_items oi ON ri.order_item_id = oi.id
+                                            WHERE oi.order_id = orders.id
+                                        ), 0)
+                                END
+                                - COALESCE(orders.shipping_cost_excluding_vat, 0)
+                                - COALESCE(orders.shipping_vat_amount, 0)
+                                - COALESCE(orders.total_commission, 0)
+                                - COALESCE(orders.payment_gateway_fee, 0)
+                                - COALESCE(orders.payment_gateway_commission_amount, 0)) as calculated_gross_profit
+                            ')
+                            ->groupBy('orders.id')
+                            ->orderBy('calculated_gross_profit', $direction);
+                    })
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->color(fn ($record) => match (true) {
                         ! $record->gross_profit => 'gray',
