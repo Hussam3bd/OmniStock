@@ -20,6 +20,7 @@ enum ExpenseCategory: string implements HasColor, HasLabel
     case LEGAL_NOTARY = 'legal_notary';
     case PROFESSIONAL_SERVICES = 'professional_services';
     case OFFICE_SUPPLIES = 'office_supplies';
+    case MEALS_CATERING = 'meals_catering';
     case RENT_UTILITIES = 'rent_utilities';
     case SALARIES_WAGES = 'salaries_wages';
     case BANK_FEES = 'bank_fees';
@@ -41,6 +42,7 @@ enum ExpenseCategory: string implements HasColor, HasLabel
             self::LEGAL_NOTARY => __('Legal & Notary Services'),
             self::PROFESSIONAL_SERVICES => __('Professional Services'),
             self::OFFICE_SUPPLIES => __('Office Supplies'),
+            self::MEALS_CATERING => __('Meals & Catering'),
             self::RENT_UTILITIES => __('Rent & Utilities'),
             self::SALARIES_WAGES => __('Salaries & Wages'),
             self::BANK_FEES => __('Bank & Payment Fees'),
@@ -58,6 +60,7 @@ enum ExpenseCategory: string implements HasColor, HasLabel
             self::SOFTWARE_TOOLS, self::PROFESSIONAL_SERVICES => 'indigo',
             self::ACCOUNTING_SERVICES => 'violet',
             self::LEGAL_NOTARY => 'amber',
+            self::MEALS_CATERING => 'orange',
             self::SALARIES_WAGES => 'purple',
             self::BANK_FEES => 'danger',
             default => 'gray',
