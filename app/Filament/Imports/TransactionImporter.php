@@ -2,7 +2,10 @@
 
 namespace App\Filament\Imports;
 
+use App\Enums\Accounting\CapitalCategory;
+use App\Enums\Accounting\ExpenseCategory;
 use App\Enums\Accounting\ImportSourceType;
+use App\Enums\Accounting\IncomeCategory;
 use App\Enums\Accounting\TransactionType;
 use App\Models\Accounting\Account;
 use App\Models\Accounting\ImportedTransaction;
@@ -71,6 +74,12 @@ class TransactionImporter extends Importer
                 ->guess(['Dekont No', 'Reference No', 'Reference', 'dekont no', 'reference'])
                 ->example('REF-123456'),
 
+            ImportColumn::make('category')
+                ->label('Category')
+                ->guess(['Kategori', 'Category', 'kategori', 'category'])
+                ->example('marketing_meta')
+                ->helperText('Optional. If provided, skips auto-categorization.'),
+
             ImportColumn::make('label')
                 ->label('Label')
                 ->guess(['Etiket', 'Label', 'etiket', 'label'])
@@ -120,8 +129,23 @@ class TransactionImporter extends Importer
         $type = $amount > 0 ? TransactionType::INCOME : TransactionType::EXPENSE;
         $absoluteAmount = abs($amount);
 
-        // Auto-categorize based on description
-        $category = $this->autoCategorize($this->data['description'], $type, $accountId);
+        // Use provided category if valid, otherwise auto-categorize
+        $category = null;
+        if (! empty($this->data['category'])) {
+            // Category provided in import - validate it exists in the correct enum
+            $providedCategory = $this->data['category'];
+
+            if ($this->isValidCategory($providedCategory, $type)) {
+                // Valid category - use it and skip auto-mapping
+                $category = $providedCategory;
+            } else {
+                // Invalid category - fall back to auto-categorization
+                $category = $this->autoCategorize($this->data['description'], $type, $accountId);
+            }
+        } else {
+            // No category provided - auto-categorize based on description
+            $category = $this->autoCategorize($this->data['description'], $type, $accountId);
+        }
 
         // Create transaction
         $transaction = Transaction::create([
@@ -222,6 +246,21 @@ class TransactionImporter extends Importer
                 return null;
             }
         }
+    }
+
+    /**
+     * Check if category is valid for the given transaction type
+     */
+    protected function isValidCategory(string $category, TransactionType $type): bool
+    {
+        $enumClass = match ($type) {
+            TransactionType::INCOME => IncomeCategory::class,
+            TransactionType::EXPENSE => ExpenseCategory::class,
+            TransactionType::CAPITAL => CapitalCategory::class,
+        };
+
+        // Check if the category value exists in the enum
+        return $enumClass::tryFrom($category) !== null;
     }
 
     /**
