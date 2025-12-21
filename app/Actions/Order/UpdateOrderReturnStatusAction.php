@@ -50,6 +50,7 @@ class UpdateOrderReturnStatusAction
 
         // Determine new statuses
         [$returnStatus, $orderStatus] = $this->calculateStatuses(
+            $order,
             $totalItemsReturned,
             $totalItemsInOrder,
             $beforeOrderStatus
@@ -90,12 +91,17 @@ class UpdateOrderReturnStatusAction
      * Calculate the appropriate return_status and order_status based on return quantities
      *
      * Business Logic:
-     * - REJECTED orders (COD refused) → Keep as REJECTED (customer never paid)
-     * - COMPLETED orders with returns → REFUNDED/PARTIALLY_REFUNDED (customer paid, got refund)
+     * - COD orders where customer refused delivery → REJECTED (never paid, no refund)
+     * - Orders where customer paid then returned → REFUNDED (got money back)
+     *
+     * Detection:
+     * - COD rejected = payment_method is 'cod' AND payment_status is 'failed' or 'pending'
+     * - Customer paid = payment_status is 'paid', 'partially_paid', 'refunded', 'partially_refunded'
      *
      * @return array{0: string|null, 1: OrderStatus} [return_status, order_status]
      */
     protected function calculateStatuses(
+        Order $order,
         int $totalItemsReturned,
         int $totalItemsInOrder,
         OrderStatus $currentOrderStatus
@@ -105,14 +111,16 @@ class UpdateOrderReturnStatusAction
             return ['none', $currentOrderStatus];
         }
 
-        // Special case: REJECTED orders (COD delivery refused)
-        // Customer never accepted/paid for order, product came back
-        // These should stay as REJECTED, not become REFUNDED
-        if ($currentOrderStatus === OrderStatus::REJECTED) {
+        // Detect COD rejected orders (customer refused delivery, never paid)
+        $isCodRejected = $this->isCodRejectedOrder($order);
+
+        if ($isCodRejected) {
+            // COD delivery refused - customer never accepted or paid
+            // These should be REJECTED, not REFUNDED (no payment = no refund)
             if ($totalItemsReturned >= $totalItemsInOrder) {
-                return ['full', OrderStatus::REJECTED]; // Keep as rejected
+                return ['full', OrderStatus::REJECTED];
             } else {
-                return ['partial', OrderStatus::REJECTED]; // Keep as rejected
+                return ['partial', OrderStatus::REJECTED];
             }
         }
 
@@ -124,5 +132,32 @@ class UpdateOrderReturnStatusAction
 
         // Partial return - some items returned, customer got partial refund
         return ['partial', OrderStatus::PARTIALLY_REFUNDED];
+    }
+
+    /**
+     * Detect if an order is a COD rejected order (customer refused delivery)
+     *
+     * Indicators:
+     * - Payment method is COD
+     * - Payment never succeeded (failed or pending)
+     * - Has returns (product came back)
+     */
+    protected function isCodRejectedOrder(Order $order): bool
+    {
+        // Must be COD payment
+        if ($order->payment_method !== 'cod') {
+            return false;
+        }
+
+        // Payment must not have succeeded
+        // If payment is 'paid', 'partially_paid', 'refunded', or 'partially_refunded', customer DID pay
+        $paidStatuses = ['paid', 'partially_paid', 'refunded', 'partially_refunded'];
+
+        if (in_array($order->payment_status->value, $paidStatuses)) {
+            return false; // Customer paid, this is a normal return
+        }
+
+        // COD + payment failed/pending/voided = customer refused delivery
+        return true;
     }
 }
