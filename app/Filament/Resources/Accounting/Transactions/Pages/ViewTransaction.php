@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Accounting\Transactions\Pages;
 
 use App\Filament\Resources\Accounting\Transactions\TransactionResource;
 use Filament\Actions\EditAction;
+use Filament\Actions\ReplicateAction;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewTransaction extends ViewRecord
@@ -14,6 +15,7 @@ class ViewTransaction extends ViewRecord
     {
         return [
             EditAction::make(),
+            ReplicateAction::make(),
         ];
     }
 }
