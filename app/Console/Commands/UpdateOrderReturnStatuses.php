@@ -62,42 +62,27 @@ class UpdateOrderReturnStatuses extends Command
         foreach ($returns as $return) {
             $order = $return->order;
 
-            if (! $dryRun) {
-                // Execute the action
-                $result = $action->execute($order);
+            // Execute action (with dryRun flag if needed)
+            $result = $action->execute($order, forceRecalculate: false, dryRun: $dryRun);
 
-                if ($result['changed']) {
-                    $updatedOrders++;
+            if ($result['changed']) {
+                $updatedOrders++;
 
-                    if ($this->output->isVerbose()) {
-                        $this->line("\nOrder #{$order->order_number}:");
-                        $this->line("  return_status: {$result['before']['return_status']} → {$result['return_status']}");
-                        $this->line("  order_status: {$result['before']['order_status']} → {$result['order_status']}");
-                    }
-                } else {
-                    $skippedOrders++;
-                }
-            } else {
-                // Dry-run: execute action but check what would change
-                $beforeReturnStatus = $order->return_status;
-                $beforeOrderStatus = $order->order_status->value;
-
-                // Simulate the calculation without saving
-                $result = $action->execute($order);
-
-                if ($result['changed']) {
-                    $updatedOrders++;
+                if ($dryRun) {
+                    // Store changes for display
                     $changes[] = [
                         'order_number' => $order->order_number,
-                        'return_status' => "{$beforeReturnStatus} → {$result['return_status']}",
-                        'order_status' => "{$beforeOrderStatus} → {$result['order_status']}",
+                        'return_status' => "{$result['before']['return_status']} → {$result['return_status']}",
+                        'order_status' => "{$result['before']['order_status']} → {$result['order_status']}",
                     ];
-
-                    // Revert changes since this is dry-run
-                    $order->refresh();
-                } else {
-                    $skippedOrders++;
+                } elseif ($this->output->isVerbose()) {
+                    // Show verbose output for actual run
+                    $this->line("\nOrder #{$order->order_number}:");
+                    $this->line("  return_status: {$result['before']['return_status']} → {$result['return_status']}");
+                    $this->line("  order_status: {$result['before']['order_status']} → {$result['order_status']}");
                 }
+            } else {
+                $skippedOrders++;
             }
 
             $progressBar->advance();
