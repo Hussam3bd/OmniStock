@@ -211,6 +211,8 @@ class TransactionsTable
 
     /**
      * Extract a meaningful pattern from transaction description
+     *
+     * Uses the entire description to create specific, non-generic mappings
      */
     protected static function extractPattern(string $description): ?string
     {
@@ -221,41 +223,12 @@ class TransactionsTable
             return null;
         }
 
-        // Try to extract merchant name or key identifier
-        // Common patterns in Turkish bank statements:
-        // "FACEBK *3948785YQ2 DUBLIN" -> "FACEBK"
-        // "APPLE.COM/BILL CORK" -> "APPLE"
-        // "PARAM/ /TRENDYOL PAZARY ISTANBUL" -> "TRENDYOL"
-        // "K.Kartı Ödeme 5289 **** **** 6015" -> "K.KARTI ÖDEME"
+        // Use entire description (up to 255 chars to fit in DB)
+        // This ensures specific mappings that won't accidentally match unrelated transactions
+        $pattern = mb_strlen($cleaned) > 255
+            ? mb_substr($cleaned, 0, 255)
+            : $cleaned;
 
-        // If it starts with a recognizable pattern, use that
-        $patterns = [
-            '/^(FACEBK)/i',
-            '/^(APPLE\.COM)/i',
-            '/^(GOOGLE)/i',
-            '/^(TRENDYOL)/i',
-            '/^(IYZICO)/i',
-            '/^(PAYTR)/i',
-            '/^(PAYCELL)/i',
-            '/^(PARAM)/i',
-            '/^(TURHOST)/i',
-            '/^(K\.KARTI? ÖDEME)/i',
-            '/^(HAVALE)/i',
-            '/^(EFT)/i',
-        ];
-
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $cleaned, $matches)) {
-                return strtoupper($matches[1]);
-            }
-        }
-
-        // Otherwise, take the first word/phrase (up to space or special char)
-        if (preg_match('/^([A-Z0-9]+)/i', $cleaned, $matches)) {
-            return strtoupper($matches[1]);
-        }
-
-        // As fallback, take first 20 characters
-        return strtoupper(substr($cleaned, 0, 20));
+        return mb_strtoupper($pattern);
     }
 }
