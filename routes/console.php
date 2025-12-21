@@ -11,3 +11,8 @@ Schedule::command('products:update-variant-costs')
     ->dailyAt('10:00')
     ->onOneServer()
     ->withoutOverlapping();
+
+Schedule::command('activitylog:clean')
+    ->weekly()
+    ->onOneServer()
+    ->withoutOverlapping();
