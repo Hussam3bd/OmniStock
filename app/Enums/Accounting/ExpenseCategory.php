@@ -16,6 +16,8 @@ enum ExpenseCategory: string implements HasColor, HasLabel
     case PHOTOGRAPHY_CONTENT = 'photography_content';
     case SHIPPING_LOGISTICS = 'shipping_logistics';
     case SOFTWARE_TOOLS = 'software_tools';
+    case ACCOUNTING_SERVICES = 'accounting_services';
+    case LEGAL_NOTARY = 'legal_notary';
     case PROFESSIONAL_SERVICES = 'professional_services';
     case OFFICE_SUPPLIES = 'office_supplies';
     case RENT_UTILITIES = 'rent_utilities';
@@ -35,6 +37,8 @@ enum ExpenseCategory: string implements HasColor, HasLabel
             self::PHOTOGRAPHY_CONTENT => __('Photography & Content Creation'),
             self::SHIPPING_LOGISTICS => __('Shipping & Logistics'),
             self::SOFTWARE_TOOLS => __('Software & Tools'),
+            self::ACCOUNTING_SERVICES => __('Accounting & Bookkeeping Services'),
+            self::LEGAL_NOTARY => __('Legal & Notary Services'),
             self::PROFESSIONAL_SERVICES => __('Professional Services'),
             self::OFFICE_SUPPLIES => __('Office Supplies'),
             self::RENT_UTILITIES => __('Rent & Utilities'),
@@ -52,6 +56,8 @@ enum ExpenseCategory: string implements HasColor, HasLabel
             self::PACKAGING_MATERIALS, self::PHOTOGRAPHY_CONTENT => 'info',
             self::SHIPPING_LOGISTICS => 'success',
             self::SOFTWARE_TOOLS, self::PROFESSIONAL_SERVICES => 'indigo',
+            self::ACCOUNTING_SERVICES => 'violet',
+            self::LEGAL_NOTARY => 'amber',
             self::SALARIES_WAGES => 'purple',
             self::BANK_FEES => 'danger',
             default => 'gray',
