@@ -4,12 +4,12 @@ namespace App\Filament\Pages\Inventory;
 
 use App\Services\Product\ProductDemandAnalyzer;
 use BackedEnum;
-use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -56,13 +56,13 @@ class ReorderRecommendations extends Page implements HasForms, HasTable
         return __('Low stock & high demand products based on sales analysis');
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Section::make(__('Analysis Filters'))
                     ->description(__('Adjust these parameters to control which products appear in recommendations'))
-                    ->schema([
+                    ->components([
                         Select::make('daysToAnalyze')
                             ->label(__('Analysis Period'))
                             ->options([
@@ -106,8 +106,7 @@ class ReorderRecommendations extends Page implements HasForms, HasTable
                     ])
                     ->columns(3)
                     ->collapsible(),
-            ])
-            ->statePath('data');
+            ]);
     }
 
     public function table(Table $table): Table
