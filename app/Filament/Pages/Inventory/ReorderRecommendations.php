@@ -133,23 +133,22 @@ class ReorderRecommendations extends Page implements HasForms, HasTable
                     ->sortable()
                     ->alignCenter(),
 
-                TextColumn::make('sku')
-                    ->label(__('SKU'))
-                    ->searchable()
-                    ->sortable()
-                    ->weight('bold'),
-
-                TextColumn::make('product_name')
+                TextColumn::make('product_info')
                     ->label(__('Product'))
-                    ->searchable()
-                    ->sortable()
-                    ->limit(30),
+                    ->searchable(['sku', 'product_name', 'variant_title'])
+                    ->html()
+                    ->getStateUsing(function ($record) {
+                        $product = '<div class="font-medium">'.$record['product_name'].'</div>';
+                        $sku = '<div class="font-mono text-sm text-gray-600 dark:text-gray-400">'.$record['sku'].'</div>';
+                        $variant = $record['variant_title']
+                            ? '<div class="text-sm text-gray-500 dark:text-gray-400">'.$record['variant_title'].'</div>'
+                            : '';
 
-                TextColumn::make('variant_title')
-                    ->label(__('Variant'))
-                    ->searchable()
-                    ->limit(20)
-                    ->toggleable(),
+                        return $product.$sku.$variant;
+                    })
+                    ->wrap()
+                    ->grow()
+                    ->extraAttributes(['style' => 'min-width: 300px;']),
 
                 TextColumn::make('current_stock')
                     ->label(__('Current Stock'))
