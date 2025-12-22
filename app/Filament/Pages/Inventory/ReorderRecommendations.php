@@ -4,6 +4,11 @@ namespace App\Filament\Pages\Inventory;
 
 use App\Services\Product\ProductDemandAnalyzer;
 use BackedEnum;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Forms\Form;
 use Filament\Pages\Page;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -11,14 +16,25 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use UnitEnum;
 
-class ReorderRecommendations extends Page implements HasTable
+class ReorderRecommendations extends Page implements HasForms, HasTable
 {
+    use InteractsWithForms;
     use InteractsWithTable;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-arrow-trending-up';
+
     protected string $view = 'filament.pages.inventory.reorder-recommendations';
+
     protected static string|UnitEnum|null $navigationGroup = 'Inventory';
+
     protected static ?int $navigationSort = 2;
+
+    // Filter properties
+    public ?int $daysToAnalyze = 30;
+
+    public ?int $minDaysOfStock = 14;
+
+    public ?int $minSales = 5;
 
     public static function getNavigationLabel(): string
     {
@@ -40,23 +56,81 @@ class ReorderRecommendations extends Page implements HasTable
         return __('Low stock & high demand products based on sales analysis');
     }
 
+    public function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Section::make(__('Analysis Filters'))
+                    ->description(__('Adjust these parameters to control which products appear in recommendations'))
+                    ->schema([
+                        Select::make('daysToAnalyze')
+                            ->label(__('Analysis Period'))
+                            ->options([
+                                7 => __('Last 7 days'),
+                                14 => __('Last 14 days'),
+                                30 => __('Last 30 days'),
+                                60 => __('Last 60 days'),
+                                90 => __('Last 90 days'),
+                            ])
+                            ->default(30)
+                            ->live()
+                            ->helperText(__('How far back to analyze sales history')),
+
+                        Select::make('minDaysOfStock')
+                            ->label(__('Max Days of Stock'))
+                            ->options([
+                                7 => __('7 days or less'),
+                                14 => __('14 days or less'),
+                                21 => __('21 days or less'),
+                                30 => __('30 days or less'),
+                                45 => __('45 days or less'),
+                                60 => __('60 days or less'),
+                            ])
+                            ->default(14)
+                            ->live()
+                            ->helperText(__('Only show products with this many days of stock remaining or less')),
+
+                        Select::make('minSales')
+                            ->label(__('Minimum Sales'))
+                            ->options([
+                                1 => __('1+ sales'),
+                                2 => __('2+ sales'),
+                                5 => __('5+ sales'),
+                                10 => __('10+ sales'),
+                                20 => __('20+ sales'),
+                                50 => __('50+ sales'),
+                            ])
+                            ->default(5)
+                            ->live()
+                            ->helperText(__('Minimum total sales in analysis period to be considered')),
+                    ])
+                    ->columns(3)
+                    ->collapsible(),
+            ])
+            ->statePath('data');
+    }
+
     public function table(Table $table): Table
     {
         $analyzer = app(ProductDemandAnalyzer::class);
 
         return $table
-            ->records(fn () => $analyzer->getReorderRecommendations())
+            ->records(fn () => $analyzer->getReorderRecommendations(
+                daysToAnalyze: $this->daysToAnalyze ?? 30,
+                minDaysOfStock: $this->minDaysOfStock ?? 14,
+                minSales: $this->minSales ?? 5
+            ))
             ->columns([
                 TextColumn::make('priority')
                     ->label(__('Priority'))
                     ->badge()
-                    ->color(fn($state) => match (true) {
+                    ->color(fn ($state) => match (true) {
                         $state >= 70 => 'danger',
                         $state >= 50 => 'warning',
                         $state >= 30 => 'info',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn($state) => $state.'%')
+                    ->formatStateUsing(fn ($state) => $state.'%')
                     ->sortable()
                     ->alignCenter(),
 
@@ -97,7 +171,7 @@ class ReorderRecommendations extends Page implements HasTable
                     ->numeric(1)
                     ->sortable()
                     ->alignCenter()
-                    ->color(fn($state) => match (true) {
+                    ->color(fn ($state) => match (true) {
                         $state <= 3 => 'danger',
                         $state <= 7 => 'warning',
                         $state <= 14 => 'info',
@@ -108,14 +182,14 @@ class ReorderRecommendations extends Page implements HasTable
                 TextColumn::make('demand_trend')
                     ->label(__('Trend'))
                     ->badge()
-                    ->color(fn($state) => match ($state) {
+                    ->color(fn ($state) => match ($state) {
                         'increasing' => 'success',
                         'stable' => 'info',
                         'decreasing' => 'warning',
                         'new' => 'primary',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn($state) => match ($state) {
+                    ->formatStateUsing(fn ($state) => match ($state) {
                         'increasing' => '📈 '.ucfirst($state),
                         'stable' => '➡️ '.ucfirst($state),
                         'decreasing' => '📉 '.ucfirst($state),
@@ -157,7 +231,7 @@ class ReorderRecommendations extends Page implements HasTable
                 TextColumn::make('estimated_cost')
                     ->label(__('Est. Order Cost'))
                     ->getStateUsing(function ($record) {
-                        if (!$record['cost_price']) {
+                        if (! $record['cost_price']) {
                             return null;
                         }
 
@@ -180,7 +254,11 @@ class ReorderRecommendations extends Page implements HasTable
     protected function getViewData(): array
     {
         $analyzer = app(ProductDemandAnalyzer::class);
-        $recommendations = $analyzer->getReorderRecommendations();
+        $recommendations = $analyzer->getReorderRecommendations(
+            daysToAnalyze: $this->daysToAnalyze ?? 30,
+            minDaysOfStock: $this->minDaysOfStock ?? 14,
+            minSales: $this->minSales ?? 5
+        );
 
         return [
             'totalProducts' => $recommendations->count(),

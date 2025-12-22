@@ -21,9 +21,10 @@ class ProductDemandAnalyzer
         int $minDaysOfStock = 14,
         int $minSales = 5
     ): Collection {
-        // Get variants with their sales data
+        // Get all variants with inventory tracking (includes out-of-stock items)
+        // Products with inventory_quantity = 0 will show as critical (0 days remaining)
         $variants = ProductVariant::with('product')
-            ->where('inventory_quantity', '>=', 0) // Has inventory tracking
+            ->where('inventory_quantity', '>=', 0)
             ->get();
 
         // Batch fetch all sales data in a single query

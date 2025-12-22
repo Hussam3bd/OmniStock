@@ -1,4 +1,9 @@
 <x-filament-panels::page>
+    {{-- Filters --}}
+    <div class="mb-6">
+        {{ $this->form }}
+    </div>
+
     {{-- Stats Overview --}}
     <div class="grid gap-4 grid-cols-1 md:grid-cols-4 mb-6">
         <x-filament::card>
