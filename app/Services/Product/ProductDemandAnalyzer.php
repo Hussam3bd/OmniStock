@@ -26,10 +26,15 @@ class ProductDemandAnalyzer
             ->where('inventory_quantity', '>=', 0) // Has inventory tracking
             ->get();
 
+        // Batch fetch all sales data in a single query
+        $salesData = $this->getBatchSalesData($variants->pluck('id'));
+
         $recommendations = [];
 
         foreach ($variants as $variant) {
-            $analysis = $this->analyzeVariant($variant, $daysToAnalyze);
+            $variantSales = $salesData[$variant->id] ?? ['sales_7d' => 0, 'sales_14d' => 0, 'sales_30d' => 0];
+
+            $analysis = $this->analyzeVariantWithData($variant, $variantSales);
 
             // Skip if no sales or below minimum
             if ($analysis['total_sales'] < $minSales) {
@@ -65,7 +70,91 @@ class ProductDemandAnalyzer
     }
 
     /**
+     * Batch fetch sales data for multiple variants in a single query
+     */
+    protected function getBatchSalesData(Collection $variantIds): array
+    {
+        if ($variantIds->isEmpty()) {
+            return [];
+        }
+
+        $now = now();
+        $date7d = $now->copy()->subDays(7);
+        $date14d = $now->copy()->subDays(14);
+        $date30d = $now->copy()->subDays(30);
+
+        // Single query to get all sales data grouped by variant and time period
+        $results = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereIn('order_items.product_variant_id', $variantIds)
+            ->whereBetween('orders.order_date', [$date30d, $now])
+            ->whereNotIn('orders.order_status', [
+                OrderStatus::CANCELLED->value,
+                OrderStatus::REJECTED->value,
+            ])
+            ->select(
+                'order_items.product_variant_id',
+                DB::raw("SUM(CASE WHEN orders.order_date >= '{$date7d->format('Y-m-d H:i:s')}' THEN order_items.quantity ELSE 0 END) as sales_7d"),
+                DB::raw("SUM(CASE WHEN orders.order_date >= '{$date14d->format('Y-m-d H:i:s')}' THEN order_items.quantity ELSE 0 END) as sales_14d"),
+                DB::raw('SUM(order_items.quantity) as sales_30d')
+            )
+            ->groupBy('order_items.product_variant_id')
+            ->get();
+
+        // Convert to array indexed by variant_id
+        return $results->mapWithKeys(function ($row) {
+            return [
+                $row->product_variant_id => [
+                    'sales_7d' => (int) $row->sales_7d,
+                    'sales_14d' => (int) $row->sales_14d,
+                    'sales_30d' => (int) $row->sales_30d,
+                ],
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Analyze a variant using pre-fetched sales data
+     */
+    protected function analyzeVariantWithData(ProductVariant $variant, array $salesData): array
+    {
+        $sales7d = $salesData['sales_7d'];
+        $sales14d = $salesData['sales_14d'];
+        $sales30d = $salesData['sales_30d'];
+
+        // Calculate average daily sales (weighted: recent = more important)
+        $avgDailySales = $this->calculateWeightedAvgDailySales($sales7d, $sales14d, $sales30d);
+
+        // Calculate days of stock remaining
+        $daysOfStockRemaining = $avgDailySales > 0
+            ? round($variant->inventory_quantity / $avgDailySales, 1)
+            : 999; // Infinite if no sales
+
+        // Determine demand trend
+        $demandTrend = $this->calculateDemandTrend($sales7d, $sales14d, $sales30d);
+
+        // Suggest order quantity (30 days of stock based on recent trend)
+        $suggestedOrderQuantity = $this->calculateSuggestedOrderQuantity(
+            $variant->inventory_quantity,
+            $avgDailySales,
+            $demandTrend
+        );
+
+        return [
+            'total_sales' => $sales30d,
+            'sales_14d' => $sales14d,
+            'sales_7d' => $sales7d,
+            'avg_daily_sales' => round($avgDailySales, 2),
+            'days_of_stock_remaining' => $daysOfStockRemaining,
+            'demand_trend' => $demandTrend,
+            'suggested_order_quantity' => $suggestedOrderQuantity,
+        ];
+    }
+
+    /**
      * Analyze a single product variant
+     *
+     * @deprecated Use analyzeVariantWithData() with getBatchSalesData() for better performance
      */
     public function analyzeVariant(ProductVariant $variant, int $daysToAnalyze = 30): array
     {
