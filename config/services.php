@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'turkey_sms' => [
+        'api_key' => env('TURKEY_SMS_API_KEY'),
+        'language' => env('TURKEY_SMS_LANGUAGE', 1), // 0=English, 1=Turkish, 2=Arabic
+        'sender_ids' => [
+            'turkey' => env('TURKEY_SMS_SENDER_ID_TURKEY', 'DEFAULT'),
+            'default' => env('TURKEY_SMS_SENDER_ID_DEFAULT', 'DEFAULT'),
+        ],
+        'test_phone' => env('TURKEY_SMS_TEST_PHONE'), // Override all SMS to this number for testing
+    ],
+
 ];
