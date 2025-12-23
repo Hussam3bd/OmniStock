@@ -7,6 +7,7 @@ use App\Enums\Order\OrderChannel;
 use App\Enums\Order\OrderStatus;
 use App\Enums\Order\PaymentStatus;
 use App\Enums\Shipping\ShippingCarrier;
+use App\Filament\Actions\Order\BulkResyncShippingDataAction;
 use App\Filament\Actions\Order\ResyncOrderAction;
 use App\Filament\Resources\Customer\Customers\CustomerResource;
 use Filament\Actions\BulkActionGroup;
@@ -348,6 +349,7 @@ class OrdersTable
             ])
             ->bulkActions([
                 BulkActionGroup::make([
+                    BulkResyncShippingDataAction::make(),
                     DeleteBulkAction::make(),
                 ]),
             ]);
