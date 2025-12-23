@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Supplier\Suppliers;
 use App\Filament\Resources\Supplier\Suppliers\Pages\CreateSupplier;
 use App\Filament\Resources\Supplier\Suppliers\Pages\EditSupplier;
 use App\Filament\Resources\Supplier\Suppliers\Pages\ListSuppliers;
+use App\Filament\Resources\Supplier\Suppliers\Pages\ViewSupplier;
 use App\Filament\Resources\Supplier\Suppliers\Schemas\SupplierForm;
 use App\Filament\Resources\Supplier\Suppliers\Tables\SuppliersTable;
 use App\Models\Supplier\Supplier;
@@ -59,6 +60,7 @@ class SupplierResource extends Resource
         return [
             'index' => ListSuppliers::route('/'),
             'create' => CreateSupplier::route('/create'),
+            'view' => ViewSupplier::route('/{record}'),
             'edit' => EditSupplier::route('/{record}/edit'),
         ];
     }
