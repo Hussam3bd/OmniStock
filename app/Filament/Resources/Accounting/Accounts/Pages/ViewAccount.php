@@ -156,9 +156,12 @@ class ViewAccount extends ViewRecord
                         Infolists\Components\TextEntry::make('total_income')
                             ->label(__('Total Income'))
                             ->state(function ($record) {
-                                $total = $record->transactions()
+                                $transactions = $record->transactions()
+                                    ->get(['type', 'amount']);
+
+                                $total = $transactions
                                     ->where('type', 'income')
-                                    ->sum('amount');
+                                    ->sum(fn ($t) => $t->amount->getAmount());
 
                                 return money($total, $record->currency_code)->format();
                             })
@@ -168,9 +171,12 @@ class ViewAccount extends ViewRecord
                         Infolists\Components\TextEntry::make('total_expenses')
                             ->label(__('Total Expenses'))
                             ->state(function ($record) {
-                                $total = $record->transactions()
+                                $transactions = $record->transactions()
+                                    ->get(['type', 'amount']);
+
+                                $total = $transactions
                                     ->where('type', 'expense')
-                                    ->sum('amount');
+                                    ->sum(fn ($t) => $t->amount->getAmount());
 
                                 return money($total, $record->currency_code)->format();
                             })
@@ -180,20 +186,35 @@ class ViewAccount extends ViewRecord
                         Infolists\Components\TextEntry::make('net_flow')
                             ->label(__('Net Flow'))
                             ->state(function ($record) {
-                                $income = $record->transactions()
+                                $transactions = $record->transactions()
+                                    ->get(['type', 'amount']);
+
+                                $income = $transactions
                                     ->where('type', 'income')
-                                    ->sum('amount');
-                                $expenses = $record->transactions()
+                                    ->sum(fn ($t) => $t->amount->getAmount());
+
+                                $expenses = $transactions
                                     ->where('type', 'expense')
-                                    ->sum('amount');
+                                    ->sum(fn ($t) => $t->amount->getAmount());
+
                                 $net = $income - $expenses;
 
                                 return money($net, $record->currency_code)->format();
                             })
                             ->icon('heroicon-o-calculator')
+                            ->helperText(__('Should match current balance'))
                             ->color(function ($record) {
-                                $income = $record->transactions()->where('type', 'income')->sum('amount');
-                                $expenses = $record->transactions()->where('type', 'expense')->sum('amount');
+                                $transactions = $record->transactions()
+                                    ->get(['type', 'amount']);
+
+                                $income = $transactions
+                                    ->where('type', 'income')
+                                    ->sum(fn ($t) => $t->amount->getAmount());
+
+                                $expenses = $transactions
+                                    ->where('type', 'expense')
+                                    ->sum(fn ($t) => $t->amount->getAmount());
+
                                 $net = $income - $expenses;
 
                                 return $net >= 0 ? 'success' : 'danger';

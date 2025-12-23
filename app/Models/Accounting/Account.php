@@ -3,6 +3,7 @@
 namespace App\Models\Accounting;
 
 use App\Enums\Accounting\AccountType;
+use App\Enums\Accounting\TransactionType;
 use App\Models\Concerns\HasCurrencyCode;
 use App\Models\Currency;
 use Cknow\Money\Casts\MoneyIntegerCast;
@@ -45,24 +46,28 @@ class Account extends Model
 
     /**
      * Recalculate account balance from all transactions
+     * Includes all transactions (transfers affect account balance)
+     * Uses single query + collection filtering for better performance
      */
     public function recalculateBalance(): void
     {
-        $income = $this->transactions()
-            ->where('type', 'income')
-            ->whereNull('is_internal_transfer')
-            ->whereNull('is_refund')
-            ->sum('amount');
+        // Fetch all transactions once
+        $transactions = $this->transactions()
+            ->get(['type', 'amount']);
 
-        $expenses = $this->transactions()
-            ->where('type', 'expense')
-            ->whereNull('is_internal_transfer')
-            ->whereNull('is_refund')
-            ->sum('amount');
+        // Calculate sums using collection methods (extract Money amount as integer)
+        // Include ALL transactions - transfers affect account balance
+        $income = $transactions
+            ->where('type', TransactionType::INCOME)
+            ->sum(fn ($t) => $t->amount->getAmount());
 
-        $capital = $this->transactions()
-            ->where('type', 'capital')
-            ->sum('amount');
+        $expenses = $transactions
+            ->where('type', TransactionType::EXPENSE)
+            ->sum(fn ($t) => $t->amount->getAmount());
+
+        $capital = $transactions
+            ->where('type', TransactionType::CAPITAL)
+            ->sum(fn ($t) => $t->amount->getAmount());
 
         // Balance = Income - Expenses + Capital
         $balance = $income - $expenses + $capital;
