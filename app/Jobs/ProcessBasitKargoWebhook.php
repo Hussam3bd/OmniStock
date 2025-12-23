@@ -54,7 +54,9 @@ class ProcessBasitKargoWebhook extends ProcessWebhookJob implements ShouldQueue
 
         // Extract tracking identifiers (all three)
         $barcode = $payload['barcode'] ?? null;
-        $handlerShipmentCode = $payload['handlerShipmentCode'] ?? null;
+        $handlerShipmentCode = $payload['handlerShipmentCode']
+            ?? $payload['shipmentInfo']['handlerShipmentCode']
+            ?? null;
         $shipmentId = $payload['id'] ?? null;
         $statusCode = $payload['status'] ?? null;
 
