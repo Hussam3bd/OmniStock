@@ -5,6 +5,8 @@ namespace App\Services\Shipping;
 use App\Actions\Shipping\ProcessReturnedShipmentAction;
 use App\Actions\Shipping\UpdateShippingCostAction;
 use App\Actions\Shipping\UpdateShippingInfoAction;
+use App\Enums\Order\FulfillmentStatus;
+use App\Events\Order\OrderAwaitingCustomerPickup;
 use App\Models\Integration\Integration;
 use App\Models\Order\Order;
 use App\Services\Integrations\ShippingProviders\BasitKargo\BasitKargoAdapter;
@@ -124,6 +126,12 @@ class ShippingDataSyncService
             }
         }
 
+        // 4. Fill missing shipment IDs and aggregator integration ID
+        $this->fillMissingShipmentIds($order, $shipmentData, $integration);
+
+        // 5. Detect distribution center status and dispatch event if needed
+        $this->detectAndHandleDistributionCenterStatus($order, $shipmentData);
+
         activity()
             ->performedOn($order)
             ->withProperties([
@@ -210,10 +218,145 @@ class ShippingDataSyncService
             }
         }
 
+        // 4. Fill missing shipment IDs and aggregator integration ID
+        $this->fillMissingShipmentIds($order, $shipmentData, $integration);
+
+        // 5. Detect distribution center status and dispatch event if needed
+        $this->detectAndHandleDistributionCenterStatus($order, $shipmentData);
+
         return [
             'success' => true,
             'results' => $results,
             'return' => $return,
         ];
+    }
+
+    /**
+     * Fill in missing shipment tracking identifiers
+     */
+    protected function fillMissingShipmentIds(
+        Order $order,
+        array $shipmentData,
+        Integration $integration
+    ): void {
+        $updateData = [];
+
+        // Fill missing shipping_aggregator_shipment_id
+        if (! $order->shipping_aggregator_shipment_id && isset($shipmentData['raw_data']['id'])) {
+            $updateData['shipping_aggregator_shipment_id'] = $shipmentData['raw_data']['id'];
+        }
+
+        // Fill missing shipping_aggregator_integration_id
+        if (! $order->shipping_aggregator_integration_id) {
+            $updateData['shipping_aggregator_integration_id'] = $integration->id;
+        }
+
+        // Fill missing shipping_tracking_url
+        if (! $order->shipping_tracking_url && isset($shipmentData['raw_data']['shipmentInfo']['handlerShipmentTrackingLink'])) {
+            $updateData['shipping_tracking_url'] = $shipmentData['raw_data']['shipmentInfo']['handlerShipmentTrackingLink'];
+        }
+
+        // Fill missing shipping_tracking_number with handlerShipmentCode if available
+        if (! $order->shipping_tracking_number && isset($shipmentData['raw_data']['shipmentInfo']['handlerShipmentCode'])) {
+            $updateData['shipping_tracking_number'] = $shipmentData['raw_data']['shipmentInfo']['handlerShipmentCode'];
+        }
+
+        if (! empty($updateData)) {
+            $order->update($updateData);
+
+            activity()
+                ->performedOn($order)
+                ->withProperties($updateData)
+                ->log('shipping_ids_filled');
+        }
+    }
+
+    /**
+     * Detect if shipment is at distribution center and handle accordingly
+     */
+    protected function detectAndHandleDistributionCenterStatus(
+        Order $order,
+        array $shipmentData
+    ): void {
+        // Get status message from shipment data
+        $statusMessage = $shipmentData['raw_data']['shipmentInfo']['lastState'] ?? null;
+
+        if (! $statusMessage) {
+            return;
+        }
+
+        // Check if at distribution center
+        if (! $this->isAtDistributionCenter($statusMessage)) {
+            return;
+        }
+
+        // Only update if not already set to avoid duplicate events
+        if ($order->fulfillment_status === FulfillmentStatus::AWAITING_PICKUP_AT_DISTRIBUTION_CENTER) {
+            return;
+        }
+
+        // Extract distribution center location from traces
+        $distributionCenterName = null;
+        $distributionCenterLocation = null;
+
+        if (isset($shipmentData['raw_data']['traces']) && is_array($shipmentData['raw_data']['traces'])) {
+            // Get the latest trace (first one in array)
+            $latestTrace = $shipmentData['raw_data']['traces'][0] ?? null;
+
+            if ($latestTrace) {
+                $distributionCenterLocation = $latestTrace['location'] ?? null;
+                $distributionCenterName = $latestTrace['locationDetail'] ?? $latestTrace['location'] ?? null;
+            }
+        }
+
+        // Update order fulfillment status
+        $order->update([
+            'fulfillment_status' => FulfillmentStatus::AWAITING_PICKUP_AT_DISTRIBUTION_CENTER,
+        ]);
+
+        // Dispatch event for notifications (email, SMS, etc.)
+        OrderAwaitingCustomerPickup::dispatch(
+            $order,
+            $distributionCenterName,
+            $distributionCenterLocation
+        );
+
+        activity()
+            ->performedOn($order)
+            ->withProperties([
+                'status_message' => $statusMessage,
+                'distribution_center_name' => $distributionCenterName,
+                'distribution_center_location' => $distributionCenterLocation,
+            ])
+            ->log('order_at_distribution_center_detected');
+    }
+
+    /**
+     * Check if status message indicates package is at distribution center
+     */
+    protected function isAtDistributionCenter(?string $statusMessage): bool
+    {
+        if (! $statusMessage) {
+            return false;
+        }
+
+        $statusMessage = mb_strtolower($statusMessage);
+
+        // Turkish status messages indicating the package is at distribution center
+        $distributionCenterIndicators = [
+            'kargo devir',          // Transfer at distribution center
+            'dağıtım merkezinde',   // At distribution center
+            'şubede bekliyor',      // Waiting at branch
+            'teslim alınmayı bekliyor', // Awaiting pickup
+            'müşteri şubeye davet',  // Customer invited to branch
+        ];
+
+        foreach ($distributionCenterIndicators as $indicator) {
+            if (str_contains($statusMessage, $indicator)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

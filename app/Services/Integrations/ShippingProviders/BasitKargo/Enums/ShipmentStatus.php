@@ -8,6 +8,7 @@ enum ShipmentStatus: string
     case READY_TO_SHIP = 'READY_TO_SHIP';
     case SHIPPED = 'SHIPPED';
     case OUT_FOR_DELIVERY = 'OUT_FOR_DELIVERY';
+    case AT_DISTRIBUTION_CENTER = 'AT_DISTRIBUTION_CENTER';
     case DELIVERED = 'DELIVERED';
     case COMPLETED = 'COMPLETED';
     case NEEDS_SUPPORT = 'NEEDS_SUPPORT';
@@ -23,6 +24,7 @@ enum ShipmentStatus: string
             self::READY_TO_SHIP => __('Ready to Ship'),
             self::SHIPPED => __('Shipped'),
             self::OUT_FOR_DELIVERY => __('Out for Delivery'),
+            self::AT_DISTRIBUTION_CENTER => __('At Distribution Center'),
             self::DELIVERED, self::COMPLETED => __('Delivered'),
             self::NEEDS_SUPPORT => __('Support Needed'),
             self::DELAYED => __('Delayed'),
@@ -37,6 +39,7 @@ enum ShipmentStatus: string
         return match ($this) {
             self::NEW, self::READY_TO_SHIP => 'gray',
             self::SHIPPED, self::OUT_FOR_DELIVERY => 'info',
+            self::AT_DISTRIBUTION_CENTER => 'warning',
             self::DELIVERED, self::COMPLETED => 'success',
             self::NEEDS_SUPPORT, self::LOST => 'danger',
             self::DELAYED => 'warning',
@@ -62,5 +65,10 @@ enum ShipmentStatus: string
     public function isReturned(): bool
     {
         return in_array($this, [self::RETURNING, self::RETURNED]);
+    }
+
+    public function isAtDistributionCenter(): bool
+    {
+        return $this === self::AT_DISTRIBUTION_CENTER;
     }
 }

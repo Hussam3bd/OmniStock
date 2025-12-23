@@ -15,6 +15,7 @@ enum FulfillmentStatus: string implements HasColor, HasIcon, HasLabel
     case FULFILLED = 'fulfilled';
     case IN_TRANSIT = 'in_transit';
     case OUT_FOR_DELIVERY = 'out_for_delivery';
+    case AWAITING_PICKUP_AT_DISTRIBUTION_CENTER = 'awaiting_pickup_at_distribution_center';
     case DELIVERED = 'delivered';
     case RETURNED = 'returned';
     case CANCELLED = 'cancelled';
@@ -29,6 +30,7 @@ enum FulfillmentStatus: string implements HasColor, HasIcon, HasLabel
             self::FULFILLED => __('Fulfilled'),
             self::IN_TRANSIT => __('In Transit'),
             self::OUT_FOR_DELIVERY => __('Out for Delivery'),
+            self::AWAITING_PICKUP_AT_DISTRIBUTION_CENTER => __('Awaiting Pickup at Distribution Center'),
             self::DELIVERED => __('Delivered'),
             self::RETURNED => __('Returned'),
             self::CANCELLED => __('Cancelled'),
@@ -45,6 +47,7 @@ enum FulfillmentStatus: string implements HasColor, HasIcon, HasLabel
             self::FULFILLED => 'success',
             self::IN_TRANSIT => 'primary',
             self::OUT_FOR_DELIVERY => 'primary',
+            self::AWAITING_PICKUP_AT_DISTRIBUTION_CENTER => 'warning',
             self::DELIVERED => 'success',
             self::RETURNED => 'danger',
             self::CANCELLED => 'danger',
@@ -61,6 +64,7 @@ enum FulfillmentStatus: string implements HasColor, HasIcon, HasLabel
             self::FULFILLED => 'heroicon-o-check-circle',
             self::IN_TRANSIT => 'heroicon-o-truck',
             self::OUT_FOR_DELIVERY => 'heroicon-o-map-pin',
+            self::AWAITING_PICKUP_AT_DISTRIBUTION_CENTER => 'heroicon-o-building-storefront',
             self::DELIVERED => 'heroicon-o-check-badge',
             self::RETURNED => 'heroicon-o-arrow-uturn-left',
             self::CANCELLED => 'heroicon-o-x-circle',
@@ -77,6 +81,7 @@ enum FulfillmentStatus: string implements HasColor, HasIcon, HasLabel
             self::FULFILLED => __('All items have been shipped'),
             self::IN_TRANSIT => __('Order is in transit to customer'),
             self::OUT_FOR_DELIVERY => __('Order is out for delivery'),
+            self::AWAITING_PICKUP_AT_DISTRIBUTION_CENTER => __('Awaiting customer pickup at distribution center'),
             self::DELIVERED => __('Order successfully delivered'),
             self::RETURNED => __('Order has been returned'),
             self::CANCELLED => __('Fulfillment cancelled'),

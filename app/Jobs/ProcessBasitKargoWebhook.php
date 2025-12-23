@@ -314,13 +314,16 @@ class ProcessBasitKargoWebhook extends ProcessWebhookJob implements ShouldQueue
             }
         }
 
-        // Extract status message
+        // Extract status message for logging
         $statusMessage = null;
         if ($isDetailedWebhook) {
             $statusMessage = $payload['shipmentInfo']['lastState'] ?? null;
         } else {
             $statusMessage = $payload['statusMessage'] ?? $status->getLabel();
         }
+
+        // Note: Distribution center detection is now handled by ShippingDataSyncService
+        // when syncFromShipmentData is called above (in detailed webhooks)
 
         activity()
             ->performedOn($order)
