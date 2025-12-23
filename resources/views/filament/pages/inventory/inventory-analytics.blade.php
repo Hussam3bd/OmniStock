@@ -1,6 +1,6 @@
 <x-filament-panels::page>
     {{-- Stats Overview --}}
-    <div class="grid gap-4 grid-cols-1 md:grid-cols-4 mb-6">
+    <div class="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-6">
         <x-filament::card>
             <div class="space-y-2">
                 <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -53,6 +53,34 @@
                 </div>
                 <div class="text-xs text-gray-500 dark:text-gray-400">
                     {{ __('Available inventory') }}
+                </div>
+            </div>
+        </x-filament::card>
+
+        <x-filament::card>
+            <div class="space-y-2">
+                <div class="text-sm font-medium text-warning-500">
+                    {{ __('Cost of Goods Sold') }}
+                </div>
+                <div class="text-3xl font-bold text-warning-600 dark:text-warning-400">
+                    {{ $totalCogs->format() }}
+                </div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ __('Total cost of items sold') }}
+                </div>
+            </div>
+        </x-filament::card>
+
+        <x-filament::card>
+            <div class="space-y-2">
+                <div class="text-sm font-medium text-primary-500">
+                    {{ __('Stock Value') }}
+                </div>
+                <div class="text-3xl font-bold text-primary-600 dark:text-primary-400">
+                    {{ $totalStockValue->format() }}
+                </div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ __('Current inventory value') }}
                 </div>
             </div>
         </x-filament::card>

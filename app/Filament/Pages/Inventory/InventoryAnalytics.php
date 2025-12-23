@@ -161,6 +161,7 @@ class InventoryAnalytics extends Page implements HasTable
                 'products.title as product_title',
                 'product_variants.title as variant_title',
                 'product_variants.inventory_quantity as current_stock',
+                'product_variants.cost_price',
                 DB::raw('SUM(CASE WHEN orders.order_status NOT IN (\'cancelled\', \'rejected\') AND (orders.return_status IS NULL OR orders.return_status = \'none\') THEN order_items.quantity ELSE 0 END) as items_sold_net'),
                 DB::raw('SUM(CASE WHEN orders.return_status IN (\'full\', \'partial\') THEN order_items.quantity ELSE 0 END) as items_returned'),
                 DB::raw('SUM(CASE WHEN orders.order_status NOT IN (\'cancelled\', \'rejected\') THEN order_items.quantity ELSE 0 END) as total_items_ordered'),
@@ -169,7 +170,7 @@ class InventoryAnalytics extends Page implements HasTable
             ->leftJoin('order_items', 'product_variants.id', '=', 'order_items.product_variant_id')
             ->leftJoin('orders', 'order_items.order_id', '=', 'orders.id')
             ->where('product_variants.inventory_quantity', '>=', 0)
-            ->groupBy('product_variants.id', 'product_variants.sku', 'products.title', 'product_variants.title', 'product_variants.inventory_quantity')
+            ->groupBy('product_variants.id', 'product_variants.sku', 'products.title', 'product_variants.title', 'product_variants.inventory_quantity', 'product_variants.cost_price')
             ->having('total_items_ordered', '>', 0);
     }
 
@@ -177,11 +178,27 @@ class InventoryAnalytics extends Page implements HasTable
     {
         $data = $this->getInventoryQuery()->get();
 
+        // Calculate total COGS (Cost of Goods Sold)
+        $totalCogs = $data->sum(function ($record) {
+            $costPrice = $record->cost_price ? $record->cost_price->getAmount() : 0;
+
+            return $costPrice * $record->items_sold_net;
+        });
+
+        // Calculate total stock value
+        $totalStockValue = $data->sum(function ($record) {
+            $costPrice = $record->cost_price ? $record->cost_price->getAmount() : 0;
+
+            return $costPrice * $record->current_stock;
+        });
+
         return [
             'totalVariants' => $data->count(),
             'totalItemsSold' => $data->sum('items_sold_net'),
             'totalItemsReturned' => $data->sum('items_returned'),
             'totalCurrentStock' => $data->sum('current_stock'),
+            'totalCogs' => money($totalCogs, 'TRY'),
+            'totalStockValue' => money($totalStockValue, 'TRY'),
         ];
     }
 }
