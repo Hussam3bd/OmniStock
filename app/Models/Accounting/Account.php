@@ -42,4 +42,31 @@ class Account extends Model
     {
         return $this->hasMany(Transaction::class);
     }
+
+    /**
+     * Recalculate account balance from all transactions
+     */
+    public function recalculateBalance(): void
+    {
+        $income = $this->transactions()
+            ->where('type', 'income')
+            ->whereNull('is_internal_transfer')
+            ->whereNull('is_refund')
+            ->sum('amount');
+
+        $expenses = $this->transactions()
+            ->where('type', 'expense')
+            ->whereNull('is_internal_transfer')
+            ->whereNull('is_refund')
+            ->sum('amount');
+
+        $capital = $this->transactions()
+            ->where('type', 'capital')
+            ->sum('amount');
+
+        // Balance = Income - Expenses + Capital
+        $balance = $income - $expenses + $capital;
+
+        $this->update(['balance' => $balance]);
+    }
 }

@@ -81,6 +81,31 @@ class ViewAccount extends ViewRecord
                         ->send();
                 }),
 
+            Action::make('recalculate_balance')
+                ->label(__('Recalculate Balance'))
+                ->color('success')
+                ->icon('heroicon-o-calculator')
+                ->requiresConfirmation()
+                ->modalDescription(__('This will recalculate the account balance from all transactions (excluding internal transfers and refunds).'))
+                ->action(function () {
+                    $oldBalance = $this->record->balance;
+                    $this->record->recalculateBalance();
+                    $this->record->refresh();
+                    $newBalance = $this->record->balance;
+
+                    Notification::make()
+                        ->title(__('Balance Recalculated'))
+                        ->body(__(
+                            'Balance updated from :old to :new',
+                            [
+                                'old' => $oldBalance->format(),
+                                'new' => $newBalance->format(),
+                            ]
+                        ))
+                        ->success()
+                        ->send();
+                }),
+
             DeleteAction::make(),
         ];
     }
