@@ -35,6 +35,11 @@ class OrderMapper extends BaseOrderMapper
         return DB::transaction(function () use ($trendyolPackage, $integration) {
             $customer = $this->findOrCreateCustomerFromTrendyol($trendyolPackage);
 
+            // Update customer with real data if available (for both new and existing orders)
+            if (! $this->isCustomerDataMasked($trendyolPackage)) {
+                $this->updateCustomerFromTrendyolData($customer, $trendyolPackage);
+            }
+
             $existingMapping = PlatformMapping::where('platform', $this->getChannel()->value)
                 ->where('platform_id', (string) $trendyolPackage['id'])
                 ->where('entity_type', Order::class)
@@ -110,19 +115,57 @@ class OrderMapper extends BaseOrderMapper
             ];
         }
 
+        // If we have real data with email, check for existing customer by email first
+        // This prevents duplicates when a customer was created with masked data
+        if (! $isMasked && ! empty($customerData['email']) && $customerData['email'] !== '***') {
+            $existingCustomerByEmail = Customer::where('email', $customerData['email'])->first();
+
+            if ($existingCustomerByEmail && $externalCustomerId) {
+                // Check if this customer already has a Trendyol platform mapping
+                $existingTrendyolMapping = $existingCustomerByEmail->platformMappings()
+                    ->where('platform', $this->getChannel()->value)
+                    ->first();
+
+                // Only reuse customer if they don't have a Trendyol mapping yet
+                // OR if they have the same Trendyol customer ID
+                if (! $existingTrendyolMapping || $existingTrendyolMapping->platform_id === $externalCustomerId) {
+                    // Link customer to Trendyol ID if not already linked
+                    if (! $existingTrendyolMapping) {
+                        $existingCustomerByEmail->platformMappings()->create([
+                            'platform' => $this->getChannel()->value,
+                            'platform_id' => $externalCustomerId,
+                            'entity_type' => Customer::class,
+                            'platform_data' => [
+                                'invoice_address' => $invoiceAddress,
+                                'shipment_address' => $shipmentAddress,
+                            ],
+                        ]);
+                    }
+
+                    return $existingCustomerByEmail;
+                }
+                // If customer has a different Trendyol ID, create a new customer
+                // (they are different customers in Trendyol's system)
+            }
+        }
+
         $customer = $this->findOrCreateCustomer($customerData, $externalCustomerId);
 
-        // Update platform data if customer was found/created with external ID and data is not masked
-        if ($externalCustomerId && ! $isMasked) {
-            $customer->platformMappings()
-                ->where('platform', $this->getChannel()->value)
-                ->where('platform_id', $externalCustomerId)
-                ->update([
-                    'platform_data' => [
+        // Create or update platform mapping
+        if ($externalCustomerId) {
+            $customer->platformMappings()->updateOrCreate(
+                [
+                    'platform' => $this->getChannel()->value,
+                    'platform_id' => $externalCustomerId,
+                    'entity_type' => Customer::class,
+                ],
+                [
+                    'platform_data' => $isMasked ? [] : [
                         'invoice_address' => $invoiceAddress,
                         'shipment_address' => $shipmentAddress,
                     ],
-                ]);
+                ]
+            );
         }
 
         return $customer;
@@ -914,21 +957,33 @@ class OrderMapper extends BaseOrderMapper
             }
         }
 
-        // Update platform data with real address information
+        // Create or update platform mapping with real data
         $externalCustomerId = ! empty($trendyolPackage['customerId'])
             ? (string) $trendyolPackage['customerId']
             : null;
 
         if ($externalCustomerId) {
-            $customer->platformMappings()
-                ->where('platform', $this->getChannel()->value)
-                ->where('platform_id', $externalCustomerId)
-                ->update([
+            $customer->platformMappings()->updateOrCreate(
+                [
+                    'platform' => $this->getChannel()->value,
+                    'platform_id' => $externalCustomerId,
+                    'entity_type' => Customer::class,
+                ],
+                [
                     'platform_data' => [
                         'invoice_address' => $invoiceAddress,
                         'shipment_address' => $shipmentAddress,
                     ],
-                ]);
+                ]
+            );
+
+            activity()
+                ->performedOn($customer)
+                ->withProperties([
+                    'platform' => $this->getChannel()->value,
+                    'platform_id' => $externalCustomerId,
+                ])
+                ->log('customer_platform_mapping_created');
         }
     }
 

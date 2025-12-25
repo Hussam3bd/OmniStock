@@ -299,6 +299,76 @@ test('creates addresses when real data arrives after masked data', function () {
         ->and($updatedOrder->billingAddress->phone)->toBe('+905551112233');
 });
 
+test('prevents duplicate customers when masked data customer gets real data', function () {
+    // First order with MASKED data - creates placeholder customer
+    $maskedPayload = [
+        'id' => 3500000001,
+        'orderNumber' => '10900000001',
+        'status' => 'Awaiting',
+        'customerId' => 88888888,
+        'customerFirstName' => '***',
+        'customerLastName' => '***',
+        'customerEmail' => '***',
+        'currencyCode' => 'TRY',
+        'grossAmount' => 100.00,
+        'totalPrice' => 100.00,
+        'orderDate' => now()->timestamp * 1000,
+        'shipmentAddress' => [
+            'firstName' => '***',
+            'lastName' => '***',
+            'phone' => '***',
+            'fullAddress' => '***',
+        ],
+        'lines' => [],
+    ];
+
+    $firstOrder = $this->mapper->mapOrder($maskedPayload, $this->integration);
+    $firstCustomerId = $firstOrder->customer_id;
+
+    // Second order with SAME Trendyol customer ID but now with REAL data
+    $realPayload = [
+        'id' => 3500000002,
+        'orderNumber' => '10900000002',
+        'status' => 'Created',
+        'customerId' => 88888888, // Same Trendyol ID
+        'customerFirstName' => 'Ali',
+        'customerLastName' => 'Yılmaz',
+        'customerEmail' => 'ali.yilmaz@example.com',
+        'currencyCode' => 'TRY',
+        'grossAmount' => 200.00,
+        'totalPrice' => 200.00,
+        'orderDate' => now()->timestamp * 1000,
+        'shipmentAddress' => [
+            'firstName' => 'Ali',
+            'lastName' => 'Yılmaz',
+            'phone' => '5557654321',
+            'fullAddress' => 'Test Address 2',
+        ],
+        'lines' => [],
+    ];
+
+    $secondOrder = $this->mapper->mapOrder($realPayload, $this->integration);
+
+    // Should reuse the same customer and update it with real data
+    expect($secondOrder->customer_id)->toBe($firstCustomerId)
+        ->and(\App\Models\Customer\Customer::where('email', 'ali.yilmaz@example.com')->count())->toBe(1);
+
+    // Customer should now have real data
+    $customer = \App\Models\Customer\Customer::find($firstCustomerId);
+    expect($customer->first_name)->toBe('Ali')
+        ->and($customer->last_name)->toBe('Yılmaz')
+        ->and($customer->email)->toBe('ali.yilmaz@example.com');
+
+    // Should have platform mapping created
+    $mapping = \App\Models\Platform\PlatformMapping::where('entity_type', \App\Models\Customer\Customer::class)
+        ->where('entity_id', $firstCustomerId)
+        ->where('platform', \App\Enums\Order\OrderChannel::TRENDYOL->value)
+        ->first();
+
+    expect($mapping)->not->toBeNull()
+        ->and($mapping->platform_id)->toBe('88888888');
+});
+
 test('platform mapping is updated only with real data', function () {
     // First webhook with masked data
     $maskedPayload = [
