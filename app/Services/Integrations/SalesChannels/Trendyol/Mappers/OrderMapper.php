@@ -73,6 +73,9 @@ class OrderMapper extends BaseOrderMapper
         $shipmentAddress = $trendyolPackage['shipmentAddress'] ?? [];
         $invoiceAddress = $trendyolPackage['invoiceAddress'] ?? [];
 
+        // Check if customer data is masked (Trendyol sends *** for Awaiting status)
+        $isMasked = $this->isCustomerDataMasked($trendyolPackage);
+
         $customerData = [
             'first_name' => $trendyolPackage['customerFirstName'] ?? $shipmentAddress['firstName'] ?? '',
             'last_name' => $trendyolPackage['customerLastName'] ?? $shipmentAddress['lastName'] ?? '',
@@ -85,10 +88,32 @@ class OrderMapper extends BaseOrderMapper
             ? (string) $trendyolPackage['customerId']
             : null;
 
+        // If data is masked, try to find existing customer by external ID only
+        if ($isMasked && $externalCustomerId) {
+            $existingMapping = \App\Models\Platform\PlatformMapping::where('platform', $this->getChannel()->value)
+                ->where('platform_id', (string) $externalCustomerId)
+                ->where('entity_type', Customer::class)
+                ->first();
+
+            if ($existingMapping && $existingMapping->entity) {
+                // Return existing customer without updating with masked data
+                return $existingMapping->entity;
+            }
+
+            // If no existing customer found with masked data, create placeholder
+            $customerData = [
+                'first_name' => 'Trendyol',
+                'last_name' => 'Customer',
+                'email' => null,
+                'phone' => null,
+                'notes' => 'Customer data pending from Trendyol',
+            ];
+        }
+
         $customer = $this->findOrCreateCustomer($customerData, $externalCustomerId);
 
-        // Update platform data if customer was found/created with external ID
-        if ($externalCustomerId) {
+        // Update platform data if customer was found/created with external ID and data is not masked
+        if ($externalCustomerId && ! $isMasked) {
             $customer->platformMappings()
                 ->where('platform', $this->getChannel()->value)
                 ->where('platform_id', $externalCustomerId)
@@ -215,6 +240,15 @@ class OrderMapper extends BaseOrderMapper
 
     protected function updateOrder(Order $order, array $trendyolPackage, ?\App\Models\Integration\Integration $integration = null): void
     {
+        // Check if customer data is masked
+        $isMasked = $this->isCustomerDataMasked($trendyolPackage);
+
+        // If data is not masked, update customer information
+        if (! $isMasked) {
+            $this->updateCustomerFromTrendyolData($order->customer, $trendyolPackage);
+            $this->updateAddressesFromTrendyolData($order, $trendyolPackage);
+        }
+
         $currency = $trendyolPackage['currencyCode'] ?? 'TRY';
 
         // Only recalculate currency fields if currency changed (rare case)
@@ -796,5 +830,238 @@ class OrderMapper extends BaseOrderMapper
         }
 
         return $shippingData;
+    }
+
+    /**
+     * Check if Trendyol customer data is masked (***).
+     * Trendyol masks customer data when status is "Awaiting".
+     */
+    protected function isCustomerDataMasked(array $trendyolPackage): bool
+    {
+        $firstName = $trendyolPackage['customerFirstName'] ?? '';
+        $lastName = $trendyolPackage['customerLastName'] ?? '';
+        $email = $trendyolPackage['customerEmail'] ?? '';
+        $phone = $trendyolPackage['shipmentAddress']['phone'] ?? '';
+        $address = $trendyolPackage['shipmentAddress']['fullAddress'] ?? '';
+
+        // Check if any critical field is masked
+        return $firstName === '***'
+            || $lastName === '***'
+            || $email === '***'
+            || $phone === '***'
+            || $address === '***';
+    }
+
+    /**
+     * Update customer data when real (non-masked) data arrives.
+     */
+    protected function updateCustomerFromTrendyolData(Customer $customer, array $trendyolPackage): void
+    {
+        $shipmentAddress = $trendyolPackage['shipmentAddress'] ?? [];
+        $invoiceAddress = $trendyolPackage['invoiceAddress'] ?? [];
+
+        $updateData = [];
+
+        // Only update if current data looks like placeholder or old masked data
+        $needsUpdate = $customer->first_name === 'Trendyol'
+            || $customer->last_name === 'Customer'
+            || $customer->first_name === '***'
+            || $customer->last_name === '***'
+            || $customer->email === '***'
+            || $customer->notes === 'Customer data pending from Trendyol'
+            || empty($customer->email);
+
+        if ($needsUpdate) {
+            $firstName = $trendyolPackage['customerFirstName'] ?? $shipmentAddress['firstName'] ?? null;
+            $lastName = $trendyolPackage['customerLastName'] ?? $shipmentAddress['lastName'] ?? null;
+            $email = $trendyolPackage['customerEmail'] ?? null;
+            $phone = $shipmentAddress['phone'] ?? null;
+
+            if ($firstName) {
+                $updateData['first_name'] = $firstName;
+            }
+            if ($lastName) {
+                $updateData['last_name'] = $lastName;
+            }
+            if ($email) {
+                $updateData['email'] = $email;
+            }
+            if ($phone) {
+                $updateData['phone'] = $phone;
+            }
+
+            // Clear the pending note if it exists
+            if ($customer->notes === 'Customer data pending from Trendyol') {
+                $updateData['notes'] = null;
+            }
+
+            if (! empty($updateData)) {
+                $customer->update($updateData);
+
+                activity()
+                    ->performedOn($customer)
+                    ->withProperties([
+                        'updated_fields' => array_keys($updateData),
+                        'source' => 'trendyol_webhook_update',
+                    ])
+                    ->log('customer_updated_from_trendyol');
+            }
+        }
+
+        // Update platform data with real address information
+        $externalCustomerId = ! empty($trendyolPackage['customerId'])
+            ? (string) $trendyolPackage['customerId']
+            : null;
+
+        if ($externalCustomerId) {
+            $customer->platformMappings()
+                ->where('platform', $this->getChannel()->value)
+                ->where('platform_id', $externalCustomerId)
+                ->update([
+                    'platform_data' => [
+                        'invoice_address' => $invoiceAddress,
+                        'shipment_address' => $shipmentAddress,
+                    ],
+                ]);
+        }
+    }
+
+    /**
+     * Update order addresses when real (non-masked) data arrives.
+     */
+    protected function updateAddressesFromTrendyolData(Order $order, array $trendyolPackage): void
+    {
+        $shipmentAddress = $trendyolPackage['shipmentAddress'] ?? [];
+        $invoiceAddress = $trendyolPackage['invoiceAddress'] ?? [];
+
+        if (empty($shipmentAddress)) {
+            return;
+        }
+
+        // Check if addresses exist but might have masked data
+        $shippingNeedsUpdate = false;
+        $billingNeedsUpdate = false;
+
+        if ($order->shipping_address_id) {
+            $shippingAddress = $order->shippingAddress;
+            // Check if address looks masked or incomplete
+            if ($shippingAddress && ($shippingAddress->address1 === '***' || empty($shippingAddress->address1))) {
+                $shippingNeedsUpdate = true;
+            }
+        }
+
+        if ($order->billing_address_id && ! empty($invoiceAddress)) {
+            $billingAddress = $order->billingAddress;
+            if ($billingAddress && ($billingAddress->address1 === '***' || empty($billingAddress->address1))) {
+                $billingNeedsUpdate = true;
+            }
+        }
+
+        // Create addresses if missing, or update if they were masked
+        if (! $order->shipping_address_id || ! $order->billing_address_id || $shippingNeedsUpdate || $billingNeedsUpdate) {
+            $mappedShippingAddress = $this->mapTrendyolAddress($shipmentAddress);
+            $mappedBillingAddress = ! empty($invoiceAddress)
+                ? $this->mapTrendyolAddress($invoiceAddress)
+                : null;
+
+            // Check if both addresses are the same
+            $addressesAreSame = $mappedBillingAddress && $this->addressService->isSameAddress($mappedShippingAddress, $mappedBillingAddress);
+
+            if (($shippingNeedsUpdate || $billingNeedsUpdate) && $order->shipping_address_id) {
+                // Delete old address snapshots
+                if ($shippingNeedsUpdate || $billingNeedsUpdate) {
+                    // If they're the same address, delete both (they might point to same record)
+                    if ($order->shipping_address_id === $order->billing_address_id) {
+                        $order->shippingAddress?->delete();
+                    } else {
+                        if ($shippingNeedsUpdate) {
+                            $order->shippingAddress?->delete();
+                        }
+                        if ($billingNeedsUpdate) {
+                            $order->billingAddress?->delete();
+                        }
+                    }
+                }
+
+                if ($addressesAreSame) {
+                    // Create one address for both shipping and billing
+                    $addressSnapshot = $this->addressService->createOrderAddressSnapshot(
+                        $order,
+                        $mappedShippingAddress,
+                        'both'
+                    );
+                    $order->update([
+                        'shipping_address_id' => $addressSnapshot->id,
+                        'billing_address_id' => $addressSnapshot->id,
+                    ]);
+
+                    // Update customer's address
+                    $this->addressService->createOrUpdateAddress(
+                        $order->customer,
+                        $mappedShippingAddress,
+                        'both'
+                    );
+                } else {
+                    // Create separate addresses
+                    if ($shippingNeedsUpdate || ! $order->shipping_address_id) {
+                        $shippingSnapshot = $this->addressService->createOrderAddressSnapshot(
+                            $order,
+                            $mappedShippingAddress,
+                            'shipping'
+                        );
+                        $order->update(['shipping_address_id' => $shippingSnapshot->id]);
+
+                        $this->addressService->createOrUpdateAddress(
+                            $order->customer,
+                            $mappedShippingAddress,
+                            'shipping'
+                        );
+                    }
+
+                    if (($billingNeedsUpdate || ! $order->billing_address_id) && $mappedBillingAddress) {
+                        $billingSnapshot = $this->addressService->createOrderAddressSnapshot(
+                            $order,
+                            $mappedBillingAddress,
+                            'billing'
+                        );
+                        $order->update(['billing_address_id' => $billingSnapshot->id]);
+
+                        $this->addressService->createOrUpdateAddress(
+                            $order->customer,
+                            $mappedBillingAddress,
+                            'billing'
+                        );
+                    }
+                }
+
+                activity()
+                    ->performedOn($order)
+                    ->withProperties([
+                        'source' => 'trendyol_webhook_update',
+                        'addresses_updated' => true,
+                        'addresses_are_same' => $addressesAreSame,
+                    ])
+                    ->log('order_addresses_updated_from_trendyol');
+            } else {
+                // Create new addresses
+                $addressIds = $this->addressService->createOrderAndCustomerAddresses(
+                    $order,
+                    $order->customer,
+                    $mappedShippingAddress,
+                    $mappedBillingAddress
+                );
+
+                // Update order with address IDs
+                $order->update($addressIds);
+
+                activity()
+                    ->performedOn($order)
+                    ->withProperties([
+                        'source' => 'trendyol_webhook_update',
+                        'addresses_created' => true,
+                    ])
+                    ->log('order_addresses_created_from_trendyol');
+            }
+        }
     }
 }
