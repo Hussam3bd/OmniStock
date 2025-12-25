@@ -270,15 +270,19 @@ class OrderMapper extends BaseOrderMapper
         $newPaymentStatus = $this->mapPaymentStatus($trendyolPackage);
         $newFulfillmentStatus = $this->mapFulfillmentStatus($trendyolPackage);
 
-        // Track status changes
+        // Check if order has returns - if so, preserve current order/payment status
+        // Returns take precedence over Trendyol delivery status
+        $hasReturns = $order->returns()->exists();
+
+        // Track status changes (only if not preserving due to returns)
         $statusChanges = [];
-        if ($order->order_status !== $newOrderStatus) {
+        if (! $hasReturns && $order->order_status !== $newOrderStatus) {
             $statusChanges['order_status'] = [
                 'from' => $order->order_status->value,
                 'to' => $newOrderStatus->value,
             ];
         }
-        if ($order->payment_status !== $newPaymentStatus) {
+        if (! $hasReturns && $order->payment_status !== $newPaymentStatus) {
             $statusChanges['payment_status'] = [
                 'from' => $order->payment_status->value,
                 'to' => $newPaymentStatus->value,
@@ -314,8 +318,10 @@ class OrderMapper extends BaseOrderMapper
         $shippingCosts = $this->calculateShippingCosts($trendyolPackage);
 
         $updateData = [
-            'order_status' => $newOrderStatus,
-            'payment_status' => $newPaymentStatus,
+            // Only update order/payment status if order has no returns
+            // Returns manage their own order/payment status lifecycle
+            'order_status' => $hasReturns ? $order->order_status : $newOrderStatus,
+            'payment_status' => $hasReturns ? $order->payment_status : $newPaymentStatus,
             'fulfillment_status' => $newFulfillmentStatus,
             'subtotal' => $grossAmount,
             'discount_amount' => $totalDiscount,
