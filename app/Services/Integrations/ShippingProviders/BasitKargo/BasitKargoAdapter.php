@@ -148,10 +148,54 @@ class BasitKargoAdapter implements ShippingProviderAdapter
     }
 
     /**
+     * Get shipment details by BasitKargo shipment ID (e.g., "GKG-MMZ-4Y4")
+     */
+    public function getShipmentById(string $shipmentId): ?array
+    {
+        $response = $this->client()->get("/v2/order/{$shipmentId}");
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        return $response->json();
+    }
+
+    /**
+     * Get shipment details by tracking number (handler shipment code)
+     */
+    public function getShipmentByTrackingNumber(string $trackingNumber): ?array
+    {
+        $response = $this->client()->get("/v2/order/handler-shipment-code/{$trackingNumber}");
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        return $response->json();
+    }
+
+    /**
+     * Get shipment details by barcode
+     */
+    public function getShipmentByBarcode(string $barcode): ?array
+    {
+        $response = $this->client()->get("/v2/order/barcode/{$barcode}");
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        return $response->json();
+    }
+
+    /**
      * Get shipment details as DTO (internal use for type safety)
+     * Deprecated: Use specific methods (getShipmentById, getShipmentByTrackingNumber, getShipmentByBarcode) instead
      */
     protected function getShipmentDetails(string $trackingNumber): ShipmentResponse
     {
+        // Try handler shipment code first (most common)
         $response = $this->client()->get("/v2/order/handler-shipment-code/{$trackingNumber}");
 
         if (! $response->successful()) {

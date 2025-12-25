@@ -14,28 +14,62 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use Spatie\WebhookClient\Jobs\ProcessWebhookJob;
 
 class ProcessBasitKargoWebhook extends ProcessWebhookJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    protected array $payload;
+
+    protected Integration $integration;
+
+    protected ?string $barcode = null;
+
+    protected ?string $handlerShipmentCode = null;
+
+    protected ?string $shipmentId = null;
+
+    protected ShipmentStatus $shipmentStatus;
+
+    protected bool $isDetailedWebhook = false;
+
     public function handle(): void
     {
-        $payload = $this->webhookCall->payload;
+        $this->payload = $this->webhookCall->payload;
 
-        // Extract integration ID (validated before webhook reaches here)
-        $integrationId = $payload['_basitkargo_integration_id'] ?? null;
+        if (! $this->validateAndLoadIntegration()) {
+            return;
+        }
+
+        $this->extractIdentifiers();
+
+        if (! $this->validateAndParseStatus()) {
+            return;
+        }
+
+        $this->isDetailedWebhook = isset($this->payload['shipmentInfo']);
+
+        $this->processWebhook();
+    }
+
+    /**
+     * Validate webhook has integration and load it
+     */
+    protected function validateAndLoadIntegration(): bool
+    {
+        $integrationId = $this->payload['_basitkargo_integration_id'] ?? null;
 
         if (! $integrationId) {
             activity()
                 ->withProperties([
-                    'payload' => $payload,
+                    'payload' => $this->payload,
                     'error' => 'Missing _basitkargo_integration_id in webhook payload',
                 ])
                 ->log('basitkargo_webhook_no_integration_id');
 
-            return;
+            return false;
         }
 
         $integration = Integration::find($integrationId);
@@ -43,92 +77,113 @@ class ProcessBasitKargoWebhook extends ProcessWebhookJob implements ShouldQueue
         if (! $integration) {
             activity()
                 ->withProperties([
-                    'payload' => $payload,
+                    'payload' => $this->payload,
                     'integration_id' => $integrationId,
                     'error' => 'Integration not found',
                 ])
                 ->log('basitkargo_webhook_integration_not_found');
 
-            return;
+            return false;
         }
 
-        // Extract tracking identifiers (all three)
-        $barcode = $payload['barcode'] ?? null;
-        $handlerShipmentCode = $payload['handlerShipmentCode']
-            ?? $payload['shipmentInfo']['handlerShipmentCode']
+        $this->integration = $integration;
+
+        return true;
+    }
+
+    /**
+     * Extract all tracking identifiers from webhook payload
+     */
+    protected function extractIdentifiers(): void
+    {
+        // Barcode is always at top level
+        $this->barcode = $this->payload['barcode'] ?? null;
+
+        // Handler shipment code can be in two places
+        $this->handlerShipmentCode = $this->payload['handlerShipmentCode']
+            ?? $this->payload['shipmentInfo']['handlerShipmentCode']
             ?? null;
-        $shipmentId = $payload['id'] ?? null;
-        $statusCode = $payload['status'] ?? null;
+
+        // BasitKargo shipment ID
+        $this->shipmentId = $this->payload['id'] ?? null;
+    }
+
+    /**
+     * Validate status exists and parse it
+     */
+    protected function validateAndParseStatus(): bool
+    {
+        $statusCode = $this->payload['status'] ?? null;
 
         if (! $statusCode) {
             activity()
-                ->performedOn($integration)
+                ->performedOn($this->integration)
                 ->withProperties([
-                    'payload' => $payload,
+                    'payload' => $this->payload,
                     'error' => 'Missing status in webhook payload',
                 ])
                 ->log('basitkargo_webhook_invalid');
 
-            return;
+            return false;
         }
 
-        // Parse the BasitKargo status
         $shipmentStatus = ShipmentStatus::tryFrom($statusCode);
 
         if (! $shipmentStatus) {
             activity()
-                ->performedOn($integration)
-                ->withProperties([
-                    'barcode' => $barcode,
-                    'handler_shipment_code' => $handlerShipmentCode,
-                    'shipment_id' => $shipmentId,
+                ->performedOn($this->integration)
+                ->withProperties($this->getIdentifierProperties() + [
                     'status' => $statusCode,
                     'error' => 'Unknown shipment status code',
                 ])
                 ->log('basitkargo_webhook_unknown_status');
 
-            return;
+            return false;
         }
 
-        // Determine if detailed webhook (has shipmentInfo)
-        $isDetailedWebhook = isset($payload['shipmentInfo']);
+        $this->shipmentStatus = $shipmentStatus;
 
+        return true;
+    }
+
+    /**
+     * Process the webhook - find shipment and update it
+     */
+    protected function processWebhook(): void
+    {
         try {
-            // Try to find return shipment first (search by all identifiers)
-            $return = $this->findReturn($barcode, $handlerShipmentCode, $shipmentId);
+            // Try to find return shipment first
+            $return = $this->findReturn();
 
             if ($return) {
-                $this->handleReturnShipmentUpdate($return, $shipmentStatus, $payload, $integration);
+                $this->handleReturnShipmentUpdate($return);
 
                 return;
             }
 
-            // Try to find order shipment (search by all identifiers)
-            $order = $this->findOrder($barcode, $handlerShipmentCode, $shipmentId);
+            // Try to find order shipment
+            $order = $this->findOrder();
 
             if ($order) {
-                $this->handleOrderShipmentUpdate($order, $shipmentStatus, $payload, $integration, $isDetailedWebhook);
+                $this->handleOrderShipmentUpdate($order);
 
                 return;
             }
 
             // No matching shipment found
             activity()
-                ->performedOn($integration)
-                ->withProperties([
-                    'barcode' => $barcode,
-                    'handler_shipment_code' => $handlerShipmentCode,
-                    'shipment_id' => $shipmentId,
-                    'status' => $statusCode,
+                ->performedOn($this->integration)
+                ->withProperties($this->getIdentifierProperties() + [
+                    'status' => $this->payload['status'],
                     'error' => 'No matching order or return found',
                 ])
                 ->log('basitkargo_webhook_no_shipment');
         } catch (\Exception $e) {
             activity()
-                ->performedOn($integration)
+                ->performedOn($this->integration)
                 ->withProperties([
                     'error' => $e->getMessage(),
-                    'payload' => $payload,
+                    'payload' => $this->payload,
                     'trace' => $e->getTraceAsString(),
                 ])
                 ->log('basitkargo_webhook_failed');
@@ -138,206 +193,230 @@ class ProcessBasitKargoWebhook extends ProcessWebhookJob implements ShouldQueue
     }
 
     /**
-     * Find return by searching all three identifiers
+     * Find return by searching all identifiers
      */
-    protected function findReturn(?string $barcode, ?string $handlerShipmentCode, ?string $shipmentId): ?OrderReturn
+    protected function findReturn(): ?OrderReturn
     {
-        $query = OrderReturn::query();
+        return OrderReturn::query()
+            ->where(function ($q) {
+                if ($this->barcode) {
+                    $q->orWhere('return_tracking_number', $this->barcode);
+                }
 
-        $query->where(function ($q) use ($barcode, $handlerShipmentCode, $shipmentId) {
-            if ($barcode) {
-                $q->orWhere('return_tracking_number', $barcode);
-            }
+                if ($this->handlerShipmentCode) {
+                    $q->orWhere('return_tracking_number', $this->handlerShipmentCode);
+                }
 
-            if ($handlerShipmentCode) {
-                $q->orWhere('return_tracking_number', $handlerShipmentCode);
-            }
-
-            if ($shipmentId) {
-                $q->orWhere('return_shipping_aggregator_shipment_id', $shipmentId);
-            }
-        });
-
-        return $query->first();
+                if ($this->shipmentId) {
+                    $q->orWhere('return_shipping_aggregator_shipment_id', $this->shipmentId);
+                }
+            })
+            ->first();
     }
 
     /**
-     * Find order by searching all three identifiers
+     * Find order by searching all identifiers
      */
-    protected function findOrder(?string $barcode, ?string $handlerShipmentCode, ?string $shipmentId): ?Order
+    protected function findOrder(): ?Order
     {
-        $query = Order::query();
+        return Order::query()
+            ->where(function ($q) {
+                if ($this->barcode) {
+                    $q->orWhere('shipping_tracking_number', $this->barcode);
+                }
 
-        $query->where(function ($q) use ($barcode, $handlerShipmentCode, $shipmentId) {
-            if ($barcode) {
-                $q->orWhere('shipping_tracking_number', $barcode);
-            }
+                if ($this->handlerShipmentCode) {
+                    $q->orWhere('shipping_tracking_number', $this->handlerShipmentCode);
+                }
 
-            if ($handlerShipmentCode) {
-                $q->orWhere('shipping_tracking_number', $handlerShipmentCode);
-            }
-
-            if ($shipmentId) {
-                $q->orWhere('shipping_aggregator_shipment_id', $shipmentId);
-            }
-        });
-
-        return $query->first();
+                if ($this->shipmentId) {
+                    $q->orWhere('shipping_aggregator_shipment_id', $this->shipmentId);
+                }
+            })
+            ->first();
     }
 
-    protected function handleReturnShipmentUpdate(
-        OrderReturn $return,
-        ShipmentStatus $status,
-        array $payload,
-        Integration $integration
-    ): void {
-        $updateData = [];
-
-        // Extract identifiers
-        $barcode = $payload['barcode'] ?? null;
-        $handlerShipmentCode = $payload['handlerShipmentCode'] ?? null;
-        $shipmentId = $payload['id'] ?? null;
-
-        // Map BasitKargo status to Return status
-        if ($status === ShipmentStatus::SHIPPED || $status === ShipmentStatus::OUT_FOR_DELIVERY) {
-            // Return is in transit
-            if ($return->status === ReturnStatus::Approved || $return->status === ReturnStatus::LabelGenerated) {
-                $updateData['status'] = ReturnStatus::InTransit;
-                $updateData['shipped_at'] = now();
-            }
-        } elseif ($status === ShipmentStatus::DELIVERED || $status === ShipmentStatus::COMPLETED) {
-            // Return has been delivered to warehouse
-            if (! in_array($return->status, [ReturnStatus::Inspecting, ReturnStatus::Completed, ReturnStatus::Rejected])) {
-                $updateData['status'] = ReturnStatus::Received;
-                $updateData['received_at'] = now();
-            }
-        } elseif ($status === ShipmentStatus::RETURNED || $status === ShipmentStatus::RETURNING) {
-            // Return shipment failed and is being returned to customer
-            activity()
-                ->performedOn($return)
-                ->withProperties([
-                    'barcode' => $barcode,
-                    'handler_shipment_code' => $handlerShipmentCode,
-                    'status' => $status->value,
-                    'message' => $payload['statusMessage'] ?? 'Return shipment returned to sender',
-                ])
-                ->log('return_shipment_returned_to_sender');
-        }
-
-        // Update tracking number with handlerShipmentCode if available and not set
-        if ($handlerShipmentCode && ! $return->return_tracking_number) {
-            $updateData['return_tracking_number'] = $handlerShipmentCode;
-        }
-
-        // Update shipment ID if not set
-        if ($shipmentId && ! $return->return_shipping_aggregator_shipment_id) {
-            $updateData['return_shipping_aggregator_shipment_id'] = $shipmentId;
-        }
+    /**
+     * Handle return shipment webhook update
+     */
+    protected function handleReturnShipmentUpdate(OrderReturn $return): void
+    {
+        $updateData = $this->getReturnUpdateData($return);
 
         if (! empty($updateData)) {
             $return->update($updateData);
 
             activity()
                 ->performedOn($return)
-                ->withProperties([
-                    'integration_id' => $integration->id,
-                    'barcode' => $barcode,
-                    'handler_shipment_code' => $handlerShipmentCode,
-                    'shipment_id' => $shipmentId,
+                ->withProperties($this->getIdentifierProperties() + [
+                    'integration_id' => $this->integration->id,
                     'old_status' => $return->getOriginal('status'),
                     'new_status' => $updateData['status'] ?? $return->status,
-                    'basitkargo_status' => $status->value,
+                    'basitkargo_status' => $this->shipmentStatus->value,
                 ])
                 ->log('basitkargo_return_webhook_processed');
         } else {
             activity()
                 ->performedOn($return)
-                ->withProperties([
-                    'integration_id' => $integration->id,
-                    'barcode' => $barcode,
-                    'handler_shipment_code' => $handlerShipmentCode,
-                    'shipment_id' => $shipmentId,
-                    'status' => $status->value,
+                ->withProperties($this->getIdentifierProperties() + [
+                    'integration_id' => $this->integration->id,
+                    'status' => $this->shipmentStatus->value,
                     'reason' => 'No status update needed',
                 ])
                 ->log('basitkargo_return_webhook_skipped');
         }
     }
 
-    protected function handleOrderShipmentUpdate(
-        Order $order,
-        ShipmentStatus $status,
-        array $payload,
-        Integration $integration,
-        bool $isDetailedWebhook = false
-    ): void {
+    /**
+     * Get update data for return based on shipment status
+     */
+    protected function getReturnUpdateData(OrderReturn $return): array
+    {
         $updateData = [];
 
-        // Extract identifiers
-        $barcode = $payload['barcode'] ?? null;
-        $handlerShipmentCode = $payload['handlerShipmentCode'] ?? null;
-        $shipmentId = $payload['id'] ?? null;
+        // Map BasitKargo status to Return status
+        if ($this->shipmentStatus === ShipmentStatus::SHIPPED || $this->shipmentStatus === ShipmentStatus::OUT_FOR_DELIVERY) {
+            if ($return->status === ReturnStatus::Approved || $return->status === ReturnStatus::LabelGenerated) {
+                $updateData['status'] = ReturnStatus::InTransit;
+                $updateData['shipped_at'] = now();
+            }
+        } elseif ($this->shipmentStatus === ShipmentStatus::DELIVERED || $this->shipmentStatus === ShipmentStatus::COMPLETED) {
+            if (! in_array($return->status, [ReturnStatus::Inspecting, ReturnStatus::Completed, ReturnStatus::Rejected])) {
+                $updateData['status'] = ReturnStatus::Received;
+                $updateData['received_at'] = now();
+            }
+        } elseif ($this->shipmentStatus === ShipmentStatus::RETURNED || $this->shipmentStatus === ShipmentStatus::RETURNING) {
+            activity()
+                ->performedOn($return)
+                ->withProperties($this->getIdentifierProperties() + [
+                    'status' => $this->shipmentStatus->value,
+                    'message' => $this->payload['statusMessage'] ?? 'Return shipment returned to sender',
+                ])
+                ->log('return_shipment_returned_to_sender');
+        }
 
-        // Update tracking number with handlerShipmentCode if available
-        if ($handlerShipmentCode && ! $order->shipping_tracking_number) {
-            $updateData['shipping_tracking_number'] = $handlerShipmentCode;
+        // Update tracking number if not set
+        if ($this->handlerShipmentCode && ! $return->return_tracking_number) {
+            $updateData['return_tracking_number'] = $this->handlerShipmentCode;
         }
 
         // Update shipment ID if not set
-        if ($shipmentId && ! $order->shipping_aggregator_shipment_id) {
-            $updateData['shipping_aggregator_shipment_id'] = $shipmentId;
+        if ($this->shipmentId && ! $return->return_shipping_aggregator_shipment_id) {
+            $updateData['return_shipping_aggregator_shipment_id'] = $this->shipmentId;
         }
 
-        // Update aggregator integration ID if not set
+        return $updateData;
+    }
+
+    /**
+     * Handle order shipment webhook update
+     */
+    protected function handleOrderShipmentUpdate(Order $order): void
+    {
+        $this->updateOrderIdentifiers($order);
+
+        if ($this->isDetailedWebhook) {
+            $this->fetchAndSyncShipmentData($order);
+        }
+
+        $this->logOrderWebhookProcessed($order);
+    }
+
+    /**
+     * Update order tracking identifiers if not set
+     */
+    protected function updateOrderIdentifiers(Order $order): void
+    {
+        $updateData = [];
+
+        if ($this->handlerShipmentCode && ! $order->shipping_tracking_number) {
+            $updateData['shipping_tracking_number'] = $this->handlerShipmentCode;
+        }
+
+        if ($this->shipmentId && ! $order->shipping_aggregator_shipment_id) {
+            $updateData['shipping_aggregator_shipment_id'] = $this->shipmentId;
+        }
+
         if (! $order->shipping_aggregator_integration_id) {
-            $updateData['shipping_aggregator_integration_id'] = $integration->id;
+            $updateData['shipping_aggregator_integration_id'] = $this->integration->id;
         }
 
-        // Update order fields
         if (! empty($updateData)) {
             $order->update($updateData);
         }
+    }
 
-        // Use unified shipping data sync service for detailed webhooks
-        // This handles: cost updates, info updates, and auto-return creation
-        if ($isDetailedWebhook) {
-            $adapter = new BasitKargoAdapter($integration);
+    /**
+     * Fetch shipment details from API and sync data
+     */
+    protected function fetchAndSyncShipmentData(Order $order): void
+    {
+        $adapter = new BasitKargoAdapter($this->integration);
+        $shipmentData = null;
 
-            // Use handlerShipmentCode if available, fallback to barcode
-            $trackingToQuery = $handlerShipmentCode ?? $barcode;
-
-            if ($trackingToQuery) {
-                $shipmentData = $adapter->trackShipment($trackingToQuery);
-
-                if ($shipmentData) {
-                    $syncService = app(ShippingDataSyncService::class);
-                    $syncService->syncFromShipmentData($order, $shipmentData, $integration);
-                }
+        try {
+            // Call the appropriate endpoint based on available identifier
+            // Priority: shipmentId > handlerShipmentCode > barcode
+            if ($this->shipmentId) {
+                $shipmentData = $adapter->getShipmentById($this->shipmentId);
+            } elseif ($this->handlerShipmentCode) {
+                $shipmentData = $adapter->getShipmentByTrackingNumber($this->handlerShipmentCode);
+            } elseif ($this->barcode) {
+                $shipmentData = $adapter->getShipmentByBarcode($this->barcode);
             }
-        }
 
-        // Extract status message for logging
-        $statusMessage = null;
-        if ($isDetailedWebhook) {
-            $statusMessage = $payload['shipmentInfo']['lastState'] ?? null;
-        } else {
-            $statusMessage = $payload['statusMessage'] ?? $status->getLabel();
-        }
+            if ($shipmentData) {
+                $syncService = app(ShippingDataSyncService::class);
+                $syncService->syncFromShipmentData($order, $shipmentData, $this->integration);
+            } else {
+                Log::warning('Failed to fetch shipment details from BasitKargo API', [
+                    'order_id' => $order->id,
+                ] + $this->getIdentifierProperties());
+            }
+        } catch (\Exception $e) {
+            Log::warning('Exception while fetching shipment details from BasitKargo API', [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+            ] + $this->getIdentifierProperties());
 
-        // Note: Distribution center detection is now handled by ShippingDataSyncService
-        // when syncFromShipmentData is called above (in detailed webhooks)
+            activity()
+                ->performedOn($order)
+                ->withProperties($this->getIdentifierProperties() + [
+                    'error' => $e->getMessage(),
+                ])
+                ->log('basitkargo_track_shipment_failed');
+        }
+    }
+
+    /**
+     * Log order webhook processing
+     */
+    protected function logOrderWebhookProcessed(Order $order): void
+    {
+        $statusMessage = $this->isDetailedWebhook
+            ? ($this->payload['shipmentInfo']['lastState'] ?? null)
+            : ($this->payload['statusMessage'] ?? $this->shipmentStatus->getLabel());
 
         activity()
             ->performedOn($order)
-            ->withProperties([
-                'integration_id' => $integration->id,
-                'barcode' => $barcode,
-                'handler_shipment_code' => $handlerShipmentCode,
-                'shipment_id' => $shipmentId,
-                'basitkargo_status' => $status->value,
+            ->withProperties($this->getIdentifierProperties() + [
+                'integration_id' => $this->integration->id,
+                'basitkargo_status' => $this->shipmentStatus->value,
                 'status_message' => $statusMessage,
-                'webhook_type' => $isDetailedWebhook ? 'detailed' : 'simple',
+                'webhook_type' => $this->isDetailedWebhook ? 'detailed' : 'simple',
             ])
             ->log('basitkargo_order_webhook_processed');
+    }
+
+    /**
+     * Get identifier properties for logging
+     */
+    protected function getIdentifierProperties(): array
+    {
+        return [
+            'barcode' => $this->barcode,
+            'handler_shipment_code' => $this->handlerShipmentCode,
+            'shipment_id' => $this->shipmentId,
+        ];
     }
 }
