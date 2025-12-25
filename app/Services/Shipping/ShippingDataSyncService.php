@@ -156,6 +156,11 @@ class ShippingDataSyncService
         array $shipmentData,
         Integration $integration
     ): array {
+        // If shipmentData doesn't have 'raw_data', wrap it (for raw API responses from webhook)
+        if (! isset($shipmentData['raw_data'])) {
+            $shipmentData = ['raw_data' => $shipmentData];
+        }
+
         $results = [
             'cost_updated' => false,
             'info_updated' => false,
