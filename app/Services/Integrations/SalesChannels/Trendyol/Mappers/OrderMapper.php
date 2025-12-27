@@ -131,15 +131,33 @@ class OrderMapper extends BaseOrderMapper
                 if (! $existingTrendyolMapping || $existingTrendyolMapping->platform_id === $externalCustomerId) {
                     // Link customer to Trendyol ID if not already linked
                     if (! $existingTrendyolMapping) {
-                        $existingCustomerByEmail->platformMappings()->create([
-                            'platform' => $this->getChannel()->value,
-                            'platform_id' => $externalCustomerId,
-                            'entity_type' => Customer::class,
-                            'platform_data' => [
-                                'invoice_address' => $invoiceAddress,
-                                'shipment_address' => $shipmentAddress,
-                            ],
-                        ]);
+                        // Check if this Trendyol ID is already assigned to another customer globally
+                        $globalMapping = PlatformMapping::where('platform', $this->getChannel()->value)
+                            ->where('platform_id', $externalCustomerId)
+                            ->where('entity_type', Customer::class)
+                            ->first();
+
+                        if ($globalMapping && $globalMapping->entity_id !== $existingCustomerByEmail->id) {
+                            // Move the mapping from the old customer to this one
+                            $globalMapping->update([
+                                'entity_id' => $existingCustomerByEmail->id,
+                                'platform_data' => [
+                                    'invoice_address' => $invoiceAddress,
+                                    'shipment_address' => $shipmentAddress,
+                                ],
+                            ]);
+                        } else {
+                            // Create new mapping
+                            $existingCustomerByEmail->platformMappings()->create([
+                                'platform' => $this->getChannel()->value,
+                                'platform_id' => $externalCustomerId,
+                                'entity_type' => Customer::class,
+                                'platform_data' => [
+                                    'invoice_address' => $invoiceAddress,
+                                    'shipment_address' => $shipmentAddress,
+                                ],
+                            ]);
+                        }
                     }
 
                     return $existingCustomerByEmail;
@@ -963,27 +981,58 @@ class OrderMapper extends BaseOrderMapper
             : null;
 
         if ($externalCustomerId) {
-            $customer->platformMappings()->updateOrCreate(
-                [
-                    'platform' => $this->getChannel()->value,
-                    'platform_id' => $externalCustomerId,
-                    'entity_type' => Customer::class,
-                ],
-                [
+            // Check if this platform mapping already exists globally (on any customer)
+            $existingMapping = PlatformMapping::where('platform', $this->getChannel()->value)
+                ->where('platform_id', $externalCustomerId)
+                ->where('entity_type', Customer::class)
+                ->first();
+
+            // If mapping exists on a different customer, it's a duplicate customer situation
+            // We should NOT create a duplicate mapping, just update the existing one
+            if ($existingMapping && $existingMapping->entity_id !== $customer->id) {
+                // Update the mapping to point to the current customer
+                // This handles the case where we found a better customer record (by email)
+                $existingMapping->update([
+                    'entity_id' => $customer->id,
                     'platform_data' => [
                         'invoice_address' => $invoiceAddress,
                         'shipment_address' => $shipmentAddress,
                     ],
-                ]
-            );
+                ]);
 
-            activity()
-                ->performedOn($customer)
-                ->withProperties([
-                    'platform' => $this->getChannel()->value,
-                    'platform_id' => $externalCustomerId,
-                ])
-                ->log('customer_platform_mapping_created');
+                activity()
+                    ->performedOn($customer)
+                    ->withProperties([
+                        'platform' => $this->getChannel()->value,
+                        'platform_id' => $externalCustomerId,
+                        'old_customer_id' => $existingMapping->entity_id,
+                        'action' => 'moved_platform_mapping',
+                    ])
+                    ->log('customer_platform_mapping_moved');
+            } else {
+                // Normal case: create or update the mapping
+                $customer->platformMappings()->updateOrCreate(
+                    [
+                        'platform' => $this->getChannel()->value,
+                        'platform_id' => $externalCustomerId,
+                        'entity_type' => Customer::class,
+                    ],
+                    [
+                        'platform_data' => [
+                            'invoice_address' => $invoiceAddress,
+                            'shipment_address' => $shipmentAddress,
+                        ],
+                    ]
+                );
+
+                activity()
+                    ->performedOn($customer)
+                    ->withProperties([
+                        'platform' => $this->getChannel()->value,
+                        'platform_id' => $externalCustomerId,
+                    ])
+                    ->log('customer_platform_mapping_created');
+            }
         }
     }
 
