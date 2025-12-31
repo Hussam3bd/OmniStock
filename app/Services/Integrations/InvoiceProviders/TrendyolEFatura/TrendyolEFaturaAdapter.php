@@ -398,6 +398,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
             'phone' => $customer->phone ?? '',
             'taxId' => $customer->tax_number ?? $customer->identity_number ?? '1111111111',
             'name' => $customer->first_name,
+            'surname' => $customer->last_name,
         ];
 
         // Only add email if it's not empty (minimum 2 characters required by API)
