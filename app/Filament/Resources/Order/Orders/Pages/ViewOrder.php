@@ -2,11 +2,15 @@
 
 namespace App\Filament\Resources\Order\Orders\Pages;
 
+use App\Filament\Actions\Order\GenerateInvoiceAction;
 use App\Filament\Actions\Order\ResyncOrderAction;
 use App\Filament\Actions\Order\ResyncPaymentCostAction;
 use App\Filament\Actions\Order\ResyncShippingCostAction;
 use App\Filament\Resources\Order\Orders\Infolists\OrderInfolist;
 use App\Filament\Resources\Order\Orders\OrderResource;
+use App\Filament\Resources\Order\Orders\RelationManagers\AddressesRelationManager;
+use App\Filament\Resources\Order\Orders\RelationManagers\InvoicesRelationManager;
+use App\Filament\Resources\Order\Orders\RelationManagers\ItemsRelationManager;
 use App\Filament\Resources\Order\Orders\RelationManagers\ReturnsRelationManager;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
@@ -34,6 +38,7 @@ class ViewOrder extends ViewRecord
         return [
             EditAction::make()
                 ->visible(fn () => ! $this->record->isExternal()),
+            GenerateInvoiceAction::make(),
             ResyncOrderAction::make(),
             ResyncShippingCostAction::make(),
             ResyncPaymentCostAction::make(),
@@ -43,8 +48,9 @@ class ViewOrder extends ViewRecord
     public function getRelationManagers(): array
     {
         return [
-            \App\Filament\Resources\Order\Orders\RelationManagers\AddressesRelationManager::class,
-            \App\Filament\Resources\Order\Orders\RelationManagers\ItemsRelationManager::class,
+            AddressesRelationManager::class,
+            ItemsRelationManager::class,
+            InvoicesRelationManager::class,
             ReturnsRelationManager::class,
         ];
     }

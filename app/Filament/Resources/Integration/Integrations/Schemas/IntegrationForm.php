@@ -5,12 +5,16 @@ namespace App\Filament\Resources\Integration\Integrations\Schemas;
 use App\Enums\Integration\IntegrationProvider;
 use App\Enums\Integration\IntegrationType;
 use App\Services\Integrations\ProviderRegistry;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Str;
 
 class IntegrationForm
 {
@@ -102,11 +106,17 @@ class IntegrationForm
 
         foreach ($providerInfo['required_fields'] as $fieldKey => $fieldConfig) {
             $field = match ($fieldConfig['type']) {
+                'section' => Placeholder::make($fieldKey)
+                    ->label($fieldConfig['label'])
+                    ->content($fieldConfig['description'] ?? '')
+                    ->columnSpanFull(),
+
                 'toggle' => Toggle::make("settings.{$fieldKey}")
                     ->label($fieldConfig['label'])
                     ->default($fieldConfig['default'] ?? false)
                     ->required($fieldConfig['required'] ?? false)
-                    ->helperText($fieldConfig['helper'] ?? null),
+                    ->helperText($fieldConfig['helper'] ?? null)
+                    ->disabled($fieldConfig['disabled'] ?? false),
 
                 'password' => TextInput::make("settings.{$fieldKey}")
                     ->label($fieldConfig['label'])
@@ -114,7 +124,17 @@ class IntegrationForm
                     ->revealable()
                     ->required($fieldConfig['required'] ?? false)
                     ->placeholder($fieldConfig['placeholder'] ?? null)
-                    ->helperText($fieldConfig['helper'] ?? null),
+                    ->helperText($fieldConfig['helper'] ?? null)
+                    ->disabled($fieldConfig['disabled'] ?? false),
+
+                'textarea' => Textarea::make("settings.{$fieldKey}")
+                    ->label($fieldConfig['label'])
+                    ->required($fieldConfig['required'] ?? false)
+                    ->placeholder($fieldConfig['placeholder'] ?? null)
+                    ->default($fieldConfig['default'] ?? null)
+                    ->helperText($fieldConfig['helper'] ?? null)
+                    ->rows($fieldConfig['rows'] ?? 3)
+                    ->disabled($fieldConfig['disabled'] ?? false),
 
                 'select' => Select::make("settings.{$fieldKey}")
                     ->label($fieldConfig['label'])
@@ -123,7 +143,27 @@ class IntegrationForm
                     ->placeholder($fieldConfig['placeholder'] ?? null)
                     ->default($fieldConfig['default'] ?? null)
                     ->helperText($fieldConfig['helper'] ?? null)
-                    ->searchable($fieldConfig['searchable'] ?? false),
+                    ->searchable($fieldConfig['searchable'] ?? false)
+                    ->disabled($fieldConfig['disabled'] ?? false),
+
+                'number' => TextInput::make("settings.{$fieldKey}")
+                    ->label($fieldConfig['label'])
+                    ->numeric()
+                    ->required($fieldConfig['required'] ?? false)
+                    ->placeholder($fieldConfig['placeholder'] ?? null)
+                    ->default($fieldConfig['default'] ?? null)
+                    ->helperText($fieldConfig['helper'] ?? null)
+                    ->disabled($fieldConfig['disabled'] ?? false),
+
+                'repeater' => Repeater::make("settings.{$fieldKey}")
+                    ->label($fieldConfig['label'])
+                    ->schema(self::buildRepeaterSchema($fieldConfig['schema'] ?? []))
+                    ->required($fieldConfig['required'] ?? false)
+                    ->helperText($fieldConfig['helper'] ?? null)
+                    ->collapsible()
+                    ->cloneable()
+                    ->defaultItems(0)
+                    ->columnSpanFull(),
 
                 'relationship' => Select::make("settings.{$fieldKey}")
                     ->label($fieldConfig['label'])
@@ -136,14 +176,85 @@ class IntegrationForm
                     ->placeholder($fieldConfig['placeholder'] ?? null)
                     ->helperText($fieldConfig['helper'] ?? null)
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->disabled($fieldConfig['disabled'] ?? false),
 
-                default => TextInput::make("settings.{$fieldKey}")
+                default => (function () use ($fieldKey, $fieldConfig) {
+                    $field = TextInput::make("settings.{$fieldKey}")
+                        ->label($fieldConfig['label'])
+                        ->required($fieldConfig['required'] ?? false)
+                        ->placeholder($fieldConfig['placeholder'] ?? null)
+                        ->default($fieldConfig['default'] ?? null)
+                        ->helperText($fieldConfig['helper'] ?? null)
+                        ->maxLength($fieldConfig['maxLength'] ?? null)
+                        ->disabled($fieldConfig['disabled'] ?? false)
+                        ->rules($fieldConfig['rules'] ?? []);
+
+                    // Add regex validation if specified
+                    if (isset($fieldConfig['regex'])) {
+                        $field->regex($fieldConfig['regex']);
+                    }
+
+                    // Add uppercase transformation if specified
+                    if ($fieldConfig['uppercase'] ?? false) {
+                        $field->dehydrateStateUsing(fn (string $state): string => Str::upper($state));
+                    }
+
+                    return $field;
+                })(),
+            };
+
+            $fields[] = $field;
+        }
+
+        return $fields;
+    }
+
+    protected static function buildRepeaterSchema(array $schemaConfig): array
+    {
+        $fields = [];
+
+        foreach ($schemaConfig as $fieldKey => $fieldConfig) {
+            $field = match ($fieldConfig['type']) {
+                'toggle' => Toggle::make($fieldKey)
+                    ->label($fieldConfig['label'])
+                    ->default($fieldConfig['default'] ?? false)
+                    ->required($fieldConfig['required'] ?? false),
+
+                'password' => TextInput::make($fieldKey)
+                    ->label($fieldConfig['label'])
+                    ->password()
+                    ->revealable()
+                    ->required($fieldConfig['required'] ?? false)
+                    ->placeholder($fieldConfig['placeholder'] ?? null),
+
+                'textarea' => Textarea::make($fieldKey)
                     ->label($fieldConfig['label'])
                     ->required($fieldConfig['required'] ?? false)
                     ->placeholder($fieldConfig['placeholder'] ?? null)
                     ->default($fieldConfig['default'] ?? null)
-                    ->helperText($fieldConfig['helper'] ?? null),
+                    ->rows($fieldConfig['rows'] ?? 3),
+
+                'select' => Select::make($fieldKey)
+                    ->label($fieldConfig['label'])
+                    ->options($fieldConfig['options'] ?? [])
+                    ->required($fieldConfig['required'] ?? false)
+                    ->placeholder($fieldConfig['placeholder'] ?? null)
+                    ->default($fieldConfig['default'] ?? null)
+                    ->searchable($fieldConfig['searchable'] ?? false),
+
+                'number' => TextInput::make($fieldKey)
+                    ->label($fieldConfig['label'])
+                    ->numeric()
+                    ->required($fieldConfig['required'] ?? false)
+                    ->placeholder($fieldConfig['placeholder'] ?? null)
+                    ->default($fieldConfig['default'] ?? null),
+
+                default => TextInput::make($fieldKey)
+                    ->label($fieldConfig['label'])
+                    ->required($fieldConfig['required'] ?? false)
+                    ->placeholder($fieldConfig['placeholder'] ?? null)
+                    ->default($fieldConfig['default'] ?? null),
             };
 
             $fields[] = $field;

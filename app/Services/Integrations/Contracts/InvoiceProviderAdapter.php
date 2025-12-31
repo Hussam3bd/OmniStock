@@ -9,7 +9,7 @@ interface InvoiceProviderAdapter
 {
     public function authenticate(): bool;
 
-    public function generateInvoice(Order $order): string;
+    public function generateInvoice(Order $order): array|string;
 
     public function sendInvoice(string $invoiceId, Customer $customer): bool;
 

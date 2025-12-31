@@ -14,6 +14,7 @@ use App\Models\Concerns\HasAddressSnapshots;
 use App\Models\Currency;
 use App\Models\Customer\Customer;
 use App\Models\Inventory\InventoryMovement;
+use App\Models\Invoice\Invoice;
 use App\Models\Platform\PlatformMapping;
 use Cknow\Money\Casts\MoneyIntegerCast;
 use Cknow\Money\Money;
@@ -329,6 +330,11 @@ class Order extends Model
     public function returns(): HasMany
     {
         return $this->hasMany(OrderReturn::class);
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
     }
 
     public function currency(): BelongsTo

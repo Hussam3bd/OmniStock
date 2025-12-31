@@ -3,10 +3,12 @@
 namespace App\Filament\Resources\Integration\Integrations\Pages;
 
 use App\Enums\Integration\IntegrationProvider;
+use App\Enums\Integration\IntegrationType;
 use App\Filament\Actions\Integration\SyncShopifyOrderReturnsAction;
 use App\Filament\Resources\Integration\Integrations\IntegrationResource;
 use App\Jobs\SyncPaymentFees;
 use App\Models\Order\Order;
+use App\Services\Integrations\AdapterFactory;
 use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
 use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
 use Filament\Actions\Action;
@@ -186,6 +188,59 @@ class EditIntegration extends EditRecord
 
         // Add sync returns action for Shopify integration
         $actions[] = SyncShopifyOrderReturnsAction::make();
+
+        // Add test authentication action for Trendyol E-Fatura integration
+        if ($this->record->type === IntegrationType::INVOICE_PROVIDER && $this->record->provider === IntegrationProvider::TRENDYOL_EFATURA) {
+            $actions[] = Action::make('test_authentication')
+                ->label(__('Test Authentication'))
+                ->icon(Heroicon::OutlinedShieldCheck)
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalHeading(__('Test Trendyol E-Fatura Authentication'))
+                ->modalDescription(__('This will test the authentication with Trendyol E-Fatura and update your user_id and company_id if successful.'))
+                ->modalSubmitActionLabel(__('Test Connection'))
+                ->action(function () {
+                    try {
+                        // Get the adapter
+                        $adapter = AdapterFactory::make($this->record);
+
+                        // Test authentication
+                        $success = $adapter->authenticate();
+
+                        if ($success) {
+                            // Refresh the record to get updated settings
+                            $this->record->refresh();
+
+                            $userId = $this->record->settings['user_id'] ?? null;
+                            $companyId = $this->record->settings['company_id'] ?? null;
+
+                            Notification::make()
+                                ->title(__('Authentication Successful'))
+                                ->body(__('Successfully authenticated with Trendyol E-Fatura. User ID: :user_id, Company ID: :company_id', [
+                                    'user_id' => $userId ?? 'N/A',
+                                    'company_id' => $companyId ?? 'Not returned',
+                                ]))
+                                ->success()
+                                ->send();
+
+                            // Refresh the form to show updated user_id and company_id
+                            $this->fillForm();
+                        } else {
+                            Notification::make()
+                                ->title(__('Authentication Failed'))
+                                ->body(__('Failed to authenticate with Trendyol E-Fatura. Please check your credentials.'))
+                                ->danger()
+                                ->send();
+                        }
+                    } catch (\Exception $e) {
+                        Notification::make()
+                            ->title(__('Authentication Error'))
+                            ->body(__('Error: :error', ['error' => $e->getMessage()]))
+                            ->danger()
+                            ->send();
+                    }
+                });
+        }
 
         return $actions;
     }

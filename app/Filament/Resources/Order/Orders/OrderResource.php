@@ -44,6 +44,7 @@ class OrderResource extends Resource
         return [
             RelationManagers\AddressesRelationManager::class,
             RelationManagers\ItemsRelationManager::class,
+            RelationManagers\InvoicesRelationManager::class,
             RelationManagers\ReturnsRelationManager::class,
         ];
     }
