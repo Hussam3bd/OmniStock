@@ -5,6 +5,7 @@ namespace App\Services\Integrations\InvoiceProviders\TrendyolEFatura;
 use App\Enums\Invoice\DocumentType;
 use App\Enums\Invoice\FileExtension;
 use App\Enums\Invoice\InvoiceStatus;
+use App\Enums\Order\PaymentMethod;
 use App\Models\Customer\Customer;
 use App\Models\Integration\Integration;
 use App\Models\Order\Order;
@@ -73,7 +74,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
                 'password' => $this->password,
             ]);
 
-            if (! $response->successful()) {
+            if (!$response->successful()) {
                 throw new \Exception(
                     'Authentication failed: '.$response->body()
                 );
@@ -83,7 +84,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
             $this->accessToken = $response->header('x-access-token');
             $this->refreshToken = $response->header('x-refresh-token');
 
-            if (! $this->accessToken || ! $this->refreshToken) {
+            if (!$this->accessToken || !$this->refreshToken) {
                 throw new \Exception('Authentication response missing tokens');
             }
 
@@ -143,7 +144,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
     protected function ensureAuthenticated(): void
     {
         // If no access token, authenticate
-        if (! $this->accessToken) {
+        if (!$this->accessToken) {
             $this->authenticate();
 
             return;
@@ -171,7 +172,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
 
             $response = $this->makeRequest('GET', "/taxpayer/{$taxId}");
 
-            if (! $response->successful()) {
+            if (!$response->successful()) {
                 throw new \Exception(
                     'Tax ID verification failed: '.$response->body()
                 );
@@ -215,7 +216,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
                 'body' => $response->json(),
             ]);
 
-            if (! $response->successful()) {
+            if (!$response->successful()) {
                 throw new \Exception(
                     'Failed to generate invoice: '.$response->body()
                 );
@@ -252,8 +253,8 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
             $response = $this->makeRequest('POST', "/e-archive/{$invoiceId}/send", [
                 'email' => $customer->email,
                 'phone' => $customer->phone,
-                'send_via_email' => ! empty($customer->email),
-                'send_via_sms' => ! empty($customer->phone),
+                'send_via_email' => !empty($customer->email),
+                'send_via_sms' => !empty($customer->phone),
             ]);
 
             return $response->successful();
@@ -284,7 +285,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
                 'companyId' => $companyId,
             ]);
 
-            if (! $response->successful()) {
+            if (!$response->successful()) {
                 throw new \Exception(
                     'Failed to cancel invoice: '.$response->body()
                 );
@@ -311,7 +312,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
 
             $response = $this->makeRequest('GET', "/e-archive/{$invoiceId}");
 
-            if (! $response->successful()) {
+            if (!$response->successful()) {
                 throw new \Exception(
                     'Failed to get invoice: '.$response->body()
                 );
@@ -399,7 +400,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
             'address' => $shippingAddress?->address_line1 ?? '',
             'phone' => $customer->phone ?? '',
             'taxId' => $customer->tax_number ?? $customer->identity_number ?? '1111111111',
-            'name' => $customer->first_name,
+            'name' => $customer->full_name,
             'surname' => $customer->last_name,
         ];
 
@@ -612,7 +613,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
 
         return [
             'currency' => $currency,
-            'hasExchange' => ! $isTRY,
+            'hasExchange' => !$isTRY,
             'calculationRate' => $isTRY ? 0 : (int) round($exchangeRate * 100),
             'sourceCurrency' => $currency,
             'targetCurrency' => $isTRY ? 'TRY' : 'TRY',
@@ -688,9 +689,9 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
     protected function mapPaymentMethodToMeans(string $paymentMethod): PaymentMeans
     {
         return match (strtolower($paymentMethod)) {
-            'credit_card', 'card', 'credit card' => PaymentMeans::CREDIT_CARD,
-            'eft', 'bank_transfer', 'transfer' => PaymentMeans::EFT,
-            'cash_on_delivery', 'cod' => PaymentMeans::ON_DELIVERY,
+            'credit_card', 'card', 'credit card', PaymentMethod::ONLINE->value => PaymentMeans::CREDIT_CARD,
+            'eft', 'bank_transfer', 'transfer', PaymentMethod::BANK_TRANSFER->value => PaymentMeans::EFT,
+            'cash_on_delivery', 'cod', PaymentMethod::COD->value => PaymentMeans::ON_DELIVERY,
             'mediator', 'escrow' => PaymentMeans::MEDIATOR,
             default => PaymentMeans::OTHER,
         };
@@ -720,12 +721,12 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
     protected function buildCarrierInfo(Order $order): ?array
     {
         // Get carrier info from the order's shipping aggregator integration
-        if (! $order->shipping_aggregator_integration_id) {
+        if (!$order->shipping_aggregator_integration_id) {
             return null;
         }
 
         $shippingIntegration = Integration::find($order->shipping_aggregator_integration_id);
-        if (! $shippingIntegration) {
+        if (!$shippingIntegration) {
             return null;
         }
 
@@ -733,7 +734,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
         $carrierTaxId = $shippingIntegration->settings['carrier_tax_id'] ?? null;
 
         // Both carrierName and carrierTaxId are required by API
-        if (! $carrierName || ! $carrierTaxId) {
+        if (!$carrierName || !$carrierTaxId) {
             return null;
         }
 
@@ -770,7 +771,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
             ->whereNull('cancelled_at')
             ->first();
 
-        if (! $originalInvoice) {
+        if (!$originalInvoice) {
             return null;
         }
 
@@ -816,7 +817,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
     ): ?string {
         $companyId = $this->integration->settings['company_id'] ?? null;
 
-        if (! $companyId) {
+        if (!$companyId) {
             throw new \Exception('Company ID is required to generate download URL. Please authenticate first.');
         }
 
@@ -835,7 +836,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
                 ->withHeaders(['Accept' => 'text/plain'])
                 ->post('/invoice/documents/download/permanent-url', $payload);
 
-            if (! $response->successful()) {
+            if (!$response->successful()) {
                 Log::error('Failed to get permanent URL', [
                     'status' => $response->status(),
                     'response' => $response->body(),

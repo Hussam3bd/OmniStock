@@ -228,7 +228,7 @@ class GenerateInvoiceAction
         }
 
         $invoice->order->update([
-            'invoice_number' => $invoice->invoice_number,
+            'invoice_number' => $invoice->external_id,
             'invoice_date' => $invoice->issued_at,
             'invoice_url' => $invoice->pdf_url ?? $invoice->html_url,
         ]);

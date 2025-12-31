@@ -7,6 +7,7 @@ use App\Models\Address\Address;
 use App\Models\Order\Order;
 use App\Models\Platform\PlatformMapping;
 use App\Models\SMS\SmsLog;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -52,8 +53,8 @@ class Customer extends Model
         return $this->hasMany(SmsLog::class);
     }
 
-    public function getFullNameAttribute(): string
+    public function fullName(): Attribute
     {
-        return trim("{$this->first_name} {$this->last_name}");
+        return Attribute::get(fn() => trim("{$this->first_name} {$this->last_name}"));
     }
 }
