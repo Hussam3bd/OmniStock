@@ -11,6 +11,7 @@ use App\Enums\Order\PaymentStatus;
 use App\Events\Order\OrderCancelled;
 use App\Jobs\SyncOrderFulfillmentData;
 use App\Jobs\SyncOrderPaymentFees;
+use App\Jobs\SyncPaymentTransactionId;
 use App\Models\Accounting\Account;
 use App\Models\Accounting\Transaction;
 use App\Models\Order\Order;
@@ -22,6 +23,15 @@ class OrderObserver
      */
     public function created(Order $order): void
     {
+        // Auto-fetch payment transaction ID for Shopify orders that are missing it
+        // This handles orders synced from bulk imports where transactions aren't included
+        if ($order->channel === OrderChannel::SHOPIFY &&
+            $order->isExternal() &&
+            ! $order->payment_transaction_id &&
+            $order->payment_gateway) {
+            SyncPaymentTransactionId::dispatch($order);
+        }
+
         // Auto-sync payment fees for orders created with PAID status and transaction ID
         // This handles orders synced from Shopify/external platforms that are already paid
         if ($order->payment_status === PaymentStatus::PAID &&
@@ -42,14 +52,31 @@ class OrderObserver
             OrderCancelled::dispatch($order);
         }
 
-        // 2. Auto-sync payment fees when order is paid
+        // 2. Auto-fetch payment transaction ID when payment status changes to PAID but transaction ID is missing
+        if ($order->isDirty('payment_status') &&
+            $order->payment_status === PaymentStatus::PAID &&
+            ! $order->payment_transaction_id &&
+            $order->channel === OrderChannel::SHOPIFY &&
+            $order->isExternal() &&
+            $order->payment_gateway) {
+            SyncPaymentTransactionId::dispatch($order);
+        }
+
+        // 3. Auto-sync payment fees when order is paid and has transaction ID
         if ($order->isDirty('payment_status') &&
             $order->payment_status === PaymentStatus::PAID &&
             $order->payment_transaction_id) {
             SyncOrderPaymentFees::dispatch($order);
         }
 
-        // 3. Auto-create income transaction when order is paid
+        // 4. Auto-sync payment fees when transaction ID is added
+        if ($order->isDirty('payment_transaction_id') &&
+            $order->payment_transaction_id &&
+            $order->payment_status === PaymentStatus::PAID) {
+            SyncOrderPaymentFees::dispatch($order);
+        }
+
+        // 5. Auto-create income transaction when order is paid
         if ($order->isDirty('payment_status') &&
             $order->payment_status === PaymentStatus::PAID &&
             $order->payment_payout_amount &&
@@ -57,7 +84,7 @@ class OrderObserver
             $this->createIncomeTransaction($order);
         }
 
-        // 4. Auto-sync shipment data when Shopify order is fulfilled
+        // 6. Auto-sync shipment data when Shopify order is fulfilled
         if ($order->isDirty('fulfillment_status') &&
             $order->fulfillment_status === FulfillmentStatus::FULFILLED &&
             $order->channel === OrderChannel::SHOPIFY &&
