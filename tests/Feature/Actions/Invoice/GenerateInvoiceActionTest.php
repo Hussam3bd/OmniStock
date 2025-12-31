@@ -36,6 +36,7 @@ beforeEach(function () {
             'company_tax_id' => '1234567890',
             'prefix' => 'DAP',
             'user_id' => 63211,
+            'company_id' => 12345,
             'access_token' => 'test_access_token',
         ],
     ]);
@@ -93,7 +94,11 @@ beforeEach(function () {
 test('can generate invoice for order', function () {
     Http::fake([
         'https://stage-apigateway.trendyolefaturam.com/api/invoice/documents/earchive' => Http::response(
-            ['invoiceId' => 'INV-12345', 'uuid' => 'test-uuid-123'],
+            ['invoiceId' => 'INV-12345', 'invoiceUuid' => 'test-uuid-123'],
+            200
+        ),
+        'https://stage-apigateway.trendyolefaturam.com/api/invoice/documents/download/permanent-url' => Http::response(
+            'https://example.com/invoice.pdf',
             200
         ),
     ]);
@@ -106,7 +111,9 @@ test('can generate invoice for order', function () {
         ->and($invoice->integration_id)->toBe($this->integration->id)
         ->and($invoice->status)->toBe(InvoiceStatus::ISSUED)
         ->and($invoice->external_id)->toBe('INV-12345')
-        ->and($invoice->issued_at)->not->toBeNull();
+        ->and($invoice->issued_at)->not->toBeNull()
+        ->and($invoice->pdf_url)->not->toBeNull()
+        ->and($invoice->html_url)->not->toBeNull();
 
     // Verify invoice was created in database
     $this->assertDatabaseHas('invoices', [
@@ -114,6 +121,12 @@ test('can generate invoice for order', function () {
         'external_id' => 'INV-12345',
         'status' => InvoiceStatus::ISSUED->value,
     ]);
+
+    // Verify order was updated with invoice data
+    $this->order->refresh();
+    expect($this->order->invoice_number)->not->toBeNull()
+        ->and($this->order->invoice_date)->not->toBeNull()
+        ->and($this->order->invoice_url)->not->toBeNull();
 });
 
 test('can generate invoice with specific integration', function () {
@@ -123,6 +136,7 @@ test('can generate invoice with specific integration', function () {
         'is_active' => true,
         'settings' => [
             'user_id' => 99999,
+            'company_id' => 12345,
             'access_token' => 'second_token',
             'test_mode' => true,
         ],
@@ -130,7 +144,11 @@ test('can generate invoice with specific integration', function () {
 
     Http::fake([
         'https://stage-apigateway.trendyolefaturam.com/api/invoice/documents/earchive' => Http::response(
-            ['invoiceId' => 'INV-SECOND-12345', 'uuid' => 'test-uuid-456'],
+            ['invoiceId' => 'INV-SECOND-12345', 'invoiceUuid' => 'test-uuid-456'],
+            200
+        ),
+        'https://stage-apigateway.trendyolefaturam.com/api/invoice/documents/download/permanent-url' => Http::response(
+            'https://example.com/invoice.pdf',
             200
         ),
     ]);
@@ -145,7 +163,11 @@ test('can generate invoice with specific integration', function () {
 test('can generate e-archive invoice type', function () {
     Http::fake([
         'https://stage-apigateway.trendyolefaturam.com/api/invoice/documents/earchive' => Http::response(
-            ['invoiceId' => 'INV-12345', 'uuid' => 'test-uuid'],
+            ['invoiceId' => 'INV-12345', 'invoiceUuid' => 'test-uuid'],
+            200
+        ),
+        'https://stage-apigateway.trendyolefaturam.com/api/invoice/documents/download/permanent-url' => Http::response(
+            'https://example.com/invoice.pdf',
             200
         ),
     ]);
@@ -178,7 +200,11 @@ test('throws exception when api call fails', function () {
 test('logs invoice generation activity', function () {
     Http::fake([
         'https://stage-apigateway.trendyolefaturam.com/api/invoice/documents/earchive' => Http::response(
-            ['invoiceId' => 'INV-12345', 'uuid' => 'test-uuid'],
+            ['invoiceId' => 'INV-12345', 'invoiceUuid' => 'test-uuid'],
+            200
+        ),
+        'https://stage-apigateway.trendyolefaturam.com/api/invoice/documents/download/permanent-url' => Http::response(
+            'https://example.com/invoice.pdf',
             200
         ),
     ]);
@@ -197,7 +223,11 @@ test('logs invoice generation activity', function () {
 test('generates correct invoice number with prefix', function () {
     Http::fake([
         'https://stage-apigateway.trendyolefaturam.com/api/invoice/documents/earchive' => Http::response(
-            ['invoiceId' => 'INV-12345', 'uuid' => 'test-uuid'],
+            ['invoiceId' => 'INV-12345', 'invoiceUuid' => 'test-uuid'],
+            200
+        ),
+        'https://stage-apigateway.trendyolefaturam.com/api/invoice/documents/download/permanent-url' => Http::response(
+            'https://example.com/invoice.pdf',
             200
         ),
     ]);
@@ -224,6 +254,10 @@ test('retries failed invoice instead of creating duplicate', function () {
     Http::fake([
         'https://stage-apigateway.trendyolefaturam.com/api/invoice/documents/earchive' => Http::response(
             ['invoiceId' => 'INV-SUCCESS-001', 'invoiceUuid' => 'test-uuid-retry'],
+            200
+        ),
+        'https://stage-apigateway.trendyolefaturam.com/api/invoice/documents/download/permanent-url' => Http::response(
+            'https://example.com/invoice.pdf',
             200
         ),
     ]);

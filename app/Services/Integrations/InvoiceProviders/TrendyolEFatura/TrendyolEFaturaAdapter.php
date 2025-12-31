@@ -2,6 +2,8 @@
 
 namespace App\Services\Integrations\InvoiceProviders\TrendyolEFatura;
 
+use App\Enums\Invoice\DocumentType;
+use App\Enums\Invoice\FileExtension;
 use App\Enums\Invoice\InvoiceStatus;
 use App\Models\Customer\Customer;
 use App\Models\Integration\Integration;
@@ -802,6 +804,59 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
         }
 
         return $bankAccounts;
+    }
+
+    /**
+     * Get permanent download URL for invoice PDF or HTML
+     */
+    public function getPermanentUrl(
+        string $invoiceUuid,
+        DocumentType $documentType = DocumentType::EARCHIVE,
+        FileExtension $fileExtension = FileExtension::PDF
+    ): ?string {
+        $companyId = $this->integration->settings['company_id'] ?? null;
+
+        if (! $companyId) {
+            throw new \Exception('Company ID is required to generate download URL. Please authenticate first.');
+        }
+
+        $payload = [
+            'documentType' => $documentType->value,
+            'fileExtension' => $fileExtension->value,
+            'documentUuid' => $invoiceUuid,
+            'invoiceUuid' => $invoiceUuid,
+            'companyId' => (int) $companyId,
+        ];
+
+        Log::debug('Fetching permanent URL for invoice', $payload);
+
+        try {
+            $response = $this->httpClient()
+                ->withHeaders(['Accept' => 'text/plain'])
+                ->post('/invoice/documents/download/permanent-url', $payload);
+
+            if (! $response->successful()) {
+                Log::error('Failed to get permanent URL', [
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+
+                return null;
+            }
+
+            // Response is plain text URL
+            $url = trim($response->body());
+
+            Log::debug('Permanent URL fetched successfully', ['url' => $url]);
+
+            return $url;
+        } catch (\Exception $e) {
+            Log::error('Exception while fetching permanent URL', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**

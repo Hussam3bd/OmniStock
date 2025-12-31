@@ -3,6 +3,7 @@
 namespace App\Actions\Invoice;
 
 use App\Enums\Integration\IntegrationType;
+use App\Enums\Invoice\FileExtension;
 use App\Enums\Invoice\InvoiceStatus;
 use App\Enums\Invoice\InvoiceType;
 use App\Models\Integration\Integration;
@@ -10,6 +11,7 @@ use App\Models\Invoice\Invoice;
 use App\Models\Order\Order;
 use App\Services\Integrations\AdapterFactory;
 use App\Services\Integrations\Contracts\InvoiceProviderAdapter;
+use Illuminate\Support\Facades\Log;
 
 class GenerateInvoiceAction
 {
@@ -87,6 +89,37 @@ class GenerateInvoiceAction
             $invoice->markAsIssued($externalId, $invoiceUuid, array_merge([
                 'generated_at' => now()->toIso8601String(),
             ], $providerResponse));
+
+            // Fetch and store PDF and HTML URLs if adapter supports it
+            if (method_exists($adapter, 'getPermanentUrl') && $invoiceUuid) {
+                try {
+                    // Fetch PDF URL
+                    $pdfUrl = $adapter->getPermanentUrl(
+                        $invoiceUuid,
+                    );
+
+                    // Fetch HTML URL
+                    $htmlUrl = $adapter->getPermanentUrl(
+                        $invoiceUuid,
+                        fileExtension: FileExtension::HTML,
+                    );
+
+                    // Update invoice with URLs
+                    $invoice->update([
+                        'pdf_url' => $pdfUrl,
+                        'html_url' => $htmlUrl,
+                    ]);
+                } catch (\Exception $e) {
+                    // Log error but don't fail the invoice generation
+                    Log::warning('Failed to fetch invoice URLs', [
+                        'invoice_id' => $invoice->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Update order with invoice data
+            $this->syncInvoiceToOrder($invoice);
 
             // Send to customer if requested
             if ($options['send_to_customer'] ?? false) {
@@ -183,5 +216,21 @@ class GenerateInvoiceAction
 
             $invoice->markAsSent($methods);
         }
+    }
+
+    /**
+     * Sync invoice data to order table for easy access
+     */
+    protected function syncInvoiceToOrder(Invoice $invoice): void
+    {
+        if (!$invoice->order) {
+            return;
+        }
+
+        $invoice->order->update([
+            'invoice_number' => $invoice->invoice_number,
+            'invoice_date' => $invoice->issued_at,
+            'invoice_url' => $invoice->pdf_url ?? $invoice->html_url,
+        ]);
     }
 }
