@@ -12,6 +12,7 @@
         "filament/spatie-laravel-media-library-plugin": "^4.0",
         "filament/spatie-laravel-settings-plugin": "^4.0",
         "iyzico/iyzipay-php": "^2.0",
+        "joaopaulolndev/filament-edit-profile": "^2.0",
         "lara-zeus/spatie-translatable": "^1.0",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
