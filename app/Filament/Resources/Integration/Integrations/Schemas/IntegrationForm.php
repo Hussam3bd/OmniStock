@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Integration\Integrations\Schemas;
 
 use App\Enums\Integration\IntegrationProvider;
 use App\Enums\Integration\IntegrationType;
+use App\Models\Integration\Integration;
 use App\Services\Integrations\ProviderRegistry;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -75,6 +76,32 @@ class IntegrationForm
                     ->description(fn (Get $get): string => self::getProviderDescription($get('type'), $get('provider')))
                     ->schema(fn (Get $get): array => self::getProviderFields($get('type'), $get('provider')))
                     ->visible(fn (Get $get): bool => filled($get('type')) && filled($get('provider')))
+                    ->columnSpanFull(),
+
+                Section::make(__('Invoice Settings'))
+                    ->description(__('Configure automatic invoice generation for orders from this integration.'))
+                    ->schema([
+                        Toggle::make('settings.auto_invoice_generation')
+                            ->label(__('Auto-Generate Invoices'))
+                            ->helperText(__('Automatically generate invoices when orders are paid and fulfilled.'))
+                            ->reactive()
+                            ->default(false)
+                            ->inline(false),
+
+                        Select::make('settings.invoice_provider_integration_id')
+                            ->label(__('Invoice Provider'))
+                            ->helperText(__('Select which invoice provider to use for generating invoices.'))
+                            ->options(fn () => Integration::where('type', IntegrationType::INVOICE_PROVIDER)
+                                ->where('is_active', true)
+                                ->pluck('name', 'id')
+                                ->toArray())
+                            ->searchable()
+                            ->preload()
+                            ->required(fn (Get $get): bool => $get('settings.auto_invoice_generation') === true)
+                            ->visible(fn (Get $get): bool => $get('settings.auto_invoice_generation') === true),
+                    ])
+                    ->visible(fn (Get $get): bool => $get('type') === IntegrationType::SALES_CHANNEL->value || $get('type') === IntegrationType::SALES_CHANNEL)
+                    ->collapsed()
                     ->columnSpanFull(),
             ]);
     }

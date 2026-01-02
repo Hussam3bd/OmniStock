@@ -9,6 +9,8 @@ use App\Enums\Order\OrderChannel;
 use App\Enums\Order\OrderStatus;
 use App\Enums\Order\PaymentStatus;
 use App\Events\Order\OrderCancelled;
+use App\Events\Order\OrderDelivered;
+use App\Events\Order\OrderPaid;
 use App\Jobs\SyncOrderFulfillmentData;
 use App\Jobs\SyncOrderPaymentFees;
 use App\Jobs\SyncPaymentTransactionId;
@@ -90,6 +92,16 @@ class OrderObserver
             $order->channel === OrderChannel::SHOPIFY &&
             $order->isExternal()) {
             SyncOrderFulfillmentData::dispatch($order);
+        }
+
+        // 7. Dispatch OrderPaid event when payment status changes to PAID
+        if ($order->isDirty('payment_status') && $order->payment_status === PaymentStatus::PAID) {
+            OrderPaid::dispatch($order);
+        }
+
+        // 8. Dispatch OrderDelivered event when fulfillment status changes to DELIVERED
+        if ($order->isDirty('fulfillment_status') && $order->fulfillment_status === FulfillmentStatus::DELIVERED) {
+            OrderDelivered::dispatch($order);
         }
     }
 
