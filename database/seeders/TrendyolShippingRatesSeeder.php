@@ -14,7 +14,7 @@ class TrendyolShippingRatesSeeder extends Seeder
      */
     public function run(): void
     {
-        $csvPath = database_path('seeders/data/trendyol-shipping-cost.csv');
+        $csvPath = database_path('seeders/data/trendyol-shipping-cost-jan-2026.csv');
 
         if (! file_exists($csvPath)) {
             $this->command->error("CSV file not found at: {$csvPath}");
@@ -26,7 +26,7 @@ class TrendyolShippingRatesSeeder extends Seeder
 
         // Create rate table
         $rateTable = ShippingRateTable::create([
-            'name' => 'Trendyol Shipping Rates - December 2025',
+            'name' => 'Trendyol Shipping Rates - Jan 2026',
             'effective_from' => now()->startOfMonth(),
             'effective_until' => null,
             'is_active' => true,
