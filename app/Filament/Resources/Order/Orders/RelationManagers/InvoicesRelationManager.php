@@ -26,7 +26,7 @@ class InvoicesRelationManager extends RelationManager
                     ->label(__('Invoice #'))
                     ->searchable()
                     ->copyable()
-                    ->description(fn ($record) => __('Type: :type', ['type' => ucfirst($record->invoice_type)])),
+                    ->description(fn ($record) => __('Type: :type', ['type' => $record->invoice_type->getLabel()])),
 
                 TextColumn::make('integration.name')
                     ->label(__('Provider'))
