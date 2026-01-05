@@ -24,13 +24,23 @@ class TrendyolShippingRatesSeeder extends Seeder
 
         $this->command->info('Importing Trendyol shipping rates...');
 
+        // Deactivate existing active rate tables
+        $deactivatedCount = ShippingRateTable::where('is_active', true)->update([
+            'is_active' => false,
+            'effective_until' => now()->subDay()->toDateString(),
+        ]);
+
+        if ($deactivatedCount > 0) {
+            $this->command->warn("Deactivated {$deactivatedCount} existing active rate table(s).");
+        }
+
         // Create rate table
         $rateTable = ShippingRateTable::create([
             'name' => 'Trendyol Shipping Rates - Jan 2026',
             'effective_from' => now()->startOfMonth(),
             'effective_until' => null,
             'is_active' => true,
-            'notes' => 'Imported from trendyol-shipping-cost.csv. Prices exclude 20% VAT.',
+            'notes' => 'Imported from trendyol-shipping-cost-jan-2026.csv. Prices exclude 20% VAT.',
         ]);
 
         // Parse CSV
