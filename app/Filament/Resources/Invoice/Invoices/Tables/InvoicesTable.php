@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Invoice\Invoices\Tables;
 
 use App\Actions\Invoice\CancelInvoiceAction;
+use App\Actions\Invoice\GenerateInvoiceAction;
 use App\Models\Invoice\Invoice;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -108,6 +109,35 @@ class InvoicesTable
                     ->color('info')
                     ->url(fn ($record) => $record->pdf_url, shouldOpenInNewTab: true)
                     ->visible(fn ($record) => ! empty($record->pdf_url)),
+
+                Action::make('retry')
+                    ->label(__('Retry'))
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading(__('Retry Invoice Generation'))
+                    ->modalDescription(__('This will retry generating the invoice at Trendyol. The previous failed attempt will be replaced.'))
+                    ->visible(fn ($record) => $record->status->value === 'failed')
+                    ->action(function ($record) {
+                        try {
+                            $action = new GenerateInvoiceAction;
+                            $invoice = $action->execute($record->order, [
+                                'integration_id' => $record->integration_id,
+                            ]);
+
+                            Notification::make()
+                                ->success()
+                                ->title(__('Invoice Generated'))
+                                ->body(__('Successfully generated invoice :number', ['number' => $invoice->invoice_number]))
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->danger()
+                                ->title(__('Generation Failed'))
+                                ->body(__('Failed to generate invoice: :error', ['error' => $e->getMessage()]))
+                                ->send();
+                        }
+                    }),
 
                 Action::make('cancel')
                     ->label(__('Cancel'))

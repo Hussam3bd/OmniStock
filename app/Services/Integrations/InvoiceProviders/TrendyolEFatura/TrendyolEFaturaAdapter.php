@@ -74,7 +74,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
                 'password' => $this->password,
             ]);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 throw new \Exception(
                     'Authentication failed: '.$response->body()
                 );
@@ -84,7 +84,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
             $this->accessToken = $response->header('x-access-token');
             $this->refreshToken = $response->header('x-refresh-token');
 
-            if (!$this->accessToken || !$this->refreshToken) {
+            if (! $this->accessToken || ! $this->refreshToken) {
                 throw new \Exception('Authentication response missing tokens');
             }
 
@@ -144,7 +144,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
     protected function ensureAuthenticated(): void
     {
         // If no access token, authenticate
-        if (!$this->accessToken) {
+        if (! $this->accessToken) {
             $this->authenticate();
 
             return;
@@ -172,7 +172,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
 
             $response = $this->makeRequest('GET', "/taxpayer/{$taxId}");
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 throw new \Exception(
                     'Tax ID verification failed: '.$response->body()
                 );
@@ -216,7 +216,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
                 'body' => $response->json(),
             ]);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 throw new \Exception(
                     'Failed to generate invoice: '.$response->body()
                 );
@@ -253,8 +253,8 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
             $response = $this->makeRequest('POST', "/e-archive/{$invoiceId}/send", [
                 'email' => $customer->email,
                 'phone' => $customer->phone,
-                'send_via_email' => !empty($customer->email),
-                'send_via_sms' => !empty($customer->phone),
+                'send_via_email' => ! empty($customer->email),
+                'send_via_sms' => ! empty($customer->phone),
             ]);
 
             return $response->successful();
@@ -285,7 +285,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
                 'companyId' => $companyId,
             ]);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 throw new \Exception(
                     'Failed to cancel invoice: '.$response->body()
                 );
@@ -312,7 +312,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
 
             $response = $this->makeRequest('GET', "/e-archive/{$invoiceId}");
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 throw new \Exception(
                     'Failed to get invoice: '.$response->body()
                 );
@@ -613,7 +613,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
 
         return [
             'currency' => $currency,
-            'hasExchange' => !$isTRY,
+            'hasExchange' => ! $isTRY,
             'calculationRate' => $isTRY ? 0 : (int) round($exchangeRate * 100),
             'sourceCurrency' => $currency,
             'targetCurrency' => $isTRY ? 'TRY' : 'TRY',
@@ -721,12 +721,12 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
     protected function buildCarrierInfo(Order $order): ?array
     {
         // Get carrier info from the order's shipping aggregator integration
-        if (!$order->shipping_aggregator_integration_id) {
+        if (! $order->shipping_aggregator_integration_id) {
             return null;
         }
 
         $shippingIntegration = Integration::find($order->shipping_aggregator_integration_id);
-        if (!$shippingIntegration) {
+        if (! $shippingIntegration) {
             return null;
         }
 
@@ -734,7 +734,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
         $carrierTaxId = $shippingIntegration->settings['carrier_tax_id'] ?? null;
 
         // Both carrierName and carrierTaxId are required by API
-        if (!$carrierName || !$carrierTaxId) {
+        if (! $carrierName || ! $carrierTaxId) {
             return null;
         }
 
@@ -771,7 +771,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
             ->whereNull('cancelled_at')
             ->first();
 
-        if (!$originalInvoice) {
+        if (! $originalInvoice) {
             return null;
         }
 
@@ -817,7 +817,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
     ): ?string {
         $companyId = $this->integration->settings['company_id'] ?? null;
 
-        if (!$companyId) {
+        if (! $companyId) {
             throw new \Exception('Company ID is required to generate download URL. Please authenticate first.');
         }
 
@@ -836,7 +836,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
                 ->withHeaders(['Accept' => 'text/plain'])
                 ->post('/invoice/documents/download/permanent-url', $payload);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::error('Failed to get permanent URL', [
                     'status' => $response->status(),
                     'response' => $response->body(),
@@ -862,9 +862,26 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
 
     /**
      * Make authenticated HTTP request to Trendyol E-Fatura API
+     * Automatically re-authenticates on 401 errors since there's no refresh token endpoint
      */
-    protected function makeRequest(string $method, string $endpoint, array $data = [])
+    protected function makeRequest(string $method, string $endpoint, array $data = [], bool $isRetry = false)
     {
-        return $this->httpClient()->{strtolower($method)}($endpoint, $data);
+        $response = $this->httpClient()->{strtolower($method)}($endpoint, $data);
+
+        // If we get 401 (token expired) and haven't already retried, re-authenticate and try again
+        if ($response->status() === 401 && ! $isRetry) {
+            Log::info('Trendyol E-Fatura token expired (401), re-authenticating', [
+                'integration_id' => $this->integration->id,
+                'endpoint' => $endpoint,
+            ]);
+
+            // Re-authenticate to get a new token
+            $this->authenticate();
+
+            // Retry the request once with the new token
+            return $this->makeRequest($method, $endpoint, $data, true);
+        }
+
+        return $response;
     }
 }

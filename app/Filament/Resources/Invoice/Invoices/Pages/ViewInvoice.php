@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Invoice\Invoices\Pages;
 
 use App\Actions\Invoice\CancelInvoiceAction;
+use App\Actions\Invoice\GenerateInvoiceAction;
 use App\Filament\Resources\Invoice\Invoices\Infolists\InvoiceInfolist;
 use App\Filament\Resources\Invoice\Invoices\InvoiceResource;
 use Filament\Actions\Action;
@@ -44,6 +45,38 @@ class ViewInvoice extends ViewRecord
                     ? route('filament.admin.resources.orders.view', $this->record->order)
                     : null)
                 ->visible(fn () => $this->record->order),
+
+            Action::make('retry')
+                ->label(__('Retry Invoice Generation'))
+                ->icon('heroicon-o-arrow-path')
+                ->color('warning')
+                ->requiresConfirmation()
+                ->modalHeading(__('Retry Invoice Generation'))
+                ->modalDescription(__('This will retry generating the invoice at Trendyol. The previous failed attempt will be replaced.'))
+                ->visible(fn () => $this->record->status->value === 'failed')
+                ->action(function () {
+                    try {
+                        $action = new GenerateInvoiceAction;
+                        $invoice = $action->execute($this->record->order, [
+                            'integration_id' => $this->record->integration_id,
+                        ]);
+
+                        Notification::make()
+                            ->success()
+                            ->title(__('Invoice Generated'))
+                            ->body(__('Successfully generated invoice :number', ['number' => $invoice->invoice_number]))
+                            ->send();
+
+                        // Refresh the page to show updated invoice
+                        $this->redirect($this->getResource()::getUrl('view', ['record' => $invoice]));
+                    } catch (\Exception $e) {
+                        Notification::make()
+                            ->danger()
+                            ->title(__('Generation Failed'))
+                            ->body(__('Failed to generate invoice: :error', ['error' => $e->getMessage()]))
+                            ->send();
+                    }
+                }),
 
             Action::make('cancel')
                 ->label(__('Cancel Invoice'))
