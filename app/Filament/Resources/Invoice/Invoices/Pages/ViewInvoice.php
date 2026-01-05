@@ -42,7 +42,7 @@ class ViewInvoice extends ViewRecord
                 ->icon('heroicon-o-shopping-bag')
                 ->color('primary')
                 ->url(fn () => $this->record->order
-                    ? route('filament.admin.resources.orders.view', $this->record->order)
+                    ? route('filament.admin.resources.order.orders.view', $this->record->order)
                     : null)
                 ->visible(fn () => $this->record->order),
 

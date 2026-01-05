@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Invoice\Invoices\Infolists;
 use Filament\Infolists;
 use Filament\Schemas;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\TextSize;
 
 class InvoiceInfolist
 {
@@ -17,7 +18,7 @@ class InvoiceInfolist
                         Infolists\Components\TextEntry::make('invoice_number')
                             ->label(__('Invoice Number'))
                             ->copyable()
-                            ->size(Infolists\Components\TextEntry\TextEntrySize::Large)
+                            ->size(TextSize::Large)
                             ->weight('bold'),
 
                         Infolists\Components\TextEntry::make('invoice_type')
@@ -50,11 +51,9 @@ class InvoiceInfolist
                             ->dateTime()
                             ->icon('heroicon-o-clock'),
 
-                        Infolists\Components\TextEntry::make('sent_to_customer')
-                            ->label(__('Sent to Customer'))
-                            ->formatStateUsing(fn ($state) => $state ? __('Yes') : __('No'))
-                            ->badge()
-                            ->color(fn ($state) => $state ? 'success' : 'gray'),
+                        Infolists\Components\IconEntry::make('sent_to_customer')
+                            ->boolean()
+                            ->label(__('Sent to Customer')),
 
                         Infolists\Components\TextEntry::make('sent_at')
                             ->label(__('Sent At'))
@@ -74,7 +73,7 @@ class InvoiceInfolist
                     ->schema([
                         Infolists\Components\TextEntry::make('order.order_number')
                             ->label(__('Order Number'))
-                            ->url(fn ($record) => $record->order ? route('filament.admin.resources.orders.view', $record->order) : null)
+                            ->url(fn ($record) => $record->order ? route('filament.admin.resources.order.orders.view', $record->order) : null)
                             ->color('primary')
                             ->icon('heroicon-o-shopping-bag'),
 
