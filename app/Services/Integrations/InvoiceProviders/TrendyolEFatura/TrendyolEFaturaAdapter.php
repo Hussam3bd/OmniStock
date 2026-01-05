@@ -69,9 +69,24 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
     public function authenticate(): bool
     {
         try {
-            $response = $this->httpClient()->post('/auth/signin', [
+            Log::info('Attempting Trendyol E-Fatura authentication', [
+                'integration_id' => $this->integration->id,
                 'email' => $this->email,
-                'password' => $this->password,
+                'base_url' => $this->baseUrl,
+            ]);
+
+            // Don't use the old token for authentication
+            $response = Http::baseUrl($this->baseUrl)
+                ->asJson()
+                ->acceptJson()
+                ->post('/auth/signin', [
+                    'email' => $this->email,
+                    'password' => $this->password,
+                ]);
+
+            Log::info('Trendyol E-Fatura auth response', [
+                'status' => $response->status(),
+                'headers' => $response->headers(),
             ]);
 
             if (! $response->successful()) {
@@ -85,6 +100,11 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
             $this->refreshToken = $response->header('x-refresh-token');
 
             if (! $this->accessToken || ! $this->refreshToken) {
+                Log::error('Trendyol E-Fatura tokens missing from response', [
+                    'has_access_token' => ! empty($this->accessToken),
+                    'has_refresh_token' => ! empty($this->refreshToken),
+                    'response_headers' => $response->headers(),
+                ]);
                 throw new \Exception('Authentication response missing tokens');
             }
 
@@ -207,8 +227,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
                 'payload' => $invoiceData,
             ]);
 
-            $response = $this->httpClient()
-                ->post('/invoice/documents/earchive', $invoiceData);
+            $response = $this->makeRequest('POST', '/invoice/documents/earchive', $invoiceData);
 
             // Log the response for debugging (debug level in production)
             Log::debug('Trendyol E-Fatura invoice generation response', [
@@ -280,7 +299,7 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
 
             $companyId = $this->integration->settings['company_id'] ?? null;
 
-            $response = $this->httpClient()->post('/invoice/documents/earchive/cancel', [
+            $response = $this->makeRequest('POST', '/invoice/documents/earchive/cancel', [
                 'invoiceUuid' => $invoiceId,
                 'companyId' => $companyId,
             ]);
@@ -832,9 +851,22 @@ class TrendyolEFaturaAdapter implements InvoiceProviderAdapter
         Log::debug('Fetching permanent URL for invoice', $payload);
 
         try {
+            // Note: We can't use makeRequest here because we need custom Accept header
+            // But we should still handle 401 errors manually
             $response = $this->httpClient()
                 ->withHeaders(['Accept' => 'text/plain'])
                 ->post('/invoice/documents/download/permanent-url', $payload);
+
+            // Handle token expiry
+            if ($response->status() === 401) {
+                Log::info('Trendyol E-Fatura token expired while getting permanent URL, re-authenticating');
+                $this->authenticate();
+
+                // Retry with new token
+                $response = $this->httpClient()
+                    ->withHeaders(['Accept' => 'text/plain'])
+                    ->post('/invoice/documents/download/permanent-url', $payload);
+            }
 
             if (! $response->successful()) {
                 Log::error('Failed to get permanent URL', [
