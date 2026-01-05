@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Invoice\Invoices\Tables;
 
 use App\Actions\Invoice\CancelInvoiceAction;
+use App\Models\Invoice\Invoice;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
@@ -22,13 +23,13 @@ class InvoicesTable
                     ->searchable()
                     ->sortable()
                     ->copyable()
-                    ->description(fn ($record) => __('Type: :type', ['type' => $record->invoice_type])),
+                    ->description(fn (Invoice $record, $state) => __('Type: :type', ['type' => $record->invoice_type->getLabel()])),
 
                 TextColumn::make('order.order_number')
                     ->label(__('Order #'))
                     ->searchable()
                     ->sortable()
-                    ->url(fn ($record) => $record->order ? route('filament.admin.resources.orders.view', $record->order) : null)
+                    ->url(fn ($record) => $record->order ? route('filament.admin.resources.order.orders.view', $record->order) : null)
                     ->color('primary'),
 
                 TextColumn::make('integration.name')
