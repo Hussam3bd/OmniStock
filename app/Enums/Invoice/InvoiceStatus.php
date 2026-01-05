@@ -2,7 +2,10 @@
 
 namespace App\Enums\Invoice;
 
-enum InvoiceStatus: string
+use Filament\Support\Contracts\HasColor;
+use Filament\Support\Contracts\HasLabel;
+
+enum InvoiceStatus: string implements HasColor, HasLabel
 {
     case DRAFT = 'draft';
     case PENDING = 'pending';

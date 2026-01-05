@@ -2,7 +2,9 @@
 
 namespace App\Enums\Invoice;
 
-enum InvoiceType: string
+use Filament\Support\Contracts\HasLabel;
+
+enum InvoiceType: string implements HasLabel
 {
     case E_ARCHIVE = 'e-archive';
     case E_INVOICE = 'e-invoice';
