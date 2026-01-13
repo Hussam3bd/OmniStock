@@ -60,6 +60,32 @@ return [
             'report' => false,
         ],
 
+        'hetzner' => [
+            'driver' => 's3',
+            'key' => env('HETZNER_S3_ACCESS_KEY_ID'),
+            'secret' => env('HETZNER_S3_SECRET_ACCESS_KEY'),
+            'region' => env('HETZNER_S3_DEFAULT_REGION'),
+            'bucket' => env('HETZNER_S3_BUCKET'),
+            'url' => env('HETZNER_S3_URL'),
+            'endpoint' => env('HETZNER_S3_ENDPOINT'),
+            'use_path_style_endpoint' => env('HETZNER_S3_USE_PATH_STYLE_ENDPOINT', true),
+            'throw' => false,
+            'visibility' => 'private',
+        ],
+
+        'hetzner-public' => [
+            'driver' => 's3',
+            'key' => env('HETZNER_S3_ACCESS_KEY_ID'),
+            'secret' => env('HETZNER_S3_SECRET_ACCESS_KEY'),
+            'region' => env('HETZNER_S3_DEFAULT_REGION'),
+            'bucket' => env('HETZNER_S3_BUCKET'),
+            'url' => env('HETZNER_S3_URL'),
+            'endpoint' => env('HETZNER_S3_ENDPOINT'),
+            'use_path_style_endpoint' => env('HETZNER_S3_USE_PATH_STYLE_ENDPOINT', true),
+            'throw' => false,
+            'visibility' => 'public',
+        ],
+
     ],
 
     /*
