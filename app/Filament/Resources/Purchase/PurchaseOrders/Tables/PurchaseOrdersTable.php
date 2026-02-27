@@ -3,9 +3,12 @@
 namespace App\Filament\Resources\Purchase\PurchaseOrders\Tables;
 
 use App\Enums\PurchaseOrderStatus;
+use App\Filament\Resources\Purchase\PurchaseOrders\PurchaseOrderResource;
+use App\Models\Purchase\PurchaseOrder;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ReplicateAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms;
 use Filament\Tables;
@@ -182,6 +185,28 @@ class PurchaseOrdersTable
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
+                ReplicateAction::make()
+                    ->excludeAttributes(['order_number', 'status', 'received_date'])
+                    ->beforeReplicaSaved(function (PurchaseOrder $replica): void {
+                        $replica->order_number = 'PO-'.strtoupper(uniqid());
+                        $replica->status = PurchaseOrderStatus::Draft;
+                        $replica->received_date = null;
+                    })
+                    ->after(function (PurchaseOrder $record, PurchaseOrder $replica): void {
+                        $record->items->each(function ($item) use ($replica) {
+                            $replica->items()->create([
+                                'product_variant_id' => $item->product_variant_id,
+                                'quantity_ordered' => $item->quantity_ordered,
+                                'quantity_received' => 0,
+                                'unit_cost' => $item->getRawOriginal('unit_cost'),
+                                'tax_rate' => $item->tax_rate,
+                                'subtotal' => $item->getRawOriginal('subtotal'),
+                                'tax_amount' => $item->getRawOriginal('tax_amount'),
+                                'total' => $item->getRawOriginal('total'),
+                            ]);
+                        });
+                    })
+                    ->successRedirectUrl(fn (PurchaseOrder $replica): string => PurchaseOrderResource::getUrl('edit', ['record' => $replica])),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
