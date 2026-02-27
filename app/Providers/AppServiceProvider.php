@@ -8,6 +8,7 @@ use App\Events\Order\OrderReturnCompleted;
 use App\Listeners\Inventory\DeductInventoryForOrderItem;
 use App\Listeners\Inventory\RestoreInventoryForCancellation;
 use App\Listeners\Inventory\RestoreInventoryForReturn;
+use App\Listeners\Invoice\CancelInvoiceForReturn;
 use App\Models\Accounting\Transaction;
 use App\Models\Address\Address;
 use App\Models\Customer\Customer;
@@ -57,9 +58,10 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(OrderItemCreated::class, DeductInventoryForOrderItem::class);
         Event::listen(OrderCancelled::class, RestoreInventoryForCancellation::class);
         Event::listen(OrderReturnCompleted::class, RestoreInventoryForReturn::class);
+        Event::listen(OrderReturnCompleted::class, CancelInvoiceForReturn::class);
 
         LogViewer::auth(function ($request) {
-            return !!$request?->user();
+            return (bool) $request?->user();
         });
     }
 }
