@@ -54,7 +54,7 @@ class ViewPurchaseOrder extends ViewRecord
             Actions\EditAction::make(),
 
             Actions\ReplicateAction::make()
-                ->excludeAttributes(['order_number', 'status', 'received_date'])
+                ->excludeAttributes(['order_number', 'status', 'received_date', 'items_count'])
                 ->beforeReplicaSaved(function (PurchaseOrder $replica): void {
                     $replica->order_number = 'PO-'.strtoupper(uniqid());
                     $replica->status = PurchaseOrderStatus::Draft;

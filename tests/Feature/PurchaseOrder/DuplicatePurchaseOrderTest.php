@@ -148,6 +148,22 @@ it('copies items with quantity_received reset to zero', function () {
     expect((int) $replicaItems[1]->getRawOriginal('unit_cost'))->toBe(5000);
 });
 
+it('replicates successfully when model is loaded with items_count', function () {
+    $original = PurchaseOrder::withCount('items')->find($this->purchaseOrder->id);
+
+    expect($original->items_count)->toBe(2);
+
+    $replica = $original->replicate(['order_number', 'status', 'received_date', 'items_count']);
+    $replica->order_number = 'PO-'.strtoupper(uniqid());
+    $replica->status = PurchaseOrderStatus::Draft;
+    $replica->received_date = null;
+    $replica->save();
+
+    expect($replica->id)->not->toBe($original->id);
+    expect($replica->status)->toBe(PurchaseOrderStatus::Draft);
+    expect($replica->supplier_id)->toBe($original->supplier_id);
+});
+
 it('does not modify the original purchase order when duplicating', function () {
     $original = $this->purchaseOrder;
     $originalOrderNumber = $original->order_number;
