@@ -321,7 +321,7 @@ class TrendyolAdapter implements SalesChannelAdapter
             'items' => [
                 [
                     'barcode' => $mapping->platform_data['barcode'],
-                    'quantity' => $variant->stock_quantity ?? 0,
+                    'quantity' => $variant->inventory_quantity ?? 0,
                     'salePrice' => $variant->price ? $variant->price->getAmount() / 100 : 0,
                     'listPrice' => $variant->compare_at_price ? $variant->compare_at_price->getAmount() / 100 : 0,
                 ],
@@ -334,12 +334,133 @@ class TrendyolAdapter implements SalesChannelAdapter
                 ->withProperties([
                     'integration_id' => $this->integration->id,
                     'barcode' => $mapping->platform_data['barcode'],
-                    'quantity' => $variant->stock_quantity,
+                    'quantity' => $variant->inventory_quantity,
                 ])
                 ->log('trendyol_inventory_updated');
         }
 
         return $response->successful();
+    }
+
+    /**
+     * Fetch a product from Trendyol by barcode.
+     *
+     * @return array{salePrice: float, listPrice: float, ...}|null
+     */
+    public function fetchProductByBarcode(string $barcode): ?array
+    {
+        $response = Http::withBasicAuth(
+            $this->integration->settings['api_key'],
+            $this->integration->settings['api_secret']
+        )->get("https://apigw.trendyol.com/integration/product/sellers/{$this->integration->settings['supplier_id']}/products", [
+            'barcode' => $barcode,
+        ]);
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $content = $response->json('content', []);
+
+        return $content[0] ?? null;
+    }
+
+    /**
+     * Sync only stock quantities to Trendyol, preserving current Trendyol prices.
+     *
+     * @return array{success: bool, batchId: ?string, synced: int, skipped: int, errors: array}
+     */
+    public function syncStock(Collection $variants): array
+    {
+        $items = [];
+        $skipped = 0;
+        $errors = [];
+
+        foreach ($variants as $variant) {
+            $mapping = $variant->platformMappings
+                ->where('platform', OrderChannel::TRENDYOL->value)
+                ->first();
+
+            if (! $mapping || ! isset($mapping->platform_data['barcode'])) {
+                $skipped++;
+
+                continue;
+            }
+
+            $barcode = $mapping->platform_data['barcode'];
+
+            // Fetch current Trendyol prices to preserve them
+            $trendyolProduct = $this->fetchProductByBarcode($barcode);
+
+            if ($trendyolProduct) {
+                $salePrice = $trendyolProduct['salePrice'];
+                $listPrice = $trendyolProduct['listPrice'];
+            } elseif (isset($mapping->platform_data['salePrice'], $mapping->platform_data['listPrice'])) {
+                $salePrice = $mapping->platform_data['salePrice'];
+                $listPrice = $mapping->platform_data['listPrice'];
+            } else {
+                $errors[] = "Could not resolve prices for barcode {$barcode} (SKU: {$variant->sku})";
+                $skipped++;
+
+                continue;
+            }
+
+            $items[] = [
+                'barcode' => $barcode,
+                'quantity' => $variant->inventory_quantity ?? 0,
+                'salePrice' => $salePrice,
+                'listPrice' => $listPrice,
+            ];
+        }
+
+        if (empty($items)) {
+            return [
+                'success' => true,
+                'batchId' => null,
+                'synced' => 0,
+                'skipped' => $skipped,
+                'errors' => $errors,
+            ];
+        }
+
+        $batchId = null;
+        $success = true;
+
+        // Trendyol allows max 1000 items per request
+        foreach (array_chunk($items, 1000) as $chunk) {
+            $response = Http::withBasicAuth(
+                $this->integration->settings['api_key'],
+                $this->integration->settings['api_secret']
+            )->post("{$this->baseUrl}/{$this->integration->settings['supplier_id']}/products/price-and-inventory", [
+                'items' => $chunk,
+            ]);
+
+            if ($response->successful()) {
+                $batchId = $response->json('batchRequestId') ?? $batchId;
+            } else {
+                $success = false;
+                $errors[] = "API error ({$response->status()}): {$response->body()}";
+            }
+        }
+
+        if ($success) {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'synced_count' => count($items),
+                    'skipped_count' => $skipped,
+                    'batch_id' => $batchId,
+                ])
+                ->log('trendyol_stock_synced');
+        }
+
+        return [
+            'success' => $success,
+            'batchId' => $batchId,
+            'synced' => count($items),
+            'skipped' => $skipped,
+            'errors' => $errors,
+        ];
     }
 
     public function fulfillOrder(Order $order, array $trackingInfo): bool
