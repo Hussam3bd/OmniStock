@@ -377,33 +377,25 @@ class TrendyolAdapter implements SalesChannelAdapter
         $errors = [];
 
         foreach ($variants as $variant) {
-            $mapping = $variant->platformMappings
-                ->where('platform', OrderChannel::TRENDYOL->value)
-                ->first();
-
-            if (! $mapping || ! isset($mapping->platform_data['barcode'])) {
+            if (empty($variant->barcode)) {
                 $skipped++;
 
                 continue;
             }
 
-            $barcode = $mapping->platform_data['barcode'];
+            $barcode = $variant->barcode;
 
-            // Fetch current Trendyol prices to preserve them
+            // Fetch current Trendyol product to verify it exists and get prices
             $trendyolProduct = $this->fetchProductByBarcode($barcode);
 
-            if ($trendyolProduct) {
-                $salePrice = $trendyolProduct['salePrice'];
-                $listPrice = $trendyolProduct['listPrice'];
-            } elseif (isset($mapping->platform_data['salePrice'], $mapping->platform_data['listPrice'])) {
-                $salePrice = $mapping->platform_data['salePrice'];
-                $listPrice = $mapping->platform_data['listPrice'];
-            } else {
-                $errors[] = "Could not resolve prices for barcode {$barcode} (SKU: {$variant->sku})";
+            if (! $trendyolProduct) {
                 $skipped++;
 
                 continue;
             }
+
+            $salePrice = $trendyolProduct['salePrice'];
+            $listPrice = $trendyolProduct['listPrice'];
 
             $items[] = [
                 'barcode' => $barcode,

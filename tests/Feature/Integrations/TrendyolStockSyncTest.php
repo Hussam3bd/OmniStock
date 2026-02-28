@@ -1,8 +1,6 @@
 <?php
 
-use App\Enums\Order\OrderChannel;
 use App\Models\Integration\Integration;
-use App\Models\Platform\PlatformMapping;
 use App\Models\Product\Product;
 use App\Models\Product\ProductVariant;
 use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
@@ -29,21 +27,13 @@ beforeEach(function () {
     $this->adapter = new TrendyolAdapter($this->integration);
 });
 
-test('syncStock fetches trendyol prices and sends correct payload', function () {
+test('syncStock fetches trendyol prices by variant barcode and sends correct payload', function () {
     $variant = ProductVariant::create([
         'product_id' => $this->product->id,
         'sku' => 'SYNC-TEST-001',
-        'barcode' => 'SYNC001',
+        'barcode' => '8680000000001',
         'price' => 5000,
         'inventory_quantity' => 25,
-    ]);
-
-    PlatformMapping::create([
-        'platform' => OrderChannel::TRENDYOL->value,
-        'platform_id' => 'ty-123',
-        'entity_type' => ProductVariant::class,
-        'entity_id' => $variant->id,
-        'platform_data' => ['barcode' => '8680000000001'],
     ]);
 
     Http::fake([
@@ -61,7 +51,6 @@ test('syncStock fetches trendyol prices and sends correct payload', function () 
         ], 200),
     ]);
 
-    $variant->load('platformMappings');
     $result = $this->adapter->syncStock(collect([$variant]));
 
     expect($result['success'])->toBeTrue()
@@ -91,20 +80,11 @@ test('syncStock batches multiple variants in a single request', function () {
         $variant = ProductVariant::create([
             'product_id' => $this->product->id,
             'sku' => "BATCH-TEST-{$i}",
-            'barcode' => "BATCH{$i}",
+            'barcode' => "868000000000{$i}",
             'price' => 5000,
             'inventory_quantity' => $i * 10,
         ]);
 
-        PlatformMapping::create([
-            'platform' => OrderChannel::TRENDYOL->value,
-            'platform_id' => "ty-batch-{$i}",
-            'entity_type' => ProductVariant::class,
-            'entity_id' => $variant->id,
-            'platform_data' => ['barcode' => "868000000000{$i}"],
-        ]);
-
-        $variant->load('platformMappings');
         $variants->push($variant);
     }
 
@@ -136,113 +116,71 @@ test('syncStock batches multiple variants in a single request', function () {
     });
 });
 
-test('syncStock skips variants without trendyol mapping', function () {
-    $variantWithMapping = ProductVariant::create([
+test('syncStock skips variants not found on trendyol', function () {
+    $variantOnTrendyol = ProductVariant::create([
         'product_id' => $this->product->id,
-        'sku' => 'WITH-MAPPING',
-        'barcode' => 'WM001',
+        'sku' => 'ON-TRENDYOL',
+        'barcode' => '8680000000099',
         'price' => 5000,
         'inventory_quantity' => 10,
     ]);
 
-    PlatformMapping::create([
-        'platform' => OrderChannel::TRENDYOL->value,
-        'platform_id' => 'ty-mapped',
-        'entity_type' => ProductVariant::class,
-        'entity_id' => $variantWithMapping->id,
-        'platform_data' => ['barcode' => '8680000000099'],
-    ]);
-
-    $variantWithoutMapping = ProductVariant::create([
+    $variantNotOnTrendyol = ProductVariant::create([
         'product_id' => $this->product->id,
-        'sku' => 'NO-MAPPING',
-        'barcode' => 'NM001',
+        'sku' => 'NOT-ON-TRENDYOL',
+        'barcode' => '9999999999999',
         'price' => 5000,
         'inventory_quantity' => 20,
     ]);
 
     Http::fake([
-        'https://apigw.trendyol.com/integration/product/sellers/12345/products*' => Http::response([
+        'https://apigw.trendyol.com/integration/product/sellers/12345/products?barcode=8680000000099' => Http::response([
             'content' => [
                 ['barcode' => '8680000000099', 'salePrice' => 50.00, 'listPrice' => 60.00],
             ],
+        ], 200),
+        'https://apigw.trendyol.com/integration/product/sellers/12345/products?barcode=9999999999999' => Http::response([
+            'content' => [],
         ], 200),
         'https://api.trendyol.com/sapigw/suppliers/12345/products/price-and-inventory' => Http::response([
             'batchRequestId' => 'batch-skip',
         ], 200),
     ]);
 
-    $variants = collect([$variantWithMapping, $variantWithoutMapping]);
-    $variants->each->load('platformMappings');
-
-    $result = $this->adapter->syncStock($variants);
+    $result = $this->adapter->syncStock(collect([$variantOnTrendyol, $variantNotOnTrendyol]));
 
     expect($result['synced'])->toBe(1)
         ->and($result['skipped'])->toBe(1);
 });
 
-test('syncStock falls back to platform_data prices when trendyol fetch fails', function () {
+test('syncStock skips variants without barcode', function () {
     $variant = ProductVariant::create([
         'product_id' => $this->product->id,
-        'sku' => 'FALLBACK-TEST',
-        'barcode' => 'FB001',
+        'sku' => 'NO-BARCODE-TEST',
+        'barcode' => '',
         'price' => 5000,
         'inventory_quantity' => 15,
     ]);
 
-    PlatformMapping::create([
-        'platform' => OrderChannel::TRENDYOL->value,
-        'platform_id' => 'ty-fallback',
-        'entity_type' => ProductVariant::class,
-        'entity_id' => $variant->id,
-        'platform_data' => [
-            'barcode' => '8680000000055',
-            'salePrice' => 89.99,
-            'listPrice' => 109.99,
-        ],
-    ]);
-
-    Http::fake([
-        'https://apigw.trendyol.com/integration/product/sellers/12345/products*' => Http::response([], 500),
-        'https://api.trendyol.com/sapigw/suppliers/12345/products/price-and-inventory' => Http::response([
-            'batchRequestId' => 'batch-fallback',
-        ], 200),
-    ]);
-
-    $variant->load('platformMappings');
     $result = $this->adapter->syncStock(collect([$variant]));
 
     expect($result['success'])->toBeTrue()
-        ->and($result['synced'])->toBe(1);
+        ->and($result['synced'])->toBe(0)
+        ->and($result['skipped'])->toBe(1)
+        ->and($result['batchId'])->toBeNull();
 
-    Http::assertSent(function ($request) {
-        if (! str_contains($request->url(), 'price-and-inventory')) {
-            return true;
-        }
-
-        $items = $request->data()['items'] ?? [];
-
-        return count($items) === 1
-            && $items[0]['salePrice'] === 89.99
-            && $items[0]['listPrice'] === 109.99;
+    Http::assertNotSent(function ($request) {
+        return str_contains($request->url(), 'price-and-inventory');
     });
 });
 
-test('syncStock returns error gracefully when api fails', function () {
+test('syncStock returns error gracefully when price-and-inventory api fails', function () {
     $variant = ProductVariant::create([
         'product_id' => $this->product->id,
         'sku' => 'API-FAIL-TEST',
-        'barcode' => 'AF001',
+        'barcode' => '8680000000077',
         'price' => 5000,
         'inventory_quantity' => 5,
-    ]);
-
-    PlatformMapping::create([
-        'platform' => OrderChannel::TRENDYOL->value,
-        'platform_id' => 'ty-fail',
-        'entity_type' => ProductVariant::class,
-        'entity_id' => $variant->id,
-        'platform_data' => ['barcode' => '8680000000077'],
     ]);
 
     Http::fake([
@@ -256,7 +194,6 @@ test('syncStock returns error gracefully when api fails', function () {
         ], 500),
     ]);
 
-    $variant->load('platformMappings');
     $result = $this->adapter->syncStock(collect([$variant]));
 
     expect($result['success'])->toBeFalse()
@@ -267,17 +204,9 @@ test('syncStock uses inventory_quantity not stock_quantity', function () {
     $variant = ProductVariant::create([
         'product_id' => $this->product->id,
         'sku' => 'INV-QTY-TEST',
-        'barcode' => 'IQ001',
+        'barcode' => '8680000000088',
         'price' => 5000,
         'inventory_quantity' => 42,
-    ]);
-
-    PlatformMapping::create([
-        'platform' => OrderChannel::TRENDYOL->value,
-        'platform_id' => 'ty-inv',
-        'entity_type' => ProductVariant::class,
-        'entity_id' => $variant->id,
-        'platform_data' => ['barcode' => '8680000000088'],
     ]);
 
     Http::fake([
@@ -291,7 +220,6 @@ test('syncStock uses inventory_quantity not stock_quantity', function () {
         ], 200),
     ]);
 
-    $variant->load('platformMappings');
     $this->adapter->syncStock(collect([$variant]));
 
     Http::assertSent(function ($request) {
@@ -302,27 +230,5 @@ test('syncStock uses inventory_quantity not stock_quantity', function () {
         $items = $request->data()['items'] ?? [];
 
         return count($items) === 1 && $items[0]['quantity'] === 42;
-    });
-});
-
-test('syncStock returns zero synced when no variants have mappings', function () {
-    $variant = ProductVariant::create([
-        'product_id' => $this->product->id,
-        'sku' => 'NO-MAP-TEST',
-        'barcode' => 'NM001',
-        'price' => 5000,
-        'inventory_quantity' => 10,
-    ]);
-
-    $variant->load('platformMappings');
-    $result = $this->adapter->syncStock(collect([$variant]));
-
-    expect($result['success'])->toBeTrue()
-        ->and($result['synced'])->toBe(0)
-        ->and($result['skipped'])->toBe(1)
-        ->and($result['batchId'])->toBeNull();
-
-    Http::assertNotSent(function ($request) {
-        return str_contains($request->url(), 'price-and-inventory');
     });
 });

@@ -298,7 +298,7 @@ class ProductVariantsTable
                     })
                     ->action(function () use ($livewire) {
                         $product = $livewire->getOwnerRecord();
-                        $variants = $product->variants()->with('platformMappings')->get();
+                        $variants = $product->variants()->get();
 
                         $integration = Integration::where('provider', 'trendyol')
                             ->where('is_active', true)

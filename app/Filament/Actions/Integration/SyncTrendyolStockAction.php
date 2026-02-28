@@ -2,7 +2,6 @@
 
 namespace App\Filament\Actions\Integration;
 
-use App\Enums\Order\OrderChannel;
 use App\Models\Integration\Integration;
 use App\Models\Product\ProductVariant;
 use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
@@ -25,10 +24,7 @@ class SyncTrendyolStockAction extends Action
             ->icon(Heroicon::OutlinedArrowUpTray)
             ->color('warning')
             ->visible(function (ProductVariant $record): bool {
-                return $record->platformMappings
-                    ->where('platform', OrderChannel::TRENDYOL->value)
-                    ->whereNotNull('platform_data')
-                    ->contains(fn ($m) => isset($m->platform_data['barcode']));
+                return ! empty($record->barcode);
             })
             ->requiresConfirmation()
             ->modalHeading(__('Sync Stock to Trendyol'))
@@ -70,7 +66,7 @@ class SyncTrendyolStockAction extends Action
                         $errorMsg = implode('; ', $result['errors']);
                         Notification::make()
                             ->title(__('Stock sync failed'))
-                            ->body($errorMsg ?: __('Variant was skipped — no Trendyol mapping or prices found.'))
+                            ->body($errorMsg ?: __('Variant was skipped — no barcode or product not found on Trendyol.'))
                             ->danger()
                             ->send();
                     }
