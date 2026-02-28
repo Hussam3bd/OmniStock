@@ -35,6 +35,9 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
         ]);
 
+        // Seed roles and permissions (assigns super_admin to test user)
+        $this->call(RolesAndPermissionsSeeder::class);
+
         $this->command->info('Database seeding completed successfully.');
         $this->command->info('Please run:');
         $this->command->info('php artisan address:seed-turkish');
