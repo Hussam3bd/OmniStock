@@ -321,7 +321,7 @@ class TrendyolAdapter implements SalesChannelAdapter
             'items' => [
                 [
                     'barcode' => $mapping->platform_data['barcode'],
-                    'quantity' => $variant->inventory_quantity ?? 0,
+                    'quantity' => max($variant->inventory_quantity ?? 0, 0),
                     'salePrice' => $variant->price ? $variant->price->getAmount() / 100 : 0,
                     'listPrice' => $variant->compare_at_price ? $variant->compare_at_price->getAmount() / 100 : 0,
                 ],
@@ -399,7 +399,7 @@ class TrendyolAdapter implements SalesChannelAdapter
 
             $items[] = [
                 'barcode' => $barcode,
-                'quantity' => $variant->inventory_quantity ?? 0,
+                'quantity' => max($variant->inventory_quantity ?? 0, 0),
                 'salePrice' => $salePrice,
                 'listPrice' => $listPrice,
             ];

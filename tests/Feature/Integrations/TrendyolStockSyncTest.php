@@ -232,3 +232,36 @@ test('syncStock uses inventory_quantity not stock_quantity', function () {
         return count($items) === 1 && $items[0]['quantity'] === 42;
     });
 });
+
+test('syncStock sends 0 instead of negative inventory', function () {
+    $variant = ProductVariant::create([
+        'product_id' => $this->product->id,
+        'sku' => 'NEG-STOCK-TEST',
+        'barcode' => '8680000000044',
+        'price' => 5000,
+        'inventory_quantity' => -3,
+    ]);
+
+    Http::fake([
+        'https://apigw.trendyol.com/integration/product/sellers/12345/products*' => Http::response([
+            'content' => [
+                ['barcode' => '8680000000044', 'salePrice' => 50.00, 'listPrice' => 60.00],
+            ],
+        ], 200),
+        'https://api.trendyol.com/sapigw/suppliers/12345/products/price-and-inventory' => Http::response([
+            'batchRequestId' => 'batch-neg',
+        ], 200),
+    ]);
+
+    $this->adapter->syncStock(collect([$variant]));
+
+    Http::assertSent(function ($request) {
+        if (! str_contains($request->url(), 'price-and-inventory')) {
+            return true;
+        }
+
+        $items = $request->data()['items'] ?? [];
+
+        return count($items) === 1 && $items[0]['quantity'] === 0;
+    });
+});
