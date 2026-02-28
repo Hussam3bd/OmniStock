@@ -13,7 +13,7 @@ class OrdersOverTimeChart extends ChartWidget
 
     protected ?string $heading = 'Orders Over Time by Channel';
 
-    public ?string $filter = 'daily';
+    public ?string $filter = 'monthly';
 
     protected function getData(): array
     {

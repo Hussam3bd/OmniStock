@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\Product\Products\Tables;
 
 use App\Forms\Components\MoneyInput;
+use App\Models\Integration\Integration;
+use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -103,6 +105,57 @@ class ProductsTable
                                     'products' => $records->count(),
                                 ]))
                                 ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
+                    BulkAction::make('sync_trendyol_stock')
+                        ->label(__('Sync Stock to Trendyol'))
+                        ->icon('heroicon-o-arrow-up-tray')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading(__('Sync Stock to Trendyol'))
+                        ->modalDescription(__('This will push current stock quantities for all variants of the selected products to Trendyol. Trendyol prices will be preserved.'))
+                        ->modalSubmitActionLabel(__('Sync Stock'))
+                        ->visible(function () {
+                            return Integration::where('provider', 'trendyol')
+                                ->where('is_active', true)
+                                ->exists();
+                        })
+                        ->action(function (Collection $records): void {
+                            $integration = Integration::where('provider', 'trendyol')
+                                ->where('is_active', true)
+                                ->first();
+
+                            $adapter = new TrendyolAdapter($integration);
+                            $variants = $records->loadMissing('variants')->pluck('variants')->flatten();
+
+                            try {
+                                $result = $adapter->syncStock($variants);
+
+                                if ($result['success']) {
+                                    Notification::make()
+                                        ->title(__('Stock synced to Trendyol'))
+                                        ->body(__(':synced variants synced, :skipped skipped across :products products', [
+                                            'synced' => $result['synced'],
+                                            'skipped' => $result['skipped'],
+                                            'products' => $records->count(),
+                                        ]))
+                                        ->success()
+                                        ->send();
+                                } else {
+                                    Notification::make()
+                                        ->title(__('Stock sync completed with errors'))
+                                        ->body(implode('; ', $result['errors']))
+                                        ->warning()
+                                        ->send();
+                                }
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title(__('Error syncing stock'))
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
                         })
                         ->deselectRecordsAfterCompletion(),
 
