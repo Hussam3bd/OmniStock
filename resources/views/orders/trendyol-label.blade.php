@@ -13,22 +13,17 @@
         }
 
         html, body {
-            width: 100mm;
-            height: 100mm;
-            overflow: hidden;
             background: #fff;
             font-family: Arial, Helvetica, sans-serif;
         }
 
-        body {
-            padding: 3mm;
-            display: flex;
-            flex-direction: column;
-        }
-
+        /* Fixed wrapper — Safari ignores @page size, so we control
+           dimensions here. 100mm × 100mm label. */
         .label-wrapper {
-            width: 100%;
-            height: 100%;
+            width: 100mm;
+            height: 100mm;
+            overflow: hidden;
+            padding: 3mm;
             display: flex;
             flex-direction: column;
         }
@@ -107,10 +102,17 @@
         @media print {
             @page {
                 size: 100mm 100mm;
-                margin: 0;
+                margin: 0mm;
             }
 
             html, body {
+                margin: 0;
+                padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .label-wrapper {
                 width: 100mm;
                 height: 100mm;
             }
@@ -118,7 +120,7 @@
     </style>
 </head>
 <body>
-    <div class="label-wrapper">
+<div class="label-wrapper">
 
         {{-- Top barcode --}}
         <svg id="barcode-top" class="barcode-top"></svg>
@@ -180,7 +182,7 @@
                 <svg id="barcode-right"></svg>
             </div>
         </div>
-    </div>
+</div>
 
     <script>
         const trackingNumber = @json($trackingNumber);
@@ -212,7 +214,7 @@
             svg.style.transform  = `translateY(${bw}px) rotate(90deg)`;
         }());
 
-        window.addEventListener('load', () => window.print());
+        window.addEventListener('load', () => setTimeout(() => window.print(), 300));
     </script>
 </body>
 </html>

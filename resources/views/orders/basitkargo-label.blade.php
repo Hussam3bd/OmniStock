@@ -13,12 +13,14 @@
         }
 
         html, body {
-            width: 100mm;
             background: #fff;
             font-family: Arial, Helvetica, sans-serif;
         }
 
-        body {
+        /* Fixed-width label wrapper — Safari ignores @page size so we
+           control dimensions here and scale to fit the actual paper. */
+        .label-root {
+            width: 100mm;
             padding: 4mm;
             display: flex;
             flex-direction: column;
@@ -110,16 +112,25 @@
         @media print {
             @page {
                 size: 100mm auto;
-                margin: 0;
+                margin: 0mm;
             }
 
             html, body {
+                margin: 0;
+                padding: 0;
+                /* Exact colour rendering in both Chrome and Safari */
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .label-root {
                 width: 100mm;
             }
         }
     </style>
 </head>
 <body>
+<div class="label-root">
     @php
         $address   = $order->shippingAddress;
         $firstName = strtoupper($address?->first_name ?? $order->customer?->first_name ?? '');
@@ -188,7 +199,10 @@
             textMargin: 3,
         });
 
-        window.addEventListener('load', () => window.print());
+        // Safari renders SVGs asynchronously — a small delay ensures the
+        // barcode is fully painted before the print dialog opens.
+        window.addEventListener('load', () => setTimeout(() => window.print(), 300));
     </script>
+</div>
 </body>
 </html>
