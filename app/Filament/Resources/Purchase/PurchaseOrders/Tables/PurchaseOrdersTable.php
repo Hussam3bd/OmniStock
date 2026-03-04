@@ -3,11 +3,13 @@
 namespace App\Filament\Resources\Purchase\PurchaseOrders\Tables;
 
 use App\Enums\PurchaseOrderStatus;
+use App\Filament\Exports\PurchaseOrderExporter;
 use App\Filament\Resources\Purchase\PurchaseOrders\PurchaseOrderResource;
 use App\Models\Purchase\PurchaseOrder;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ExportBulkAction;
 use Filament\Actions\ReplicateAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms;
@@ -210,6 +212,8 @@ class PurchaseOrdersTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    ExportBulkAction::make()
+                        ->exporter(PurchaseOrderExporter::class),
                     DeleteBulkAction::make(),
                 ]),
             ])

@@ -9,10 +9,12 @@ use App\Enums\Order\PaymentStatus;
 use App\Enums\Shipping\ShippingCarrier;
 use App\Filament\Actions\Order\BulkResyncShippingDataAction;
 use App\Filament\Actions\Order\ResyncOrderAction;
+use App\Filament\Exports\OrderExporter;
 use App\Filament\Resources\Customer\Customers\CustomerResource;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ExportBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
@@ -349,6 +351,8 @@ class OrdersTable
             ])
             ->bulkActions([
                 BulkActionGroup::make([
+                    ExportBulkAction::make()
+                        ->exporter(OrderExporter::class),
                     BulkResyncShippingDataAction::make(),
                     DeleteBulkAction::make(),
                 ]),
