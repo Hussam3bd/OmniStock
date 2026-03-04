@@ -319,12 +319,13 @@ class PrepareOrders extends Page
                     return;
                 }
 
-                // Found without barcode (NEW / READY_TO_SHIP from Shopify app) →
-                // save the shipment ID so replaceInvalidShipment can preserve the
-                // foreignCode when it generates the barcode.
+                // Found without barcode (NEW from Shopify app) →
+                // Only remember the integration; do NOT save the shipment ID.
+                // createOutboundShipment will create a new labelled shipment
+                // with the same foreignCode so the Shopify sync link is preserved,
+                // and the Shopify-created shipment is left untouched.
                 $order->update([
                     'shipping_aggregator_integration_id' => $integration->id,
-                    'shipping_aggregator_shipment_id' => $existing['id'],
                 ]);
 
                 unset($this->currentOrder);
@@ -380,15 +381,7 @@ class PrepareOrders extends Page
         try {
             $adapter = new BasitKargoAdapter($integration);
 
-            // If a broken shipment already exists, replace it (preserving the Shopify foreignCode).
-            // Otherwise create a fresh shipment.
-            $result = $order->shipping_aggregator_shipment_id
-                ? $adapter->replaceInvalidShipment(
-                    $order->shipping_aggregator_shipment_id,
-                    $order,
-                    $this->selectedCarrier
-                )
-                : $adapter->createOutboundShipment($order, $this->selectedCarrier);
+            $result = $adapter->createOutboundShipment($order, $this->selectedCarrier);
 
             $order->update([
                 'shipping_aggregator_integration_id' => $integration->id,

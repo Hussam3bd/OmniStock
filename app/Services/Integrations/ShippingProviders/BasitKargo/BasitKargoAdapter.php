@@ -192,7 +192,8 @@ class BasitKargoAdapter implements ShippingProviderAdapter
      */
     public function createOutboundShipment(Order $order, string $handlerCode): array
     {
-        $payload = $this->buildShipmentPayload($order, $handlerCode);
+        $foreignCode = $order->platformMappings()->value('platform_id');
+        $payload = $this->buildShipmentPayload($order, $handlerCode, $foreignCode ?: null);
 
         $response = $this->client()->post('/v2/order/barcode', $payload);
 
@@ -302,7 +303,7 @@ class BasitKargoAdapter implements ShippingProviderAdapter
             ],
             'content' => [
                 'name' => 'Sipariş #'.$order->order_number,
-                'code' => $foreignCode ?? $order->order_number,
+                'code' => (string) $order->order_number,
             ],
         ];
 
