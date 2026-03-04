@@ -686,7 +686,8 @@ class OrderMapper extends BaseOrderMapper
             'INVOICED', 'SHIPPED', 'AT_COLLECTION_POINT' => OrderStatus::COMPLETED,
             'DELIVERED' => OrderStatus::COMPLETED,
             'CANCELLED', 'CANCEL_PENDING', 'UNSUPPLIED' => OrderStatus::CANCELLED,
-            'RETURNED', 'UNPACKED', 'UNDELIVERED' => OrderStatus::CANCELLED,
+            'RETURNED', 'UNPACKED' => OrderStatus::CANCELLED,
+            'UN_DELIVERED' => OrderStatus::COMPLETED,
             default => OrderStatus::PENDING,
         };
     }
@@ -702,7 +703,7 @@ class OrderMapper extends BaseOrderMapper
         return match ($status) {
             'INVOICED', 'SHIPPED', 'DELIVERED', 'AT_COLLECTION_POINT' => PaymentStatus::PAID,
             'CANCELLED', 'RETURNED', 'UNSUPPLIED' => PaymentStatus::REFUNDED,
-            'UNDELIVERED' => PaymentStatus::REFUNDED,
+            'UN_DELIVERED' => PaymentStatus::PAID,
             default => PaymentStatus::PENDING,
         };
     }
@@ -722,7 +723,8 @@ class OrderMapper extends BaseOrderMapper
             'INVOICED', 'READY_TO_SHIP' => FulfillmentStatus::AWAITING_SHIPMENT,
             'SHIPPED', 'AT_COLLECTION_POINT' => FulfillmentStatus::IN_TRANSIT,
             'DELIVERED' => FulfillmentStatus::DELIVERED,
-            'CANCELLED', 'CANCEL_PENDING', 'RETURNED', 'UNPACKED', 'UNDELIVERED', 'UNSUPPLIED' => FulfillmentStatus::CANCELLED,
+            'CANCELLED', 'CANCEL_PENDING', 'RETURNED', 'UNPACKED', 'UNSUPPLIED' => FulfillmentStatus::CANCELLED,
+            'UN_DELIVERED' => FulfillmentStatus::IN_TRANSIT,
             default => FulfillmentStatus::UNFULFILLED,
         };
     }
