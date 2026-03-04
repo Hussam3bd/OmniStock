@@ -187,6 +187,28 @@ class ProductVariant extends Model implements HasMedia
     }
 
     /**
+     * Quantity committed in orders that have not yet been shipped.
+     * These items are physically on the shelf but reserved for pending fulfillment.
+     */
+    public function committedQuantity(): int
+    {
+        return $this->orderItems()
+            ->whereHas('order', fn ($q) => $q->whereIn('fulfillment_status', [
+                \App\Enums\Order\FulfillmentStatus::UNFULFILLED->value,
+                \App\Enums\Order\FulfillmentStatus::AWAITING_SHIPMENT->value,
+            ]))
+            ->sum('quantity');
+    }
+
+    /**
+     * Physical on-hand quantity = available stock + committed (reserved by pending orders).
+     */
+    public function onHandQuantity(): int
+    {
+        return $this->inventory_quantity + $this->committedQuantity();
+    }
+
+    /**
      * Update the inventory_quantity column based on location inventory.
      * This syncs the variant's inventory_quantity with the sum of all location quantities.
      */

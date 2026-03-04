@@ -158,11 +158,16 @@
                             @if ($variant?->optionValues->isNotEmpty())
                                 <div class="flex flex-wrap gap-1.5 mt-2">
                                     @foreach ($variant->optionValues as $optionValue)
+                                        @php
+                                            $enVal = $optionValue->getTranslation('value', 'en', false) ?: $optionValue->value;
+                                            $trVal = $optionValue->getTranslation('value', 'tr', false);
+                                            $label = ($trVal && $trVal !== $enVal) ? "{$enVal} / {$trVal}" : $enVal;
+                                        @endphp
                                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-gray-100 dark:bg-gray-800 text-sm font-medium text-gray-800 dark:text-gray-200">
                                             <span class="text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide">
                                                 {{ $optionValue->variantOption?->name }}
                                             </span>
-                                            {{ $optionValue->value }}
+                                            {{ $label }}
                                         </span>
                                     @endforeach
                                 </div>
@@ -174,6 +179,17 @@
                                     · {{ $variant->barcode }}
                                 @endif
                             </p>
+                            @if ($variant)
+                                @php $onHand = $variant->onHandQuantity(); @endphp
+                                <p class="mt-1 text-xs font-medium
+                                    {{ $onHand <= 0
+                                        ? 'text-danger-600 dark:text-danger-400'
+                                        : ($onHand <= 3
+                                            ? 'text-warning-600 dark:text-warning-400'
+                                            : 'text-gray-500 dark:text-gray-400') }}">
+                                    Stok (Elde): {{ $onHand }} adet
+                                </p>
+                            @endif
                         </div>
 
                         <div class="shrink-0 text-center px-2">

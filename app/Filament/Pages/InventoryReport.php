@@ -2,7 +2,9 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\Order\FulfillmentStatus;
 use App\Models\Inventory\Location;
+use App\Models\Order\OrderItem;
 use App\Models\Product\ProductVariant;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -89,10 +91,20 @@ class InventoryReport extends Page implements HasTable
                     ->visible(fn () => $this->selectedLocation !== null),
 
                 Tables\Columns\TextColumn::make('stock_quantity')
-                    ->label(__('Stock'))
+                    ->label(__('Available'))
                     ->sortable()
                     ->badge()
                     ->getStateUsing(fn (ProductVariant $record): int => $this->getStockQuantity($record))
+                    ->color(fn (int $state): string => match (true) {
+                        $state <= 0 => 'danger',
+                        $state <= 10 => 'warning',
+                        default => 'success',
+                    }),
+
+                Tables\Columns\TextColumn::make('on_hand_quantity')
+                    ->label(__('On-hand'))
+                    ->badge()
+                    ->getStateUsing(fn (ProductVariant $record): int => $this->getStockQuantity($record) + (int) ($record->committed_quantity ?? 0))
                     ->color(fn (int $state): string => match (true) {
                         $state <= 0 => 'danger',
                         $state <= 10 => 'warning',
@@ -224,6 +236,18 @@ class InventoryReport extends Page implements HasTable
             // Get all locations - we'll aggregate in the accessor
             $query->with('locations');
         }
+
+        // Subquery for committed (reserved) quantity — avoids N+1
+        $query->addSelect([
+            'committed_quantity' => OrderItem::query()
+                ->selectRaw('COALESCE(SUM(order_items.quantity), 0)')
+                ->join('orders', 'orders.id', '=', 'order_items.order_id')
+                ->whereColumn('order_items.product_variant_id', 'product_variants.id')
+                ->whereIn('orders.fulfillment_status', [
+                    FulfillmentStatus::UNFULFILLED->value,
+                    FulfillmentStatus::AWAITING_SHIPMENT->value,
+                ]),
+        ]);
 
         return $query;
     }
