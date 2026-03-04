@@ -279,20 +279,23 @@ class PrepareOrders extends Page
         $integration = $this->resolveBasitKargoIntegration($order);
 
         // Look for a pre-existing BasitKargo shipment before creating a new one.
-        // Priority: match by Shopify foreignCode (GID) so we don't orphan shipments
-        // that were auto-created by the Shopify BasitKargo app.
-        if ($integration && $order->order_date) {
+        // Primary match: Shopify foreignCode (GID) — ensures we re-use shipments
+        // auto-created by the Shopify BasitKargo app without breaking the tracking link.
+        if ($integration && $order->order_date && ! $order->shipping_aggregator_shipment_id) {
             $adapter = new BasitKargoAdapter($integration);
 
-            // 1. Try to match by Shopify platform_id (foreignCode in BasitKargo)
-            $shopifyGid = $order->platformMappings()->value('platform_id');
-            $existing = $shopifyGid
-                ? $adapter->findShipmentByForeignCode($shopifyGid, $order->order_date)
-                : null;
-
-            // 2. Fall back to matching by order number (covers manually-created shipments)
-            if (! $existing) {
-                $existing = $adapter->findShipmentByOrderNumber($order->order_number, $order->order_date);
+            try {
+                $shopifyGid = $order->platformMappings()->value('platform_id');
+                $existing = $shopifyGid
+                    ? $adapter->findShipmentByForeignCode($shopifyGid, $order->order_date)
+                    : null;
+            } catch (\Exception $e) {
+                // Log but don't block — fall through to creating a fresh shipment
+                activity()
+                    ->performedOn($order)
+                    ->withProperties(['error' => $e->getMessage()])
+                    ->log('basitkargo_pre_search_failed');
+                $existing = null;
             }
 
             if ($existing && ! empty($existing['id'])) {
