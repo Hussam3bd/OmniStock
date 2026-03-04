@@ -105,6 +105,40 @@ class BasitKargoAdapter implements ShippingProviderAdapter
     }
 
     /**
+     * Find an existing BasitKargo shipment by the Shopify foreignCode (order GID).
+     *
+     * Searches within the same calendar day as the order date, restricted to
+     * NEW and READY_TO_SHIP statuses so we only match unprocessed shipments
+     * that were auto-created by the Shopify BasitKargo app.
+     *
+     * @return array{id: string, barcode: string, foreignCode: string}|null
+     */
+    public function findShipmentByForeignCode(string $foreignCode, \Carbon\Carbon $orderDate): ?array
+    {
+        $start = $orderDate->copy()->startOfDay()->format('Y-m-d\TH:i:s');
+        $end = $orderDate->copy()->endOfDay()->format('Y-m-d\TH:i:s');
+
+        $shipments = $this->filterOrders(
+            startDate: $start,
+            endDate: $end,
+            statusList: ['NEW', 'READY_TO_SHIP'],
+            size: 100
+        );
+
+        foreach ($shipments as $shipment) {
+            if ((string) ($shipment['foreignCode'] ?? '') === $foreignCode) {
+                return [
+                    'id' => (string) ($shipment['id'] ?? ''),
+                    'barcode' => (string) ($shipment['barcode'] ?? ''),
+                    'foreignCode' => $foreignCode,
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Find an existing BasitKargo shipment by our order number.
      * Searches within ±7 days of the order date.
      *
@@ -115,10 +149,11 @@ class BasitKargoAdapter implements ShippingProviderAdapter
         $start = $orderDate->copy()->subDays(7)->format('Y-m-d\TH:i:s');
         $end = $orderDate->copy()->addDays(7)->format('Y-m-d\TH:i:s');
 
-        $orders = $this->filterOrders(startDate: $start, endDate: $end, size: 100);
+        $shipments = $this->filterOrders(startDate: $start, endDate: $end, size: 100);
 
-        foreach ($orders as $shipment) {
-            if (($shipment['orderNumber'] ?? null) === $orderNumber) {
+        foreach ($shipments as $shipment) {
+            // Cast both sides to string to avoid strict int vs string mismatch
+            if ((string) ($shipment['orderNumber'] ?? '') === (string) $orderNumber) {
                 return [
                     'id' => (string) ($shipment['id'] ?? ''),
                     'barcode' => (string) ($shipment['barcode'] ?? ''),

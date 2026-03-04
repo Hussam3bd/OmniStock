@@ -278,31 +278,61 @@ class PrepareOrders extends Page
 
         $integration = $this->resolveBasitKargoIntegration($order);
 
-        // Check if a shipment with a barcode already exists in BasitKargo
+        // Look for a pre-existing BasitKargo shipment before creating a new one.
+        // Priority: match by Shopify foreignCode (GID) so we don't orphan shipments
+        // that were auto-created by the Shopify BasitKargo app.
         if ($integration && $order->order_date) {
-            $existing = (new BasitKargoAdapter($integration))->findShipmentByOrderNumber(
-                $order->order_number,
-                $order->order_date
-            );
+            $adapter = new BasitKargoAdapter($integration);
 
-            // Only use existing shipment if it already has a barcode (label created)
-            if ($existing && ! empty($existing['id']) && ! empty($existing['barcode'])) {
+            // 1. Try to match by Shopify platform_id (foreignCode in BasitKargo)
+            $shopifyGid = $order->platformMappings()->value('platform_id');
+            $existing = $shopifyGid
+                ? $adapter->findShipmentByForeignCode($shopifyGid, $order->order_date)
+                : null;
+
+            // 2. Fall back to matching by order number (covers manually-created shipments)
+            if (! $existing) {
+                $existing = $adapter->findShipmentByOrderNumber($order->order_number, $order->order_date);
+            }
+
+            if ($existing && ! empty($existing['id'])) {
+                if (! empty($existing['barcode'])) {
+                    // Already labelled → link & open directly
+                    $order->update([
+                        'shipping_aggregator_integration_id' => $integration->id,
+                        'shipping_aggregator_shipment_id' => $existing['id'],
+                        'shipping_tracking_number' => $existing['barcode'],
+                    ]);
+
+                    unset($this->currentOrder);
+
+                    $this->dispatch('open-label', url: route('admin.orders.basitkargo-label', $order->id));
+
+                    Notification::make()
+                        ->title('Mevcut gönderi bulundu ve bağlandı.')
+                        ->success()
+                        ->send();
+
+                    return;
+                }
+
+                // Found without barcode (NEW / READY_TO_SHIP from Shopify app) →
+                // save the shipment ID so replaceInvalidShipment can preserve the
+                // foreignCode when it generates the barcode.
                 $order->update([
                     'shipping_aggregator_integration_id' => $integration->id,
                     'shipping_aggregator_shipment_id' => $existing['id'],
-                    'shipping_tracking_number' => $existing['barcode'],
                 ]);
 
                 unset($this->currentOrder);
 
-                $this->dispatch('open-label', url: route('admin.orders.basitkargo-label', $order->id));
-
                 Notification::make()
-                    ->title('Mevcut gönderi bulundu ve bağlandı.')
-                    ->success()
+                    ->title('Mevcut gönderi bulundu.')
+                    ->body('Kargo firmasını seçerek etiketi oluşturun.')
+                    ->info()
                     ->send();
 
-                return;
+                // Fall through to carrier modal so user picks a handler
             }
         }
 
