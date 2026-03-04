@@ -104,11 +104,178 @@ class BasitKargoAdapter implements ShippingProviderAdapter
         }
     }
 
+    /**
+     * Find an existing BasitKargo shipment by our order number.
+     * Searches within ±7 days of the order date.
+     *
+     * @return array{id: string, barcode: string}|null
+     */
+    public function findShipmentByOrderNumber(string $orderNumber, \Carbon\Carbon $orderDate): ?array
+    {
+        $start = $orderDate->copy()->subDays(7)->format('Y-m-d\TH:i:s');
+        $end = $orderDate->copy()->addDays(7)->format('Y-m-d\TH:i:s');
+
+        $orders = $this->filterOrders(startDate: $start, endDate: $end, size: 100);
+
+        foreach ($orders as $shipment) {
+            if (($shipment['orderNumber'] ?? null) === $orderNumber) {
+                return [
+                    'id' => (string) ($shipment['id'] ?? ''),
+                    'barcode' => (string) ($shipment['barcode'] ?? ''),
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get available shipping handlers (carriers) from BasitKargo.
+     *
+     * @return array<int, array{code: string, name: string}>
+     */
+    public function getHandlers(): array
+    {
+        $response = $this->client()->get('/v2/handlers');
+
+        if (! $response->successful()) {
+            return [];
+        }
+
+        return collect($response->json())
+            ->map(fn ($h) => ['code' => $h['code'], 'name' => $h['name']])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Create a new outbound shipment via POST /v2/order/barcode.
+     *
+     * @return array{id: string, barcode: string}
+     *
+     * @throws \RuntimeException
+     */
+    public function createOutboundShipment(Order $order, string $handlerCode): array
+    {
+        $payload = $this->buildShipmentPayload($order, $handlerCode);
+
+        $response = $this->client()->post('/v2/order/barcode', $payload);
+
+        if (! $response->successful()) {
+            throw new \RuntimeException(
+                'BasitKargo shipment creation failed: '.$response->body()
+            );
+        }
+
+        $data = $response->json();
+
+        activity()
+            ->performedOn($order)
+            ->withProperties([
+                'integration_id' => $this->integration->id,
+                'handler_code' => $handlerCode,
+                'shipment_id' => $data['id'] ?? null,
+                'barcode' => $data['barcode'] ?? null,
+            ])
+            ->log('basitkargo_outbound_shipment_created');
+
+        return [
+            'id' => (string) ($data['id'] ?? ''),
+            'barcode' => (string) ($data['barcode'] ?? ''),
+        ];
+    }
+
+    /**
+     * Replace an existing invalid shipment with a corrected one.
+     *
+     * Fetches the existing shipment's foreignCode (Shopify order ID), deletes
+     * the broken record, then recreates it with the corrected address and the
+     * same foreignCode so the Shopify ↔ BasitKargo tracking link is preserved.
+     *
+     * @return array{id: string, barcode: string}
+     *
+     * @throws \RuntimeException
+     */
+    public function replaceInvalidShipment(string $existingShipmentId, Order $order, string $handlerCode): array
+    {
+        // Fetch original shipment to retrieve foreignCode (Shopify order ID)
+        $existing = $this->getShipmentById($existingShipmentId);
+
+        $foreignCode = $existing['foreignCode'] ?? null;
+
+        // Delete the broken shipment
+        $this->client()->delete("/v2/order/{$existingShipmentId}");
+
+        // Rebuild with corrected address, preserving the Shopify foreignCode
+        $payload = $this->buildShipmentPayload($order, $handlerCode, $foreignCode);
+
+        $response = $this->client()->post('/v2/order/barcode', $payload);
+
+        if (! $response->successful()) {
+            throw new \RuntimeException(
+                'BasitKargo shipment recreation failed: '.$response->body()
+            );
+        }
+
+        $data = $response->json();
+
+        activity()
+            ->performedOn($order)
+            ->withProperties([
+                'integration_id' => $this->integration->id,
+                'handler_code' => $handlerCode,
+                'old_shipment_id' => $existingShipmentId,
+                'new_shipment_id' => $data['id'] ?? null,
+                'foreign_code' => $foreignCode,
+                'barcode' => $data['barcode'] ?? null,
+            ])
+            ->log('basitkargo_invalid_shipment_replaced');
+
+        return [
+            'id' => (string) ($data['id'] ?? ''),
+            'barcode' => (string) ($data['barcode'] ?? ''),
+        ];
+    }
+
     public function createShipment(Order $order, array $options): array
     {
-        // Implementation for creating shipment
-        // This would be used when you want to create shipments through BasitKargo
-        throw new \Exception('Not implemented yet');
+        throw new \RuntimeException('Use createOutboundShipment() instead.');
+    }
+
+    /**
+     * Build the POST /v2/order/barcode payload from an Order.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildShipmentPayload(Order $order, string $handlerCode, ?string $foreignCode = null): array
+    {
+        $address = $order->shippingAddress;
+
+        $clientName = trim(
+            ($address?->first_name ?? $order->customer?->first_name ?? '').' '.
+            ($address?->last_name ?? $order->customer?->last_name ?? '')
+        );
+
+        $payload = [
+            'handlerCode' => $handlerCode,
+            'client' => [
+                'name' => $clientName ?: 'Müşteri',
+                'phone' => $address?->phone ?? $order->customer?->phone ?? '',
+                'city' => $address?->province?->name ?? '',
+                'town' => $address?->district?->name ?? '',
+                'address' => $address?->full_address ?? $address?->address_line1 ?? '',
+            ],
+            'content' => [
+                'name' => 'Sipariş #'.$order->order_number,
+                'code' => $foreignCode ?? $order->order_number,
+            ],
+        ];
+
+        if ($foreignCode) {
+            $payload['foreignCode'] = $foreignCode;
+        }
+
+        return $payload;
     }
 
     public function trackShipment(string $trackingNumber): array

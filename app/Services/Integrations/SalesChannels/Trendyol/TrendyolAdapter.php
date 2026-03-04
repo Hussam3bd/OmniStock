@@ -455,6 +455,30 @@ class TrendyolAdapter implements SalesChannelAdapter
         ];
     }
 
+    /**
+     * Fetch the cargo tracking number for a Trendyol order from the API.
+     *
+     * Used when the locally-stored tracking number is "0" or missing.
+     */
+    public function fetchCargoTracking(string $orderNumber): ?string
+    {
+        $supplierId = $this->integration->settings['supplier_id'];
+
+        $response = Http::withBasicAuth(
+            $this->integration->settings['api_key'],
+            $this->integration->settings['api_secret']
+        )->get("{$this->baseUrl}/{$supplierId}/orders", [
+            'orderNumber' => $orderNumber,
+            'size' => 1,
+        ]);
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        return $response->json('content.0.cargoTrackingNumber');
+    }
+
     public function fulfillOrder(Order $order, array $trackingInfo): bool
     {
         $mapping = $order->platformMappings()

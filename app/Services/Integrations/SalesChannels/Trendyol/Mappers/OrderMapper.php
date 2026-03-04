@@ -217,7 +217,7 @@ class OrderMapper extends BaseOrderMapper
 
         // Check if delivered
         $deliveredAt = null;
-        if (isset($trendyolPackage['status']) && strtoupper($trendyolPackage['status']) === 'DELIVERED') {
+        if (isset($trendyolPackage['status']) && $this->normalizeTrendyolStatus($trendyolPackage['status']) === 'DELIVERED') {
             $deliveredAt = $shippedAt; // Approximate, exact delivery date not in API
         }
 
@@ -371,7 +371,7 @@ class OrderMapper extends BaseOrderMapper
 
         // Check if delivered
         $deliveredAt = null;
-        if (isset($trendyolPackage['status']) && strtoupper($trendyolPackage['status']) === 'DELIVERED') {
+        if (isset($trendyolPackage['status']) && $this->normalizeTrendyolStatus($trendyolPackage['status']) === 'DELIVERED') {
             $deliveredAt = $shippedAt; // Approximate, exact delivery date not in API
         }
 
@@ -680,7 +680,7 @@ class OrderMapper extends BaseOrderMapper
 
     protected function mapOrderStatus(string $trendyolStatus): OrderStatus
     {
-        return match (strtoupper($trendyolStatus)) {
+        return match ($this->normalizeTrendyolStatus($trendyolStatus)) {
             'CREATED', 'AWAITING', 'VERIFIED' => OrderStatus::PENDING,
             'PICKING', 'PICKED' => OrderStatus::PROCESSING,
             'INVOICED', 'SHIPPED', 'AT_COLLECTION_POINT' => OrderStatus::COMPLETED,
@@ -697,7 +697,7 @@ class OrderMapper extends BaseOrderMapper
             return PaymentStatus::PAID;
         }
 
-        $status = strtoupper($trendyolPackage['status'] ?? '');
+        $status = $this->normalizeTrendyolStatus($trendyolPackage['status'] ?? '');
 
         return match ($status) {
             'INVOICED', 'SHIPPED', 'DELIVERED', 'AT_COLLECTION_POINT' => PaymentStatus::PAID,
@@ -714,17 +714,42 @@ class OrderMapper extends BaseOrderMapper
         $orderStatus = $trendyolPackage['status'] ?? '';
 
         // Use package status if available, otherwise fall back to order status
-        $status = $packageStatus ?? $orderStatus;
+        $status = $this->normalizeTrendyolStatus($packageStatus ?? $orderStatus);
 
-        return match (strtoupper($status)) {
+        return match ($status) {
             'CREATED', 'AWAITING', 'VERIFIED' => FulfillmentStatus::UNFULFILLED,
             'PICKING', 'PICKED' => FulfillmentStatus::AWAITING_SHIPMENT,
-            'INVOICED', 'READYTOSHIP' => FulfillmentStatus::AWAITING_SHIPMENT,
+            'INVOICED', 'READY_TO_SHIP' => FulfillmentStatus::AWAITING_SHIPMENT,
             'SHIPPED', 'AT_COLLECTION_POINT' => FulfillmentStatus::IN_TRANSIT,
             'DELIVERED' => FulfillmentStatus::DELIVERED,
             'CANCELLED', 'CANCEL_PENDING', 'RETURNED', 'UNPACKED', 'UNDELIVERED', 'UNSUPPLIED' => FulfillmentStatus::CANCELLED,
             default => FulfillmentStatus::UNFULFILLED,
         };
+    }
+
+    /**
+     * Normalise a Trendyol status string to SCREAMING_SNAKE_CASE so that both
+     * the sync API (SCREAMING_SNAKE_CASE / ALLCAPS) and webhook API (PascalCase)
+     * formats resolve to the same match arm.
+     *
+     * Examples:
+     *   AtCollectionPoint → AT_COLLECTION_POINT
+     *   CancelPending     → CANCEL_PENDING
+     *   ReadyToShip       → READY_TO_SHIP
+     *   Shipped           → SHIPPED
+     *   SHIPPED           → SHIPPED
+     *   AT_COLLECTION_POINT → AT_COLLECTION_POINT
+     */
+    private function normalizeTrendyolStatus(string $status): string
+    {
+        // Already SCREAMING or SCREAMING_SNAKE_CASE — no lowercase letters present
+        if (! preg_match('/[a-z]/', $status)) {
+            return strtoupper($status);
+        }
+
+        // PascalCase / camelCase — insert underscore before each uppercase letter
+        // that is not at the start, then uppercase everything.
+        return strtoupper(preg_replace('/(?<!^)[A-Z]/', '_$0', $status));
     }
 
     protected function splitName(string $fullName): array
