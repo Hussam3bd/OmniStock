@@ -260,19 +260,25 @@ class TrendyolAdapter implements SalesChannelAdapter
         return $response->json();
     }
 
-    public function fetchAllClaims(int $size = 50): Collection
+    public function fetchAllClaims(?Carbon $since = null, ?Carbon $until = null, int $size = 50): Collection
     {
         $allClaims = collect();
         $page = 0;
+
+        $dateParams = [];
+        if ($since) {
+            $dateParams['startDate'] = $since->timestamp * 1000;
+            $dateParams['endDate'] = ($until ?? now())->timestamp * 1000;
+        }
 
         do {
             $response = Http::withBasicAuth(
                 $this->integration->settings['api_key'],
                 $this->integration->settings['api_secret']
-            )->get("https://apigw.trendyol.com/integration/order/sellers/{$this->integration->settings['supplier_id']}/claims", [
+            )->get("https://apigw.trendyol.com/integration/order/sellers/{$this->integration->settings['supplier_id']}/claims", array_merge([
                 'size' => $size,
                 'page' => $page,
-            ]);
+            ], $dateParams));
 
             if (! $response->successful()) {
                 break;

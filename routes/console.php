@@ -23,3 +23,9 @@ Schedule::job(new SyncMissingPaymentTransactionIds(50))
     ->daily()
     ->onOneServer()
     ->withoutOverlapping();
+
+// Auto-sync Trendyol return claims using a 2-day window to avoid fetching all historical data
+Schedule::command('trendyol:sync-claims --days=2')
+    ->dailyAt('06:00')
+    ->onOneServer()
+    ->withoutOverlapping();

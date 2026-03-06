@@ -5,14 +5,13 @@ namespace App\Console\Commands;
 use App\Enums\Integration\IntegrationProvider;
 use App\Models\Integration\Integration;
 use App\Services\Integrations\SalesChannels\Trendyol\Mappers\ClaimsMapper;
+use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
 use Illuminate\Console\Command;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Http;
 
 class SyncTrendyolClaims extends Command
 {
     protected $signature = 'trendyol:sync-claims
-                            {--page=0 : Starting page number}
+                            {--days=2 : Number of days to look back (0 = fetch all)}
                             {--size=50 : Page size}';
 
     protected $description = 'Sync Trendyol return claims to the returns system';
@@ -27,13 +26,20 @@ class SyncTrendyolClaims extends Command
             return self::FAILURE;
         }
 
-        $page = (int) $this->option('page');
+        $days = (int) $this->option('days');
         $size = (int) $this->option('size');
 
-        $this->info("Fetching Trendyol claims (page: {$page}, size: {$size})");
+        $since = $days > 0 ? now()->subDays($days) : null;
 
-        // Fetch all claims with pagination
-        $allClaims = $this->fetchAllClaims($integration, $size);
+        if ($since) {
+            $this->info("Fetching Trendyol claims from the last {$days} day(s) (since {$since->format('Y-m-d')})");
+        } else {
+            $this->info('Fetching all Trendyol claims (no date filter)');
+        }
+
+        // Fetch claims with optional date window
+        $adapter = new TrendyolAdapter($integration);
+        $allClaims = $adapter->fetchAllClaims($since, size: $size);
 
         $this->info("Found {$allClaims->count()} total claims");
 
@@ -68,53 +74,5 @@ class SyncTrendyolClaims extends Command
         );
 
         return self::SUCCESS;
-    }
-
-    protected function fetchAllClaims(Integration $integration, int $size): Collection
-    {
-        $allClaims = collect();
-        $page = 0;
-
-        do {
-            $response = Http::withBasicAuth(
-                $integration->settings['api_key'],
-                $integration->settings['api_secret']
-            )->get("https://apigw.trendyol.com/integration/order/sellers/{$integration->settings['supplier_id']}/claims", [
-                'size' => $size,
-                'page' => $page,
-            ]);
-
-            if (! $response->successful()) {
-                $this->error("Failed to fetch claims: {$response->body()}");
-                break;
-            }
-
-            $data = $response->json();
-            $claims = collect($data['content'] ?? []);
-
-            if ($claims->isEmpty()) {
-                break;
-            }
-
-            $allClaims = $allClaims->merge($claims);
-
-            $this->line("Fetched page {$page}: {$claims->count()} claims");
-
-            $page++;
-            $totalPages = $data['totalPages'] ?? 1;
-
-            // Break if we've fetched all pages
-            if ($page >= $totalPages) {
-                break;
-            }
-
-            // Safety limit
-            if ($page > 100) {
-                $this->warn('Reached page limit (100)');
-                break;
-            }
-        } while (true);
-
-        return $allClaims;
     }
 }
