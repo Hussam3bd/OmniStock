@@ -136,9 +136,11 @@ class VerifyInventoryCommand extends Command
 
         $result['statistics']['expected_returns'] = $expectedReturns;
 
-        // Count actual return movements
+        // Count actual return movements, excluding cancelled/rejected orders to match
+        // the same scope as expectedReturns (stock for those is restored via cancellation).
         $actualReturns = InventoryMovement::where('product_variant_id', $variant->id)
             ->where('type', InventoryMovementType::Return->value)
+            ->whereHas('order', fn ($q) => $q->whereNotIn('order_status', ['cancelled', 'rejected']))
             ->sum('quantity');
 
         $result['statistics']['actual_returns'] = $actualReturns;
