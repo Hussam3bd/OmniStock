@@ -296,10 +296,18 @@ class VerifyInventoryCommand extends Command
 
         // Check for completed returns without movements.
         // Exclude cancelled/rejected orders — their stock is restored via cancellation.
+        // Exclude returns where ALL items are marked restocked=false (no_restock) — no movement expected.
         $returnsWithoutMovements = DB::table('returns')
             ->join('orders', 'returns.order_id', '=', 'orders.id')
             ->where('returns.status', ReturnStatus::Completed->value)
             ->whereNotIn('orders.order_status', ['cancelled', 'rejected'])
+            ->whereExists(function ($query) {
+                // At least one return item that should be restocked (null or true)
+                $query->select(DB::raw(1))
+                    ->from('return_items')
+                    ->whereColumn('return_items.return_id', 'returns.id')
+                    ->where(fn ($q) => $q->whereNull('return_items.restocked')->orWhere('return_items.restocked', true));
+            })
             ->whereNotExists(function ($query) {
                 $query->select(DB::raw(1))
                     ->from('inventory_movements')
