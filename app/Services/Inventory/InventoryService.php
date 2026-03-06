@@ -141,17 +141,20 @@ class InventoryService
     public function restoreInventoryForReturn(OrderReturn $return): void
     {
         DB::transaction(function () use ($return) {
-            foreach ($return->items as $returnItem) {
-                $variant = $returnItem->orderItem?->productVariant;
+            // Group return items by variant and sum quantities so that multiple
+            // return_items for the same variant produce a single movement.
+            // This prevents the idempotency check from skipping the second item.
+            $variantQuantities = $return->items
+                ->filter(fn ($item) => $item->orderItem?->productVariant !== null)
+                ->groupBy(fn ($item) => $item->orderItem->productVariant->id)
+                ->map(fn ($items) => [
+                    'variant' => $items->first()->orderItem->productVariant,
+                    'quantity' => $items->sum('quantity'),
+                ]);
 
-                if (! $variant) {
-                    Log::warning('Product variant not found for return item', [
-                        'return_id' => $return->id,
-                        'return_item_id' => $returnItem->id,
-                    ]);
-
-                    continue;
-                }
+            foreach ($variantQuantities as $variantData) {
+                $variant = $variantData['variant'];
+                $quantityToRestore = $variantData['quantity'];
 
                 // Find the original movement to get the location
                 $originalMovement = InventoryMovement::where('order_id', $return->order_id)
@@ -163,22 +166,6 @@ class InventoryService
 
                 if (! $location) {
                     Log::warning('No location found for inventory restoration', [
-                        'return_id' => $return->id,
-                        'variant_id' => $variant->id,
-                    ]);
-
-                    continue;
-                }
-
-                // Check if movement already exists (idempotency)
-                $existingMovement = InventoryMovement::where('order_id', $return->order_id)
-                    ->where('product_variant_id', $variant->id)
-                    ->where('type', InventoryMovementType::Return->value)
-                    ->where('reference', 'LIKE', "%{$return->return_number}%")
-                    ->first();
-
-                if ($existingMovement) {
-                    Log::info('Return inventory movement already exists, skipping', [
                         'return_id' => $return->id,
                         'variant_id' => $variant->id,
                     ]);
@@ -203,17 +190,35 @@ class InventoryService
                     continue;
                 }
 
-                // Restore quantity
-                $quantityToRestore = $returnItem->quantity;
+                // Idempotency: check if we already have a movement for this return+variant
+                // with the correct total quantity. If so, skip.
+                $existingQty = InventoryMovement::where('order_id', $return->order_id)
+                    ->where('product_variant_id', $variant->id)
+                    ->where('type', InventoryMovementType::Return->value)
+                    ->where('reference', 'LIKE', "%{$return->return_number}%")
+                    ->sum('quantity');
+
+                if ($existingQty >= $quantityToRestore) {
+                    Log::info('Return inventory movement already fully recorded, skipping', [
+                        'return_id' => $return->id,
+                        'variant_id' => $variant->id,
+                        'existing_qty' => $existingQty,
+                    ]);
+
+                    continue;
+                }
+
+                // Restore only the remaining quantity not yet recorded
+                $remaining = $quantityToRestore - $existingQty;
 
                 $this->adjustInventory(
                     variant: $variant,
                     location: $location,
-                    quantity: $quantityToRestore, // Positive for restoration
+                    quantity: $remaining,
                     type: InventoryMovementType::Return,
                     orderId: $return->order_id,
                     reference: "Return #{$return->return_number}",
-                    notes: "Return completed - restored {$quantityToRestore} units"
+                    notes: "Return completed - restored {$remaining} units"
                 );
             }
         });
