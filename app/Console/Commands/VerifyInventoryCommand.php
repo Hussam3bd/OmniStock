@@ -113,26 +113,25 @@ class VerifyInventoryCommand extends Command
 
         $result['statistics']['expected_sales'] = $expectedSales;
 
-        // Count actual sale movements (excluding those with corresponding cancellation movements)
+        // Count actual sale movements for non-cancelled/rejected orders only.
+        // Using order status directly is more reliable than checking for cancellation
+        // movements, which may not exist if restoration was done via a return movement.
         $actualSales = InventoryMovement::where('product_variant_id', $variant->id)
             ->where('type', InventoryMovementType::Sale->value)
-            ->whereNotExists(function ($query) use ($variant) {
-                $query->select(DB::raw(1))
-                    ->from('inventory_movements as cancellations')
-                    ->whereColumn('cancellations.order_id', 'inventory_movements.order_id')
-                    ->where('cancellations.product_variant_id', $variant->id)
-                    ->where('cancellations.type', InventoryMovementType::Cancellation->value);
-            })
+            ->whereHas('order', fn ($q) => $q->whereNotIn('order_status', ['cancelled', 'rejected']))
             ->sum(DB::raw('ABS(quantity)'));
 
         $result['statistics']['actual_sales'] = $actualSales;
 
-        // Count expected returns from completed returns
+        // Count expected returns from completed returns, excluding returns for
+        // cancelled/rejected orders (their stock is already restored via cancellation).
         $expectedReturns = DB::table('return_items')
             ->join('returns', 'return_items.return_id', '=', 'returns.id')
             ->join('order_items', 'return_items.order_item_id', '=', 'order_items.id')
+            ->join('orders', 'returns.order_id', '=', 'orders.id')
             ->where('order_items.product_variant_id', $variant->id)
             ->where('returns.status', ReturnStatus::Completed->value)
+            ->whereNotIn('orders.order_status', ['cancelled', 'rejected'])
             ->sum('return_items.quantity');
 
         $result['statistics']['expected_returns'] = $expectedReturns;
@@ -291,9 +290,12 @@ class VerifyInventoryCommand extends Command
             $this->warn("  ⚠️  {$ordersWithoutMovements} orders don't have inventory movements");
         }
 
-        // Check for completed returns without movements
+        // Check for completed returns without movements.
+        // Exclude cancelled/rejected orders — their stock is restored via cancellation.
         $returnsWithoutMovements = DB::table('returns')
-            ->where('status', ReturnStatus::Completed->value)
+            ->join('orders', 'returns.order_id', '=', 'orders.id')
+            ->where('returns.status', ReturnStatus::Completed->value)
+            ->whereNotIn('orders.order_status', ['cancelled', 'rejected'])
             ->whereNotExists(function ($query) {
                 $query->select(DB::raw(1))
                     ->from('inventory_movements')

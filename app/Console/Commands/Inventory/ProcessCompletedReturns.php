@@ -43,16 +43,27 @@ class ProcessCompletedReturns extends Command
 
         // Find all completed returns that don't have return inventory movements
         $returns = OrderReturn::where('status', ReturnStatus::Completed)
-            ->with('items.orderItem.productVariant')
+            ->with(['items.orderItem.productVariant', 'order'])
             ->get()
             ->filter(function ($return) {
                 // Check if this return already has inventory movements
-                $hasMovements = InventoryMovement::where('order_id', $return->order_id)
+                $hasReturnMovements = InventoryMovement::where('order_id', $return->order_id)
                     ->where('type', InventoryMovementType::Return->value)
                     ->where('reference', 'LIKE', "%{$return->return_number}%")
                     ->exists();
 
-                return ! $hasMovements;
+                if ($hasReturnMovements) {
+                    return false;
+                }
+
+                // Skip returns for cancelled/rejected orders — stock is already restored
+                // via a cancellation movement. Creating a return movement on top would
+                // double-count the restoration.
+                $hasCancellationMovements = InventoryMovement::where('order_id', $return->order_id)
+                    ->where('type', InventoryMovementType::Cancellation->value)
+                    ->exists();
+
+                return ! $hasCancellationMovements;
             });
 
         if ($returns->isEmpty()) {
