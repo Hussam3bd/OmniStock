@@ -501,6 +501,8 @@ class ShopifyRefundMapper extends BaseReturnsMapper
                 $order->currency
             );
 
+            $restockType = $refundLineItem['restock_type'] ?? null;
+
             $return->items()->updateOrCreate(
                 [
                     'order_item_id' => $orderItem->id,
@@ -511,6 +513,14 @@ class ShopifyRefundMapper extends BaseReturnsMapper
                     'reason_name' => $shopifyRefund['note'] ?? 'Refunded via Shopify',
                     'external_item_id' => (string) ($refundLineItem['id'] ?? null),
                     'platform_data' => $refundLineItem,
+                    // true = physically restocked (restore inventory)
+                    // false = no restock (defective/customer keeps — skip inventory)
+                    // null = unknown (non-Shopify) — treated as restocked
+                    'restocked' => match ($restockType) {
+                        'return' => true,
+                        'no_restock' => false,
+                        default => null,
+                    },
                 ]
             );
         }

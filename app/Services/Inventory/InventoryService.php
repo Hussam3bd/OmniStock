@@ -143,9 +143,11 @@ class InventoryService
         DB::transaction(function () use ($return) {
             // Group return items by variant and sum quantities so that multiple
             // return_items for the same variant produce a single movement.
-            // This prevents the idempotency check from skipping the second item.
+            // Skip items explicitly marked as not restocked (e.g. defective items
+            // returned but not put back to stock per Shopify's restock_type).
             $variantQuantities = $return->items
                 ->filter(fn ($item) => $item->orderItem?->productVariant !== null)
+                ->filter(fn ($item) => $item->restocked !== false)
                 ->groupBy(fn ($item) => $item->orderItem->productVariant->id)
                 ->map(fn ($items) => [
                     'variant' => $items->first()->orderItem->productVariant,

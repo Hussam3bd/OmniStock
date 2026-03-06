@@ -21,6 +21,7 @@ class ReturnItem extends Model
         'refund_amount',
         'external_item_id',
         'platform_data',
+        'restocked',
     ];
 
     protected function casts(): array

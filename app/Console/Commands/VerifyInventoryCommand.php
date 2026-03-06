@@ -123,8 +123,9 @@ class VerifyInventoryCommand extends Command
 
         $result['statistics']['actual_sales'] = $actualSales;
 
-        // Count expected returns from completed returns, excluding returns for
-        // cancelled/rejected orders (their stock is already restored via cancellation).
+        // Count expected returns from completed returns, excluding:
+        // - cancelled/rejected orders (stock restored via cancellation)
+        // - items explicitly marked as not restocked (e.g. defective, restock_type = no_restock)
         $expectedReturns = DB::table('return_items')
             ->join('returns', 'return_items.return_id', '=', 'returns.id')
             ->join('order_items', 'return_items.order_item_id', '=', 'order_items.id')
@@ -132,6 +133,7 @@ class VerifyInventoryCommand extends Command
             ->where('order_items.product_variant_id', $variant->id)
             ->where('returns.status', ReturnStatus::Completed->value)
             ->whereNotIn('orders.order_status', ['cancelled', 'rejected'])
+            ->where(fn ($q) => $q->whereNull('return_items.restocked')->orWhere('return_items.restocked', true))
             ->sum('return_items.quantity');
 
         $result['statistics']['expected_returns'] = $expectedReturns;
