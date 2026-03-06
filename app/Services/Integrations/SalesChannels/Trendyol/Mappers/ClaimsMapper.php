@@ -91,19 +91,20 @@ class ClaimsMapper extends BaseReturnsMapper
             // Adopt orphan return records that were created before external_return_id was
             // tracked. Match by claimDate so we don't incorrectly link multi-claim orders.
             // This prevents duplicate records from being created on each sync.
-            $orphanQuery = OrderReturn::where('order_id', $order->id)
-                ->where('channel', $this->getChannel()->value)
-                ->whereNull('external_return_id');
+            // Note: check existence separately to avoid MySQL's self-referencing subquery restriction.
+            $claimAlreadyLinked = OrderReturn::where('external_return_id', $claim['id'])->exists();
 
-            if ($claimDate) {
-                $orphanQuery->where('requested_at', $claimDate);
+            if (! $claimAlreadyLinked) {
+                $orphanQuery = OrderReturn::where('order_id', $order->id)
+                    ->where('channel', $this->getChannel()->value)
+                    ->whereNull('external_return_id');
+
+                if ($claimDate) {
+                    $orphanQuery->where('requested_at', $claimDate);
+                }
+
+                $orphanQuery->limit(1)->update(['external_return_id' => $claim['id']]);
             }
-
-            $orphanQuery->whereNotExists(function ($q) use ($claim) {
-                $q->select(DB::raw(1))
-                    ->from('returns as r2')
-                    ->where('r2.external_return_id', $claim['id']);
-            })->limit(1)->update(['external_return_id' => $claim['id']]);
 
             // Create or update return
             $return = OrderReturn::updateOrCreate(
