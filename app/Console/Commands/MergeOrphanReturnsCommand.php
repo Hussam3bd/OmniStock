@@ -97,8 +97,8 @@ class MergeOrphanReturnsCommand extends Command
             $toDelete->map(fn ($r) => [
                 $r->return_number,
                 $r->order_id,
-                $r->channel,
-                $r->status,
+                is_object($r->channel) ? $r->channel->value : $r->channel,
+                is_object($r->status) ? $r->status->value : $r->status,
                 $r->external_return_id ?? 'NULL',
                 $r->total_refund_amount ?? 0,
                 $r->created_at,
