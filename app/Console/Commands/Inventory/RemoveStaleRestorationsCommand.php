@@ -31,11 +31,12 @@ class RemoveStaleRestorationsCommand extends Command
 
         $this->newLine();
 
-        // Find cancellation movements where the linked order is NOT cancelled
+        // Find cancellation movements where the linked order is NOT cancelled/rejected
+        // Rejected orders are treated the same as cancelled — their stock restorations are legitimate
         $query = DB::table('inventory_movements as im')
             ->join('orders as o', 'im.order_id', '=', 'o.id')
             ->where('im.type', InventoryMovementType::Cancellation->value)
-            ->where('o.order_status', '!=', 'cancelled')
+            ->whereNotIn('o.order_status', ['cancelled', 'rejected'])
             ->whereNotNull('im.order_id')
             ->select('im.id as movement_id', 'im.product_variant_id', 'im.location_id', 'im.quantity', 'im.created_at', 'o.id as order_id', 'o.order_number', 'o.order_status');
 

@@ -38,11 +38,12 @@ class ProcessCancelledOrders extends Command
     {
         $dryRun = $this->option('dry-run');
 
-        $this->info('🔍 Finding cancelled orders without inventory restoration...');
+        $this->info('🔍 Finding cancelled/rejected orders without inventory restoration...');
         $this->newLine();
 
-        // Find all cancelled orders that have sale movements but no cancellation movements
-        $orders = Order::where('order_status', OrderStatus::CANCELLED->value)
+        // Find all cancelled/rejected orders that have sale movements but no cancellation movements
+        // Rejected orders are treated the same as cancelled for inventory purposes
+        $orders = Order::whereIn('order_status', [OrderStatus::CANCELLED->value, 'rejected'])
             ->with('items.productVariant')
             ->get()
             ->filter(function ($order) {
@@ -64,12 +65,12 @@ class ProcessCancelledOrders extends Command
             });
 
         if ($orders->isEmpty()) {
-            $this->info('✅ No cancelled orders need processing - all cancelled orders already have inventory restored');
+            $this->info('✅ No cancelled/rejected orders need processing - all already have inventory restored');
 
             return self::SUCCESS;
         }
 
-        $this->warn('Found '.$orders->count().' cancelled orders without inventory restoration');
+        $this->warn('Found '.$orders->count().' cancelled/rejected orders without inventory restoration');
         $this->newLine();
 
         if ($dryRun) {
@@ -110,7 +111,7 @@ class ProcessCancelledOrders extends Command
         $progressBar->finish();
         $this->newLine(2);
 
-        $this->info("✅ Processed {$processed} cancelled orders successfully");
+        $this->info("✅ Processed {$processed} cancelled/rejected orders successfully");
         if ($failed > 0) {
             $this->warn("⚠️  {$failed} orders failed to process");
         }
