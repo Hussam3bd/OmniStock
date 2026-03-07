@@ -6,9 +6,12 @@ use App\Enums\Inventory\InventoryMovementType;
 use App\Models\Order\Order;
 use App\Models\Product\ProductVariant;
 use App\Models\Purchase\PurchaseOrderItem;
+use App\Observers\InventoryMovementObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+#[ObservedBy(InventoryMovementObserver::class)]
 class InventoryMovement extends Model
 {
     protected $fillable = [

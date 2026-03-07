@@ -9,6 +9,8 @@ use App\Filament\Actions\Integration\SyncTrendyolStockAction;
 use App\Forms\Components\MoneyInput;
 use App\Models\Integration\Integration;
 use App\Models\Inventory\InventoryMovement;
+use App\Models\Inventory\Location;
+use App\Models\Inventory\LocationInventory;
 use App\Models\Product\ProductVariant;
 use App\Models\Product\VariantOption;
 use App\Services\BarcodeService;
@@ -410,18 +412,28 @@ class ProductVariantsTable
                                 ->rows(3),
                         ])
                         ->action(function (Collection $records, array $data): void {
+                            $location = Location::where('is_default', true)->first() ?? Location::first();
                             $quantityChange = (int) $data['quantity'];
 
                             foreach ($records as $record) {
-                                $quantityBefore = $record->inventory_quantity;
+                                $locationInventory = LocationInventory::firstOrCreate(
+                                    ['location_id' => $location->id, 'product_variant_id' => $record->id],
+                                    ['quantity' => 0]
+                                );
+
+                                $locationInventory = LocationInventory::where('id', $locationInventory->id)
+                                    ->lockForUpdate()
+                                    ->first();
+
+                                $quantityBefore = $locationInventory->quantity;
                                 $quantityAfter = $quantityBefore + $quantityChange;
 
-                                $record->update([
-                                    'inventory_quantity' => $quantityAfter,
-                                ]);
+                                $locationInventory->update(['quantity' => $quantityAfter]);
 
+                                // Observer will call syncInventoryQuantity() automatically
                                 InventoryMovement::create([
                                     'product_variant_id' => $record->id,
+                                    'location_id' => $location->id,
                                     'type' => $data['type'],
                                     'quantity' => $quantityChange,
                                     'quantity_before' => $quantityBefore,

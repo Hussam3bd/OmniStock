@@ -154,9 +154,27 @@ class VerifyInventoryCommand extends Command
 
         $result['statistics']['purchase_receipts'] = $purchaseReceipts;
 
-        // Calculate expected inventory
-        // Starting from 0 + purchases - sales + returns
-        $expectedInventory = $purchaseReceipts - $expectedSales + $expectedReturns;
+        // Count manual condition deductions (damaged, lost, needs_fix) — legitimate write-offs
+        $conditionDeductions = InventoryMovement::where('product_variant_id', $variant->id)
+            ->whereIn('type', [
+                InventoryMovementType::Damaged->value,
+                InventoryMovementType::Lost->value,
+                InventoryMovementType::NeedsFix->value,
+            ])
+            ->sum(DB::raw('ABS(quantity)'));
+
+        $result['statistics']['condition_deductions'] = $conditionDeductions;
+
+        // Count manual adjustments
+        $adjustments = InventoryMovement::where('product_variant_id', $variant->id)
+            ->where('type', InventoryMovementType::Adjustment->value)
+            ->sum('quantity');
+
+        $result['statistics']['adjustments'] = $adjustments;
+
+        // Calculate expected inventory:
+        // purchases - sales + returns - conditions + adjustments
+        $expectedInventory = $purchaseReceipts - $expectedSales + $expectedReturns - $conditionDeductions + $adjustments;
         $result['statistics']['expected_inventory'] = $expectedInventory;
 
         // Check for discrepancies
@@ -205,18 +223,28 @@ class VerifyInventoryCommand extends Command
         }
 
         // Statistics table
+        $rows = [
+            ['Current Inventory', $stats['current_inventory']],
+            ['Expected Inventory', $stats['expected_inventory']],
+            ['', ''],
+            ['Purchase Receipts', "+{$stats['purchase_receipts']}"],
+            ['Expected Sales', "-{$stats['expected_sales']}"],
+            ['Actual Sales', "-{$stats['actual_sales']}"],
+            ['Expected Returns', "+{$stats['expected_returns']}"],
+            ['Actual Returns', "+{$stats['actual_returns']}"],
+        ];
+
+        if (($stats['condition_deductions'] ?? 0) > 0) {
+            $rows[] = ['Condition Deductions', "-{$stats['condition_deductions']}"];
+        }
+
+        if (($stats['adjustments'] ?? 0) !== 0) {
+            $rows[] = ['Manual Adjustments', "{$stats['adjustments']}"];
+        }
+
         $this->table(
             ['Metric', 'Value'],
-            [
-                ['Current Inventory', $stats['current_inventory']],
-                ['Expected Inventory', $stats['expected_inventory']],
-                ['', ''],
-                ['Purchase Receipts', "+{$stats['purchase_receipts']}"],
-                ['Expected Sales', "-{$stats['expected_sales']}"],
-                ['Actual Sales', "-{$stats['actual_sales']}"],
-                ['Expected Returns', "+{$stats['expected_returns']}"],
-                ['Actual Returns', "+{$stats['actual_returns']}"],
-            ]
+            $rows
         );
 
         // Display issues
