@@ -16,17 +16,19 @@ return new class extends Migration
             $table->boolean('restocked')->nullable()->after('quantity');
         });
 
-        // Backfill from existing platform_data for Shopify return items
-        DB::statement("
-            UPDATE return_items
-            SET restocked = CASE
-                WHEN JSON_UNQUOTE(JSON_EXTRACT(platform_data, '$.restock_type')) = 'return'     THEN 1
-                WHEN JSON_UNQUOTE(JSON_EXTRACT(platform_data, '$.restock_type')) = 'no_restock' THEN 0
-                ELSE NULL
-            END
-            WHERE platform_data IS NOT NULL
-              AND JSON_EXTRACT(platform_data, '$.restock_type') IS NOT NULL
-        ");
+        // Backfill from existing platform_data for Shopify return items (MySQL only)
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("
+                UPDATE return_items
+                SET restocked = CASE
+                    WHEN JSON_UNQUOTE(JSON_EXTRACT(platform_data, '$.restock_type')) = 'return'     THEN 1
+                    WHEN JSON_UNQUOTE(JSON_EXTRACT(platform_data, '$.restock_type')) = 'no_restock' THEN 0
+                    ELSE NULL
+                END
+                WHERE platform_data IS NOT NULL
+                  AND JSON_EXTRACT(platform_data, '$.restock_type') IS NOT NULL
+            ");
+        }
     }
 
     public function down(): void

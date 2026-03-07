@@ -2,7 +2,10 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\Inventory\InventoryMovementType;
 use App\Enums\Order\FulfillmentStatus;
+use App\Filament\Actions\RecordItemConditionAction;
+use App\Models\Inventory\InventoryMovement;
 use App\Models\Inventory\Location;
 use App\Models\Order\OrderItem;
 use App\Models\Product\ProductVariant;
@@ -101,10 +104,39 @@ class InventoryReport extends Page implements HasTable
                         default => 'success',
                     }),
 
+                Tables\Columns\TextColumn::make('committed_quantity')
+                    ->label(__('Committed'))
+                    ->badge()
+                    ->getStateUsing(fn (ProductVariant $record): int => (int) ($record->committed_quantity ?? 0))
+                    ->color('primary')
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('needs_fix_quantity')
+                    ->label(__('Needs Fix'))
+                    ->badge()
+                    ->getStateUsing(fn (ProductVariant $record): int => (int) ($record->needs_fix_quantity ?? 0))
+                    ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray')
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('damaged_quantity')
+                    ->label(__('Damaged / Lost'))
+                    ->badge()
+                    ->getStateUsing(fn (ProductVariant $record): int => (int) ($record->damaged_quantity ?? 0))
+                    ->color(fn (int $state): string => $state > 0 ? 'danger' : 'gray')
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('on_hand_quantity')
                     ->label(__('On-hand'))
                     ->badge()
-                    ->getStateUsing(fn (ProductVariant $record): int => $this->getStockQuantity($record) + (int) ($record->committed_quantity ?? 0))
+                    ->getStateUsing(function (ProductVariant $record): int {
+                        $available = $this->getStockQuantity($record);
+                        $committed = (int) ($record->committed_quantity ?? 0);
+                        $needsFix = (int) ($record->needs_fix_quantity ?? 0);
+                        $damaged = (int) ($record->damaged_quantity ?? 0);
+
+                        // On-hand = available + committed + physically present conditions (damaged & needs_fix, not lost)
+                        return $available + $committed + $needsFix + $damaged;
+                    })
                     ->color(fn (int $state): string => match (true) {
                         $state <= 0 => 'danger',
                         $state <= 10 => 'warning',
@@ -150,6 +182,8 @@ class InventoryReport extends Page implements HasTable
                     ->color(fn (int $state): string => $state > 0 ? 'success' : 'danger'),
             ])
             ->recordActions([
+                RecordItemConditionAction::make(),
+
                 Action::make('view_history')
                     ->label(__('History'))
                     ->icon('heroicon-o-clock')
@@ -247,6 +281,26 @@ class InventoryReport extends Page implements HasTable
                     FulfillmentStatus::UNFULFILLED->value,
                     FulfillmentStatus::AWAITING_SHIPMENT->value,
                 ]),
+        ]);
+
+        // Subqueries for condition quantities (damaged/lost/needs_fix movements)
+        $locationFilter = $this->selectedLocation;
+
+        $query->addSelect([
+            'needs_fix_quantity' => InventoryMovement::query()
+                ->selectRaw('COALESCE(SUM(ABS(quantity)), 0)')
+                ->whereColumn('product_variant_id', 'product_variants.id')
+                ->where('type', InventoryMovementType::NeedsFix->value)
+                ->when($locationFilter, fn ($q) => $q->where('location_id', $locationFilter)),
+
+            'damaged_quantity' => InventoryMovement::query()
+                ->selectRaw('COALESCE(SUM(ABS(quantity)), 0)')
+                ->whereColumn('product_variant_id', 'product_variants.id')
+                ->whereIn('type', [
+                    InventoryMovementType::Damaged->value,
+                    InventoryMovementType::Lost->value,
+                ])
+                ->when($locationFilter, fn ($q) => $q->where('location_id', $locationFilter)),
         ]);
 
         return $query;

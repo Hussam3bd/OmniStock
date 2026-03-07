@@ -13,6 +13,8 @@ enum InventoryMovementType: string implements HasColor, HasLabel
     case Adjustment = 'adjustment';
     case PurchaseReceived = 'purchase_received';
     case Damaged = 'damaged';
+    case Lost = 'lost';
+    case NeedsFix = 'needs_fix';
     case Transfer = 'transfer';
 
     public function getLabel(): string
@@ -24,6 +26,8 @@ enum InventoryMovementType: string implements HasColor, HasLabel
             self::Adjustment => 'Manual Adjustment',
             self::PurchaseReceived => 'Purchase Received',
             self::Damaged => 'Damaged',
+            self::Lost => 'Lost',
+            self::NeedsFix => 'Needs Fix',
             self::Transfer => 'Transfer Between Locations',
         };
     }
@@ -33,6 +37,8 @@ enum InventoryMovementType: string implements HasColor, HasLabel
         return in_array($this, [
             self::Sale,
             self::Damaged,
+            self::Lost,
+            self::NeedsFix,
         ]);
     }
 
@@ -45,14 +51,24 @@ enum InventoryMovementType: string implements HasColor, HasLabel
         ]);
     }
 
+    /**
+     * Whether items of this type are still physically present in the warehouse.
+     * Damaged and NeedsFix items are still on the shelf; Lost items are gone.
+     */
+    public function isPhysicallyPresent(): bool
+    {
+        return in_array($this, [self::Damaged, self::NeedsFix]);
+    }
+
     public function getColor(): string|array|null
     {
         return match ($this) {
-            self::Sale, self::Damaged => 'danger',
+            self::Sale, self::Damaged, self::Lost => 'danger',
             self::PurchaseReceived => 'success',
             self::Return => 'info',
             self::Adjustment => 'warning',
             self::Cancellation => 'primary',
+            self::NeedsFix => 'warning',
             default => 'gray',
         };
     }
