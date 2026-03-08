@@ -43,10 +43,10 @@ class OversoldItemsWidget extends Widget
             ])
             ->get()
             ->filter(function (ProductVariant $variant): bool {
-                $available = max(0, (int) ($variant->available_quantity ?? 0));
+                $available = (int) ($variant->available_quantity ?? 0);
                 $committed = (int) ($variant->committed_quantity ?? 0);
 
-                return $committed > $available;
+                return $committed > 0 && $committed > $available;
             })
             ->sortBy(fn (ProductVariant $v) => $v->product->title)
             ->groupBy(fn (ProductVariant $v) => $v->product->title)
@@ -55,11 +55,11 @@ class OversoldItemsWidget extends Widget
                     ->groupBy(fn (ProductVariant $v) => $v->optionValues->first()?->getTranslation('value', 'tr') ?? '—')
                     ->map(function (Collection $colorVariants): Collection {
                         return $colorVariants->mapWithKeys(function (ProductVariant $v): array {
-                            $available = max(0, (int) ($v->available_quantity ?? 0));
+                            $available = (int) ($v->available_quantity ?? 0);
                             $committed = (int) ($v->committed_quantity ?? 0);
                             $size = $v->optionValues->skip(1)->first()?->getTranslation('value', 'tr') ?? '—';
 
-                            return [$size => $committed - $available];
+                            return [$size => max(0, $committed - $available)];
                         });
                     });
             });

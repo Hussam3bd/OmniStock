@@ -24,11 +24,11 @@
             display: flex;
             flex-direction: column;
             gap: 1.5mm;
-            page-break-after: always;
         }
 
-        .label-page:last-child {
-            page-break-after: avoid;
+        .label-page.break-after {
+            page-break-after: always;
+            break-after: page;
         }
 
         .section {
@@ -166,7 +166,7 @@
         $barcodeId = 'barcode-' . $order->id;
     @endphp
 
-    <div class="label-page">
+    <div class="label-page {{ $loop->last ? '' : 'break-after' }}">
         <div class="section">
             <div class="section-label">Alıcı:</div>
             <div class="alici-row">
