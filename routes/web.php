@@ -15,6 +15,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/admin/orders/{order}/basitkargo-label', [\App\Http\Controllers\BasitKargoLabelController::class, 'show'])
         ->name('admin.orders.basitkargo-label');
+
+    Route::get('/admin/orders/bulk-labels', [\App\Http\Controllers\BulkShippingLabelsController::class, 'show'])
+        ->name('admin.orders.bulk-labels');
 });
 
 Route::webhooks('webhooks/ty', 'trendyol');

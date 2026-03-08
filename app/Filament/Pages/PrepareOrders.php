@@ -12,6 +12,7 @@ use App\Models\Integration\Integration;
 use App\Models\Order\Order;
 use App\Services\Integrations\ShippingProviders\BasitKargo\BasitKargoAdapter;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -72,6 +73,21 @@ class PrepareOrders extends Page
 
     /** @var array<int, array{id: int, name: string}> */
     public array $availableDistricts = [];
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('print_all_labels')
+                ->label(__('Print All Labels'))
+                ->icon('heroicon-o-printer')
+                ->color('gray')
+                ->action(function (): void {
+                    $url = route('admin.orders.bulk-labels');
+
+                    $this->js("window.open('".addslashes($url)."', '_blank')");
+                }),
+        ];
+    }
 
     public function mount(): void
     {
