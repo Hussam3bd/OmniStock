@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Enums\Inventory\InventoryMovementType;
 use App\Enums\Order\FulfillmentStatus;
 use App\Filament\Actions\RecordItemConditionAction;
+use App\Filament\Widgets\OversoldItemsWidget;
 use App\Models\Inventory\InventoryMovement;
 use App\Models\Inventory\Location;
 use App\Models\Order\OrderItem;
@@ -46,6 +47,13 @@ class InventoryReport extends Page implements HasTable
     public function getTitle(): string
     {
         return __('Inventory Report');
+    }
+
+    protected function getFooterWidgets(): array
+    {
+        return [
+            OversoldItemsWidget::class,
+        ];
     }
 
     public function mount(): void
