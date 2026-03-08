@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Enums\Order\FulfillmentStatus;
+use App\Models\Inventory\LocationInventory;
 use App\Models\Order\OrderItem;
 use App\Models\Product\ProductVariant;
 use Filament\Widgets\Widget;
@@ -25,6 +26,12 @@ class OversoldItemsWidget extends Widget
         return ProductVariant::query()
             ->with(['product', 'optionValues'])
             ->addSelect([
+                // Live available stock from location_inventory (source of truth)
+                'available_quantity' => LocationInventory::query()
+                    ->selectRaw('COALESCE(SUM(quantity), 0)')
+                    ->whereColumn('product_variant_id', 'product_variants.id'),
+
+                // Committed = units in pending unfulfilled orders
                 'committed_quantity' => OrderItem::query()
                     ->selectRaw('COALESCE(SUM(order_items.quantity), 0)')
                     ->join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -36,7 +43,7 @@ class OversoldItemsWidget extends Widget
             ])
             ->get()
             ->filter(function (ProductVariant $variant): bool {
-                $available = max(0, $variant->inventory_quantity);
+                $available = max(0, (int) ($variant->available_quantity ?? 0));
                 $committed = (int) ($variant->committed_quantity ?? 0);
 
                 return $committed > $available;
@@ -44,12 +51,11 @@ class OversoldItemsWidget extends Widget
             ->sortBy(fn (ProductVariant $v) => $v->product->title)
             ->groupBy(fn (ProductVariant $v) => $v->product->title)
             ->map(function (Collection $variants): Collection {
-                // Group by color (first option value), then collect sizes
                 return $variants
                     ->groupBy(fn (ProductVariant $v) => $v->optionValues->first()?->getTranslation('value', 'tr') ?? '—')
                     ->map(function (Collection $colorVariants): Collection {
                         return $colorVariants->mapWithKeys(function (ProductVariant $v): array {
-                            $available = max(0, $v->inventory_quantity);
+                            $available = max(0, (int) ($v->available_quantity ?? 0));
                             $committed = (int) ($v->committed_quantity ?? 0);
                             $size = $v->optionValues->skip(1)->first()?->getTranslation('value', 'tr') ?? '—';
 
