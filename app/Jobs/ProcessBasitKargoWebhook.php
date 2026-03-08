@@ -219,8 +219,10 @@ class ProcessBasitKargoWebhook extends ProcessWebhookJob implements ShouldQueue
      */
     protected function findOrder(): ?Order
     {
+        $orderNumber = $this->payload['orderNumber'] ?? null;
+
         return Order::query()
-            ->where(function ($q) {
+            ->where(function ($q) use ($orderNumber) {
                 if ($this->barcode) {
                     $q->orWhere('shipping_tracking_number', $this->barcode);
                 }
@@ -231,6 +233,11 @@ class ProcessBasitKargoWebhook extends ProcessWebhookJob implements ShouldQueue
 
                 if ($this->shipmentId) {
                     $q->orWhere('shipping_aggregator_shipment_id', $this->shipmentId);
+                }
+
+                // READY_TO_SHIP arrives before barcode/shipment ID are stored — match by order number
+                if ($orderNumber) {
+                    $q->orWhere('order_number', $orderNumber);
                 }
             })
             ->first();
@@ -329,8 +336,11 @@ class ProcessBasitKargoWebhook extends ProcessWebhookJob implements ShouldQueue
     {
         $updateData = [];
 
-        if ($this->handlerShipmentCode && ! $order->shipping_tracking_number) {
-            $updateData['shipping_tracking_number'] = $this->handlerShipmentCode;
+        // Prefer handlerShipmentCode, fall back to barcode (set on READY_TO_SHIP)
+        $trackingNumber = $this->handlerShipmentCode ?? $this->barcode;
+
+        if ($trackingNumber && ! $order->shipping_tracking_number) {
+            $updateData['shipping_tracking_number'] = $trackingNumber;
         }
 
         if ($this->shipmentId && ! $order->shipping_aggregator_shipment_id) {

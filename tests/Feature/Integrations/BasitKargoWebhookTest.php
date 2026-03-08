@@ -483,3 +483,44 @@ test('extracts handlerShipmentCode from nested shipmentInfo', function () {
     // Should extract from API response via sync service (only fills if null)
     expect($order->fresh()->shipping_tracking_number)->toBe('NESTED-CODE-123');
 });
+
+test('READY_TO_SHIP webhook matches order by order_number and sets barcode', function () {
+    $order = Order::create([
+        'customer_id' => $this->customer->id,
+        'channel' => OrderChannel::SHOPIFY,
+        'order_number' => '1456',
+        'order_status' => OrderStatus::PENDING,
+        'payment_status' => 'pending',
+        'fulfillment_status' => 'unfulfilled',
+        'subtotal' => 10000,
+        'total_amount' => 10000,
+        'currency' => 'TRY',
+        'order_date' => now(),
+        'shipping_tracking_number' => null,
+        'shipping_aggregator_shipment_id' => null,
+    ]);
+
+    $payload = [
+        'id' => 'ZDU-HXY-1RO',
+        'status' => 'READY_TO_SHIP',
+        'barcode' => '8724166909',
+        'orderNumber' => '1456',
+        'foreignCode' => '7087847080163',
+        '_basitkargo_integration_id' => $this->integration->id,
+    ];
+
+    $webhookCall = WebhookCall::create([
+        'name' => 'basitkargo',
+        'url' => 'https://test.com/webhooks/basitkargo',
+        'payload' => $payload,
+    ]);
+
+    $job = new ProcessBasitKargoWebhook($webhookCall);
+    $job->handle();
+
+    $fresh = $order->fresh();
+
+    expect($fresh->shipping_tracking_number)->toBe('8724166909')
+        ->and($fresh->shipping_aggregator_shipment_id)->toBe('ZDU-HXY-1RO')
+        ->and($fresh->shipping_aggregator_integration_id)->toBe($this->integration->id);
+});
