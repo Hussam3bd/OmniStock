@@ -10,7 +10,7 @@
         </x-slot>
 
         <x-slot name="description">
-            {{ __('Items sold in pending orders that exceed current available stock.') }}
+            {{ __('Items with negative physical stock that need to be restocked.') }}
         </x-slot>
 
         <x-slot name="headerEnd">
@@ -45,7 +45,7 @@
         @if($grouped->isEmpty())
             <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <x-filament::icon icon="heroicon-o-check-circle" class="h-5 w-5 text-success-500" />
-                {{ __('All committed items are covered by available stock.') }}
+                {{ __('All inventory is at zero or above — nothing needs restocking.') }}
             </div>
         @else
             <div class="space-y-6">
