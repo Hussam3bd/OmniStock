@@ -41,9 +41,13 @@ class OrdersTable
                 TextColumn::make('item_skus')
                     ->label('SKU(s)')
                     ->getStateUsing(fn ($record) => $record->items
-                        ->map(fn ($item) => $item->productVariant?->sku)
+                        ->map(fn ($item) => $item->productVariant?->sku
+                            ? ($item->quantity > 1
+                                ? $item->productVariant->sku.' x'.$item->quantity
+                                : $item->productVariant->sku)
+                            : null
+                        )
                         ->filter()
-                        ->unique()
                         ->join(', ') ?: '—'
                     )
                     ->searchable(query: fn ($query, $search) => $query->whereHas(
@@ -51,6 +55,18 @@ class OrdersTable
                         fn ($q) => $q->where('sku', 'like', "%{$search}%")
                     ))
                     ->toggleable(),
+
+                TextColumn::make('item_skus_expanded')
+                    ->label('SKU(s) Expanded')
+                    ->getStateUsing(fn ($record) => $record->items
+                        ->flatMap(fn ($item) => $item->productVariant?->sku
+                            ? array_fill(0, $item->quantity, $item->productVariant->sku)
+                            : []
+                        )
+                        ->join(', ') ?: '—'
+                    )
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 TextColumn::make('customer.full_name')
                     ->label('Customer')
                     ->searchable(query: function ($query, $search) {
