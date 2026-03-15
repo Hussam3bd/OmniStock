@@ -32,11 +32,25 @@ class OrdersTable
     {
         return $table
             ->defaultSort('order_date', 'desc')
+            ->with(['items.productVariant'])
             ->columns([
                 TextColumn::make('order_number')
                     ->label('Order #')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('item_skus')
+                    ->label('SKU(s)')
+                    ->getStateUsing(fn ($record) => $record->items
+                        ->map(fn ($item) => $item->productVariant?->sku)
+                        ->filter()
+                        ->unique()
+                        ->join(', ') ?: '—'
+                    )
+                    ->searchable(query: fn ($query, $search) => $query->whereHas(
+                        'items.productVariant',
+                        fn ($q) => $q->where('sku', 'like', "%{$search}%")
+                    ))
+                    ->toggleable(),
                 TextColumn::make('customer.full_name')
                     ->label('Customer')
                     ->searchable(query: function ($query, $search) {
