@@ -168,6 +168,31 @@ class OrderExporter extends Exporter
                 ->formatStateUsing(fn ($state) => $state ? number_format((float) $state, 4) : '')
                 ->enabledByDefault(false),
 
+            // ── SKUs ──────────────────────────────────────────────────────────
+            ExportColumn::make('item_skus')
+                ->label('SKU(s)')
+                ->state(fn (Order $record): string => $record->items
+                    ->map(fn ($item) => $item->productVariant?->sku
+                        ? ($item->quantity > 1
+                            ? $item->productVariant->sku.' x'.$item->quantity
+                            : $item->productVariant->sku)
+                        : null
+                    )
+                    ->filter()
+                    ->implode(', ') ?: ''
+                ),
+
+            ExportColumn::make('item_skus_expanded')
+                ->label('SKU(s) Expanded')
+                ->state(fn (Order $record): string => $record->items
+                    ->flatMap(fn ($item) => $item->productVariant?->sku
+                        ? array_fill(0, $item->quantity, $item->productVariant->sku)
+                        : []
+                    )
+                    ->implode(', ') ?: ''
+                )
+                ->enabledByDefault(false),
+
             // ── Line items ────────────────────────────────────────────────────
             ExportColumn::make('items_count')
                 ->label('# Line Items')

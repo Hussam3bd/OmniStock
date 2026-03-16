@@ -32,7 +32,7 @@ class OrdersTable
     {
         return $table
             ->defaultSort('order_date', 'desc')
-            ->with(['items.productVariant'])
+            ->modifyQueryUsing(fn ($query) => $query->with(['items.productVariant']))
             ->columns([
                 TextColumn::make('order_number')
                     ->label('Order #')
