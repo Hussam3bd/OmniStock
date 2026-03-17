@@ -2,7 +2,9 @@
 
 namespace App\Filament\Widgets;
 
+use App\Enums\Order\FulfillmentStatus;
 use App\Models\Inventory\LocationInventory;
+use App\Models\Order\OrderItem;
 use App\Models\Product\ProductVariant;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Collection;
@@ -16,20 +18,35 @@ class OversoldItemsWidget extends Widget
     protected int|string|array $columnSpan = 'full';
 
     /**
-     * Returns variants with negative available stock grouped as:
-     * product_title → color → [ size => abs(available) ]
+     * Returns variants where committed (pending orders) exceeds physical stock,
+     * grouped as: product_title → color → [ size => shortfall ]
      */
     public function getGroupedItems(): Collection
     {
+        $pendingStatuses = [
+            FulfillmentStatus::UNFULFILLED->value,
+            FulfillmentStatus::AWAITING_SHIPMENT->value,
+        ];
+
         return ProductVariant::query()
             ->with(['product', 'optionValues'])
             ->addSelect([
-                'available_quantity' => LocationInventory::query()
+                'physical_stock' => LocationInventory::query()
                     ->selectRaw('COALESCE(SUM(quantity), 0)')
                     ->whereColumn('product_variant_id', 'product_variants.id'),
+                'committed_quantity' => OrderItem::query()
+                    ->selectRaw('COALESCE(SUM(order_items.quantity), 0)')
+                    ->whereColumn('order_items.product_variant_id', 'product_variants.id')
+                    ->join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->whereIn('orders.fulfillment_status', $pendingStatuses),
             ])
             ->get()
-            ->filter(fn (ProductVariant $v) => (int) ($v->available_quantity ?? 0) < 0)
+            ->filter(fn (ProductVariant $v) => (int) ($v->committed_quantity ?? 0) > (int) ($v->physical_stock ?? 0))
+            ->map(function (ProductVariant $v): ProductVariant {
+                $v->shortfall = (int) $v->committed_quantity - (int) $v->physical_stock;
+
+                return $v;
+            })
             ->sortBy(fn (ProductVariant $v) => $v->product->title)
             ->groupBy(fn (ProductVariant $v) => $v->product->title)
             ->map(function (Collection $variants): Collection {
@@ -39,7 +56,7 @@ class OversoldItemsWidget extends Widget
                         return $colorVariants->mapWithKeys(function (ProductVariant $v): array {
                             $size = $v->optionValues->skip(1)->first()?->getTranslation('value', 'tr') ?? '—';
 
-                            return [$size => abs((int) ($v->available_quantity ?? 0))];
+                            return [$size => $v->shortfall];
                         });
                     });
             });

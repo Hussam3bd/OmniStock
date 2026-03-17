@@ -10,7 +10,7 @@
         </x-slot>
 
         <x-slot name="description">
-            {{ __('Items with negative physical stock that need to be restocked.') }}
+            {{ __('Items where pending orders exceed physical stock — quantity shows how many units you need to bring in.') }}
         </x-slot>
 
         <x-slot name="headerEnd">
