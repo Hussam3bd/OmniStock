@@ -152,6 +152,19 @@ class PurchaseOrderForm
 
                 Schemas\Components\Section::make(__('Order Summary'))
                     ->schema([
+                        Infolists\Components\TextEntry::make('items_summary')
+                            ->label(__('Items'))
+                            ->state(function ($get) {
+                                $items = collect($get('items') ?? []);
+                                $lineItems = $items->count();
+                                $totalUnits = $items->sum(fn ($item) => (int) ($item['quantity_ordered'] ?? 0));
+
+                                return __(':lines line items, :units total units', [
+                                    'lines' => $lineItems,
+                                    'units' => $totalUnits,
+                                ]);
+                            }),
+
                         Infolists\Components\TextEntry::make('subtotal_display')
                             ->label(__('Subtotal'))
                             ->state(function ($get) {
@@ -240,6 +253,107 @@ class PurchaseOrderForm
                     return __('Order Items').' ('.$itemsCount.')';
                 })
                     ->headerActions([
+                        Action::make('quickImport')
+                            ->label(__('Quick Import'))
+                            ->icon('heroicon-o-clipboard-document-list')
+                            ->color('info')
+                            ->schema([
+                                Forms\Components\Textarea::make('json_data')
+                                    ->label(__('SKU & Quantity JSON'))
+                                    ->required()
+                                    ->rows(10)
+                                    ->placeholder('[{"sku":"REV-0009-SIY-36","qty":13},{"sku":"REV-0009-SIY-37","qty":4}]')
+                                    ->helperText(__('Paste JSON array of {"sku":"...","qty":...} objects')),
+
+                                Forms\Components\TextInput::make('bulk_unit_cost')
+                                    ->label(__('Unit Cost (for all items)'))
+                                    ->numeric()
+                                    ->step(0.01)
+                                    ->suffix(fn ($livewire) => Currency::find($livewire->data['currency_id'] ?? null)?->code ?? 'TRY')
+                                    ->helperText(__('Leave empty to use each variant\'s cost price')),
+                            ])
+                            ->action(function (array $data, $livewire) {
+                                $entries = json_decode($data['json_data'], true);
+
+                                if (! is_array($entries) || empty($entries)) {
+                                    Notification::make()
+                                        ->danger()
+                                        ->title(__('Invalid JSON'))
+                                        ->body(__('Could not parse the JSON data. Ensure it is a valid array.'))
+                                        ->send();
+
+                                    return;
+                                }
+
+                                $currencyId = $livewire->data['currency_id'] ?? null;
+                                $currency = $currencyId ? Currency::find($currencyId) : Currency::where('is_default', true)->first();
+                                $currencyCode = $currency?->code ?? 'TRY';
+                                $bulkUnitCost = ! empty($data['bulk_unit_cost']) ? (float) $data['bulk_unit_cost'] : null;
+
+                                $formState = $livewire->form->getRawState();
+                                $currentItems = $formState['items'] ?? [];
+                                $existingVariantIds = collect($currentItems)->pluck('product_variant_id')->filter()->values()->toArray();
+
+                                $skus = collect($entries)->pluck('sku')->filter()->values()->toArray();
+                                $variants = ProductVariant::whereIn('sku', $skus)->get()->keyBy('sku');
+
+                                $addedCount = 0;
+                                $notFoundSkus = [];
+
+                                foreach ($entries as $entry) {
+                                    $sku = $entry['sku'] ?? null;
+                                    $qty = (int) ($entry['qty'] ?? 0);
+
+                                    if (! $sku || $qty <= 0) {
+                                        continue;
+                                    }
+
+                                    $variant = $variants->get($sku);
+
+                                    if (! $variant) {
+                                        $notFoundSkus[] = $sku;
+
+                                        continue;
+                                    }
+
+                                    if (in_array($variant->id, $existingVariantIds)) {
+                                        continue;
+                                    }
+
+                                    $unitCost = $bulkUnitCost !== null
+                                        ? Money::parse($bulkUnitCost, $currencyCode)
+                                        : ($variant->cost_price ?? Money::parse(0, $currencyCode));
+
+                                    $currentItems[] = [
+                                        'product_variant_id' => $variant->id,
+                                        'quantity_ordered' => $qty,
+                                        'unit_cost' => $unitCost,
+                                        'tax_rate' => 0,
+                                    ];
+                                    $existingVariantIds[] = $variant->id;
+                                    $addedCount++;
+                                }
+
+                                $livewire->data['items'] = $currentItems;
+                                $formState['items'] = $currentItems;
+                                $livewire->form->fill($formState);
+                                $livewire->dispatch('$refresh');
+
+                                $message = __(':count item(s) imported.', ['count' => $addedCount]);
+                                if (! empty($notFoundSkus)) {
+                                    $message .= ' '.__('SKUs not found: :skus', ['skus' => implode(', ', $notFoundSkus)]);
+                                }
+
+                                Notification::make()
+                                    ->title($addedCount > 0 ? __('Import Successful') : __('No Items Imported'))
+                                    ->body($message)
+                                    ->color($addedCount > 0 ? 'success' : 'warning')
+                                    ->send();
+                            })
+                            ->modalHeading(__('Quick Import by SKU'))
+                            ->modalSubmitActionLabel(__('Import'))
+                            ->modalWidth('md'),
+
                         Action::make('addAllVariants')
                             ->label(__('Add All Variants'))
                             ->icon('heroicon-o-plus-circle')
