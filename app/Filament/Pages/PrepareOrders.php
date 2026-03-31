@@ -6,6 +6,7 @@ use App\Enums\Integration\IntegrationProvider;
 use App\Enums\Order\FulfillmentStatus;
 use App\Enums\Order\OrderChannel;
 use App\Enums\Order\OrderStatus;
+use App\Jobs\SyncAddressToShopify;
 use App\Models\Address\District;
 use App\Models\Address\Province;
 use App\Models\Integration\Integration;
@@ -260,17 +261,22 @@ class PrepareOrders extends Page
             'address_line1' => $this->editAddressLine1,
         ]);
 
+        // Sync corrected address to Shopify so the webhook can issue a new label
+        if ($order->channel === OrderChannel::SHOPIFY) {
+            SyncAddressToShopify::dispatch($order);
+        }
+
         unset($this->currentOrder);
 
         $this->showAddressModal = false;
 
         Notification::make()
             ->title('Adres güncellendi.')
+            ->body($order->channel === OrderChannel::SHOPIFY
+                ? 'Adres Shopify\'a senkronize ediliyor.'
+                : null)
             ->success()
             ->send();
-
-        // Proceed to carrier selection with the corrected address
-        $this->openCarrierModal();
     }
 
     // ── Carrier selection & shipment creation ─────────────────────────────────
