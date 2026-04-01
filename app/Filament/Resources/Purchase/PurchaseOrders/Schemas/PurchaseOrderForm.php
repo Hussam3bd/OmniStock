@@ -262,8 +262,8 @@ class PurchaseOrderForm
                                     ->label(__('SKU & Quantity JSON'))
                                     ->required()
                                     ->rows(10)
-                                    ->placeholder('[{"sku":"REV-0009-SIY-36","qty":13},{"sku":"REV-0009-SIY-37","qty":4}]')
-                                    ->helperText(__('Paste JSON array of {"sku":"...","qty":...} objects')),
+                                    ->placeholder('[{"sku":"REV-0009-SIY-36","quantity":3},{"sku":"REV-0009-SIY-37","quantity":4}]')
+                                    ->helperText(__('Paste JSON array with "sku" and "quantity" (or "qty") keys')),
 
                                 Forms\Components\TextInput::make('bulk_unit_cost')
                                     ->label(__('Unit Cost (for all items)'))
@@ -302,7 +302,7 @@ class PurchaseOrderForm
 
                                 foreach ($entries as $entry) {
                                     $sku = $entry['sku'] ?? null;
-                                    $qty = (int) ($entry['qty'] ?? 0);
+                                    $qty = (int) ($entry['qty'] ?? $entry['quantity'] ?? 0);
 
                                     if (! $sku || $qty <= 0) {
                                         continue;
