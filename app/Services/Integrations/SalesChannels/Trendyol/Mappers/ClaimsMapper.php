@@ -196,10 +196,11 @@ class ClaimsMapper extends BaseReturnsMapper
                 // Find matching order item by platform mapping (most reliable)
                 $orderItem = null;
 
-                if (isset($orderLine['id'])) {
+                $orderLineId = $orderLine['lineId'] ?? $orderLine['id'] ?? null;
+                if ($orderLineId) {
                     $mapping = PlatformMapping::where('platform', $this->getChannel()->value)
                         ->where('entity_type', 'App\Models\Order\OrderItem')
-                        ->where('platform_id', (string) $orderLine['id'])
+                        ->where('platform_id', (string) $orderLineId)
                         ->first();
 
                     if ($mapping && $mapping->entity) {
@@ -209,10 +210,11 @@ class ClaimsMapper extends BaseReturnsMapper
 
                 // Fallback: try to match by barcode or merchant SKU
                 if (! $orderItem) {
+                    $stockCode = $orderLine['stockCode'] ?? $orderLine['merchantSku'] ?? '';
                     $orderItem = $order->items()
-                        ->whereHas('productVariant', function ($query) use ($orderLine) {
+                        ->whereHas('productVariant', function ($query) use ($orderLine, $stockCode) {
                             $query->where('barcode', $orderLine['barcode'] ?? '')
-                                ->orWhere('sku', $orderLine['merchantSku'] ?? '');
+                                ->orWhere('sku', $stockCode);
                         })
                         ->first();
                 }
@@ -222,9 +224,9 @@ class ClaimsMapper extends BaseReturnsMapper
                     activity()
                         ->performedOn($return)
                         ->withProperties([
-                            'order_line_id' => $orderLine['id'] ?? null,
+                            'order_line_id' => $orderLine['lineId'] ?? $orderLine['id'] ?? null,
                             'barcode' => $orderLine['barcode'] ?? null,
-                            'merchant_sku' => $orderLine['merchantSku'] ?? null,
+                            'merchant_sku' => $orderLine['stockCode'] ?? $orderLine['merchantSku'] ?? null,
                             'claim_item_id' => $claimItem['id'] ?? null,
                         ])
                         ->log('trendyol_claim_item_order_item_not_found');

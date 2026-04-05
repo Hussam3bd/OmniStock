@@ -40,8 +40,10 @@ class OrderMapper extends BaseOrderMapper
                 $this->updateCustomerFromTrendyolData($customer, $trendyolPackage);
             }
 
+            $packageId = $trendyolPackage['shipmentPackageId'] ?? $trendyolPackage['id'];
+
             $existingMapping = PlatformMapping::where('platform', $this->getChannel()->value)
-                ->where('platform_id', (string) $trendyolPackage['id'])
+                ->where('platform_id', (string) $packageId)
                 ->where('entity_type', Order::class)
                 ->first();
 
@@ -191,12 +193,13 @@ class OrderMapper extends BaseOrderMapper
 
     protected function createOrder(Customer $customer, array $trendyolPackage, ?\App\Models\Integration\Integration $integration = null): Order
     {
+        $packageId = $trendyolPackage['shipmentPackageId'] ?? $trendyolPackage['id'];
         $currency = $trendyolPackage['currencyCode'] ?? 'TRY';
         $currencyFields = $this->resolveCurrencyFields($currency);
 
-        $grossAmount = $this->convertToMinorUnits($trendyolPackage['grossAmount'] ?? 0, $currency);
-        $totalDiscount = $this->convertToMinorUnits($trendyolPackage['totalDiscount'] ?? 0, $currency);
-        $totalPrice = $this->convertToMinorUnits($trendyolPackage['totalPrice'] ?? 0, $currency);
+        $grossAmount = $this->convertToMinorUnits($trendyolPackage['packageGrossAmount'] ?? $trendyolPackage['grossAmount'] ?? 0, $currency);
+        $totalDiscount = $this->convertToMinorUnits($trendyolPackage['packageSellerDiscount'] ?? $trendyolPackage['totalDiscount'] ?? 0, $currency);
+        $totalPrice = $this->convertToMinorUnits($trendyolPackage['packageTotalPrice'] ?? $trendyolPackage['totalPrice'] ?? 0, $currency);
 
         $orderStatus = $this->mapOrderStatus($trendyolPackage['status'] ?? '');
         $paymentStatus = $this->mapPaymentStatus($trendyolPackage);
@@ -271,7 +274,7 @@ class OrderMapper extends BaseOrderMapper
                 'entity_id' => $order->id,
             ],
             [
-                'platform_id' => (string) $trendyolPackage['id'],
+                'platform_id' => (string) $packageId,
                 'platform_data' => $trendyolPackage,
                 'last_synced_at' => now(),
             ]
@@ -318,9 +321,9 @@ class OrderMapper extends BaseOrderMapper
             $currencyFields = $this->resolveCurrencyFields($currency);
         }
 
-        $grossAmount = $this->convertToMinorUnits($trendyolPackage['grossAmount'] ?? 0, $currency);
-        $totalDiscount = $this->convertToMinorUnits($trendyolPackage['totalDiscount'] ?? 0, $currency);
-        $totalPrice = $this->convertToMinorUnits($trendyolPackage['totalPrice'] ?? 0, $currency);
+        $grossAmount = $this->convertToMinorUnits($trendyolPackage['packageGrossAmount'] ?? $trendyolPackage['grossAmount'] ?? 0, $currency);
+        $totalDiscount = $this->convertToMinorUnits($trendyolPackage['packageSellerDiscount'] ?? $trendyolPackage['totalDiscount'] ?? 0, $currency);
+        $totalPrice = $this->convertToMinorUnits($trendyolPackage['packageTotalPrice'] ?? $trendyolPackage['totalPrice'] ?? 0, $currency);
 
         // Update integration_id if provided and not already set
         if ($integration && ! $order->integration_id) {
@@ -448,10 +451,10 @@ class OrderMapper extends BaseOrderMapper
             }
 
             $currency = $line['currencyCode'] ?? 'TRY';
-            $unitPrice = $this->convertToMinorUnits($line['price'] ?? 0, $currency);
+            $unitPrice = $this->convertToMinorUnits($line['lineUnitPrice'] ?? $line['price'] ?? 0, $currency);
             $quantity = $line['quantity'] ?? 1;
-            $discount = $this->convertToMinorUnits($line['discount'] ?? 0, $currency);
-            $taxRate = $line['vatBaseAmount'] ?? 0;
+            $discount = $this->convertToMinorUnits($line['lineSellerDiscount'] ?? $line['discount'] ?? 0, $currency);
+            $taxRate = $line['vatRate'] ?? $line['vatBaseAmount'] ?? 0;
             $commissionRate = $line['commission'] ?? 0; // Commission is a percentage rate
 
             // Calculate tax amount based on tax rate
@@ -476,8 +479,10 @@ class OrderMapper extends BaseOrderMapper
                 'commission_rate' => round($commissionRate, 2),
             ];
 
+            $lineId = $line['lineId'] ?? $line['id'];
+
             $existingMapping = PlatformMapping::where('platform', $this->getChannel()->value)
-                ->where('platform_id', (string) $line['id'])
+                ->where('platform_id', (string) $lineId)
                 ->where('entity_type', 'App\Models\Order\OrderItem')
                 ->first();
 
@@ -503,7 +508,7 @@ class OrderMapper extends BaseOrderMapper
                         'entity_id' => $item->id,
                     ],
                     [
-                        'platform_id' => (string) $line['id'],
+                        'platform_id' => (string) $lineId,
                         'platform_data' => $line,
                         'last_synced_at' => now(),
                     ]
@@ -553,9 +558,9 @@ class OrderMapper extends BaseOrderMapper
             }
         }
 
-        $merchantSku = $line['merchantSku'] ?? null;
-        if ($merchantSku) {
-            $variant = ProductVariant::where('sku', $merchantSku)->first();
+        $stockCode = $line['stockCode'] ?? $line['merchantSku'] ?? null;
+        if ($stockCode) {
+            $variant = ProductVariant::where('sku', $stockCode)->first();
             if ($variant) {
                 return $variant;
             }
@@ -569,8 +574,10 @@ class OrderMapper extends BaseOrderMapper
             }
         }
 
+        $contentId = $line['contentId'] ?? $line['productCode'] ?? '';
+
         $mapping = PlatformMapping::where('platform', $this->getChannel()->value)
-            ->where('platform_id', (string) ($line['productCode'] ?? ''))
+            ->where('platform_id', (string) $contentId)
             ->where('entity_type', ProductVariant::class)
             ->first();
 
@@ -584,10 +591,10 @@ class OrderMapper extends BaseOrderMapper
     protected function createProductFromLine(array $line): ProductVariant
     {
         $productName = $line['productName'] ?? 'Unknown Product';
-        $productCode = $line['productCode'] ?? null;
+        $productCode = $line['contentId'] ?? $line['productCode'] ?? null;
         $barcode = $line['barcode'] ?? $line['sku'] ?? null;
-        $merchantSku = $line['merchantSku'] ?? null;
-        $price = $this->convertToMinorUnits($line['price'] ?? 0, $line['currencyCode'] ?? 'TRY');
+        $merchantSku = $line['stockCode'] ?? $line['merchantSku'] ?? null;
+        $price = $this->convertToMinorUnits($line['lineUnitPrice'] ?? $line['price'] ?? 0, $line['currencyCode'] ?? 'TRY');
 
         // Extract model code and clean product name
         $modelCode = $this->extractModelCode($productName);
