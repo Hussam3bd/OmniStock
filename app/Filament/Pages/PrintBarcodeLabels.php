@@ -40,9 +40,9 @@ class PrintBarcodeLabels extends Page
 
     public string $labelPreset = '';
 
-    public float $labelWidth = 76;
+    public float $labelWidth = 60;
 
-    public float $labelHeight = 25.4;
+    public float $labelHeight = 40;
 
     public function mount(): void
     {

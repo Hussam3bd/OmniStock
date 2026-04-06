@@ -140,7 +140,7 @@ it('rejects print request with no variants', function () {
 
 it('updates label preset and dimensions', function () {
     Livewire::test(PrintBarcodeLabels::class)
-        ->set('labelPreset', '50x25')
-        ->assertSet('labelWidth', 50.0)
-        ->assertSet('labelHeight', 25.0);
+        ->set('labelPreset', '60x40')
+        ->assertSet('labelWidth', 60.0)
+        ->assertSet('labelHeight', 40.0);
 });

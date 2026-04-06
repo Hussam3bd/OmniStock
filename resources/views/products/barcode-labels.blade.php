@@ -15,6 +15,7 @@
             background: #fff;
             font-family: Arial, Helvetica, sans-serif;
             -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
 
         .labels-grid {
@@ -29,8 +30,9 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: center;
             overflow: hidden;
-            padding: 1.5mm 2mm;
+            padding: {{ $height >= 35 ? '2mm 3mm' : '1.5mm 2mm' }};
             page-break-inside: avoid;
         }
 
@@ -79,10 +81,15 @@
             @page {
                 size: {{ $width }}mm {{ $height }}mm;
                 margin: 0;
+                padding: 0;
             }
 
             html, body {
                 width: {{ $width }}mm;
+                height: {{ $height }}mm;
+                overflow: hidden;
+                margin: 0;
+                padding: 0;
             }
 
             .labels-grid {
@@ -93,6 +100,7 @@
                 width: {{ $width }}mm;
                 height: {{ $height }}mm;
                 page-break-after: always;
+                overflow: hidden;
             }
 
             .label:last-child {
