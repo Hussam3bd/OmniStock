@@ -18,6 +18,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/admin/orders/bulk-labels', [\App\Http\Controllers\BulkShippingLabelsController::class, 'show'])
         ->name('admin.orders.bulk-labels');
+
+    Route::get('/admin/barcode-labels/print', [\App\Http\Controllers\BarcodeLabelsController::class, 'print'])
+        ->name('admin.barcode-labels.print');
 });
 
 Route::webhooks('webhooks/ty', 'trendyol');

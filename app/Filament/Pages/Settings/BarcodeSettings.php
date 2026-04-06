@@ -6,6 +6,7 @@ use App\Settings\BarcodeSettings as BarcodeSettingsClass;
 use BackedEnum;
 use Filament\Forms;
 use Filament\Pages\SettingsPage;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
@@ -69,6 +70,42 @@ class BarcodeSettings extends SettingsPage
                             ->default(false),
                     ])
                     ->columns(2),
+
+                Section::make(__('Label Size'))
+                    ->description(__('Default label dimensions for barcode printing'))
+                    ->schema([
+                        Forms\Components\Select::make('label_preset')
+                            ->label(__('Label Preset'))
+                            ->options(collect(BarcodeSettingsClass::labelPresets())->mapWithKeys(
+                                fn (array $preset, string $key) => [$key => $preset['label']]
+                            ))
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(function (string $state, Forms\Set $set): void {
+                                $presets = BarcodeSettingsClass::labelPresets();
+                                if ($state !== 'custom' && isset($presets[$state])) {
+                                    $set('label_width', $presets[$state]['width']);
+                                    $set('label_height', $presets[$state]['height']);
+                                }
+                            }),
+
+                        Grid::make(2)->schema([
+                            Forms\Components\TextInput::make('label_width')
+                                ->label(__('Width (mm)'))
+                                ->numeric()
+                                ->step(0.1)
+                                ->required()
+                                ->suffix('mm'),
+
+                            Forms\Components\TextInput::make('label_height')
+                                ->label(__('Height (mm)'))
+                                ->numeric()
+                                ->step(0.1)
+                                ->required()
+                                ->suffix('mm'),
+                        ]),
+                    ])
+                    ->columns(1),
             ]);
     }
 }
