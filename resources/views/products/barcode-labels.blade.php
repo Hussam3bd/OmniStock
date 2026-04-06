@@ -86,8 +86,6 @@
 
             html, body {
                 width: {{ $width }}mm;
-                height: {{ $height }}mm;
-                overflow: hidden;
                 margin: 0;
                 padding: 0;
             }
