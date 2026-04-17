@@ -289,77 +289,25 @@ class PrepareOrders extends Page
             return;
         }
 
-        // Validate address completeness before calling BasitKargo
+        $integration = $this->resolveBasitKargoIntegration($order);
+
+        // Step 1 — try to link an existing BasitKargo shipment before demanding
+        // address completeness. BasitKargo already holds its own address on the
+        // shipment, so if a labelled shipment exists for this Shopify order we
+        // should reuse it regardless of our local province/district mapping.
+        if ($integration && $order->order_date && ! $order->shipping_aggregator_shipment_id) {
+            if ($this->tryLinkExistingBasitKargoShipment($order, $integration)) {
+                return;
+            }
+        }
+
+        // Step 2 — creating a new shipment requires a full local address.
         $address = $order->shippingAddress;
 
         if (! $address?->province_id || ! $address?->district_id) {
             $this->openAddressModal();
 
             return;
-        }
-
-        $integration = $this->resolveBasitKargoIntegration($order);
-
-        // Look for a pre-existing BasitKargo shipment before creating a new one.
-        // Primary match: Shopify foreignCode (GID) — ensures we re-use shipments
-        // auto-created by the Shopify BasitKargo app without breaking the tracking link.
-        if ($integration && $order->order_date && ! $order->shipping_aggregator_shipment_id) {
-            $adapter = new BasitKargoAdapter($integration);
-
-            try {
-                $shopifyGid = $order->platformMappings()->value('platform_id');
-                $existing = $shopifyGid
-                    ? $adapter->findShipmentByForeignCode($shopifyGid, $order->order_date)
-                    : null;
-            } catch (\Exception $e) {
-                // Log but don't block — fall through to creating a fresh shipment
-                activity()
-                    ->performedOn($order)
-                    ->withProperties(['error' => $e->getMessage()])
-                    ->log('basitkargo_pre_search_failed');
-                $existing = null;
-            }
-
-            if ($existing && ! empty($existing['id'])) {
-                if (! empty($existing['barcode'])) {
-                    // Already labelled → link & open directly
-                    $order->update([
-                        'shipping_aggregator_integration_id' => $integration->id,
-                        'shipping_aggregator_shipment_id' => $existing['id'],
-                        'shipping_tracking_number' => $existing['barcode'],
-                    ]);
-
-                    unset($this->currentOrder);
-
-                    $this->dispatch('open-label', url: route('admin.orders.basitkargo-label', $order->id));
-
-                    Notification::make()
-                        ->title('Mevcut gönderi bulundu ve bağlandı.')
-                        ->success()
-                        ->send();
-
-                    return;
-                }
-
-                // Found without barcode (NEW from Shopify app) →
-                // Only remember the integration; do NOT save the shipment ID.
-                // createOutboundShipment will create a new labelled shipment
-                // with the same foreignCode so the Shopify sync link is preserved,
-                // and the Shopify-created shipment is left untouched.
-                $order->update([
-                    'shipping_aggregator_integration_id' => $integration->id,
-                ]);
-
-                unset($this->currentOrder);
-
-                Notification::make()
-                    ->title('Mevcut gönderi bulundu.')
-                    ->body('Kargo firmasını seçerek etiketi oluşturun.')
-                    ->info()
-                    ->send();
-
-                // Fall through to carrier modal so user picks a handler
-            }
         }
 
         if ($integration) {
@@ -377,6 +325,73 @@ class PrepareOrders extends Page
 
         $this->selectedCarrier = 'SURAT';
         $this->showCarrierModal = true;
+    }
+
+    /**
+     * Search BasitKargo for a shipment that matches this Shopify order.
+     *
+     * Returns true when the caller should stop processing (either we linked
+     * a labelled shipment and opened the label, or the lookup itself produced
+     * a user-visible result). Returns false when the caller should proceed
+     * to the carrier-selection flow.
+     */
+    private function tryLinkExistingBasitKargoShipment(Order $order, Integration $integration): bool
+    {
+        $adapter = new BasitKargoAdapter($integration);
+
+        try {
+            $shopifyGid = $order->platformMappings()->value('platform_id');
+            $existing = $shopifyGid
+                ? $adapter->findShipmentByForeignCode($shopifyGid, $order->order_date)
+                : null;
+        } catch (\Exception $e) {
+            activity()
+                ->performedOn($order)
+                ->withProperties(['error' => $e->getMessage()])
+                ->log('basitkargo_pre_search_failed');
+
+            return false;
+        }
+
+        if (! $existing || empty($existing['id'])) {
+            return false;
+        }
+
+        if (! empty($existing['barcode'])) {
+            $order->update([
+                'shipping_aggregator_integration_id' => $integration->id,
+                'shipping_aggregator_shipment_id' => $existing['id'],
+                'shipping_tracking_number' => $existing['barcode'],
+            ]);
+
+            unset($this->currentOrder);
+
+            $this->dispatch('open-label', url: route('admin.orders.basitkargo-label', $order->id));
+
+            Notification::make()
+                ->title('Mevcut gönderi bulundu ve bağlandı.')
+                ->success()
+                ->send();
+
+            return true;
+        }
+
+        // Unlabelled shipment (auto-created by Shopify BasitKargo app).
+        // Remember the integration only — createOutboundShipment will produce
+        // a new labelled shipment with the same foreignCode.
+        $order->update([
+            'shipping_aggregator_integration_id' => $integration->id,
+        ]);
+
+        unset($this->currentOrder);
+
+        Notification::make()
+            ->title('Mevcut gönderi bulundu.')
+            ->body('Kargo firmasını seçerek etiketi oluşturun.')
+            ->info()
+            ->send();
+
+        return false;
     }
 
     public function createShipmentForOrder(): void

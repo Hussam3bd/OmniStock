@@ -1,16 +1,23 @@
 <?php
 
+use App\Enums\Integration\IntegrationProvider;
+use App\Enums\Integration\IntegrationType;
 use App\Enums\Order\FulfillmentStatus;
 use App\Enums\Order\OrderChannel;
 use App\Enums\Order\OrderStatus;
 use App\Filament\Pages\PrepareOrders;
+use App\Models\Address\Address;
 use App\Models\Currency;
+use App\Models\Customer\Customer;
+use App\Models\Integration\Integration;
 use App\Models\Order\Order;
 use App\Models\Order\OrderItem;
+use App\Models\Platform\PlatformMapping;
 use App\Models\Product\Product;
 use App\Models\Product\ProductVariant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 
@@ -213,4 +220,98 @@ it('reloads the queue on loadQueue call', function () {
 
 it('shows the page in the Sales navigation group', function () {
     expect(PrepareOrders::getNavigationGroup())->toBe('Sales');
+});
+
+// --- openCarrierModal: existing-shipment linking ---
+
+function makeShopifyOrderWithoutLocalAddress(): Order
+{
+    $customer = Customer::create([
+        'first_name' => 'Test',
+        'last_name' => 'User',
+        'email' => 'buyer@example.test',
+    ]);
+
+    $order = Order::factory()->create([
+        'customer_id' => $customer->id,
+        'channel' => OrderChannel::SHOPIFY,
+        'fulfillment_status' => FulfillmentStatus::UNFULFILLED,
+        'order_status' => OrderStatus::PROCESSING,
+        'order_date' => now(),
+    ]);
+
+    // Address with NO province / district — the exact failure mode production hit.
+    $address = Address::create([
+        'addressable_type' => Order::class,
+        'addressable_id' => $order->id,
+        'type' => 'residential',
+        'title' => 'Shipping',
+        'first_name' => 'Test',
+        'last_name' => 'User',
+        'phone' => '+905551234567',
+        'address_line1' => 'Test Street 1',
+        'is_shipping' => true,
+    ]);
+
+    $order->update(['shipping_address_id' => $address->id]);
+
+    PlatformMapping::create([
+        'platform' => OrderChannel::SHOPIFY->value,
+        'platform_id' => 'gid://shopify/Order/12345',
+        'entity_type' => Order::class,
+        'entity_id' => $order->id,
+    ]);
+
+    Integration::create([
+        'name' => 'BasitKargo',
+        'type' => IntegrationType::SHIPPING_PROVIDER,
+        'provider' => IntegrationProvider::BASIT_KARGO,
+        'is_active' => true,
+        'settings' => ['api_token' => 'test'],
+    ]);
+
+    return $order->fresh();
+}
+
+it('links existing BasitKargo shipment and skips address modal when address is incomplete', function () {
+    $order = makeShopifyOrderWithoutLocalAddress();
+
+    Http::fake([
+        '*/v2/order/filter' => Http::response([
+            [
+                'id' => 'BK-123-ABC',
+                'barcode' => '13251188161213',
+                'foreignCode' => 'gid://shopify/Order/12345',
+                'orderNumber' => $order->order_number,
+            ],
+        ], 200),
+    ]);
+
+    Livewire::test(PrepareOrders::class)
+        ->call('openCarrierModal')
+        ->assertSet('showAddressModal', false)
+        ->assertSet('showCarrierModal', false);
+
+    $order->refresh();
+
+    expect($order->shipping_aggregator_shipment_id)->toBe('BK-123-ABC')
+        ->and($order->shipping_tracking_number)->toBe('13251188161213');
+});
+
+it('falls back to address modal when BasitKargo has no matching shipment and address is incomplete', function () {
+    $order = makeShopifyOrderWithoutLocalAddress();
+
+    Http::fake([
+        '*/v2/order/filter' => Http::response([], 200),
+    ]);
+
+    Livewire::test(PrepareOrders::class)
+        ->call('openCarrierModal')
+        ->assertSet('showAddressModal', true)
+        ->assertSet('showCarrierModal', false);
+
+    $order->refresh();
+
+    expect($order->shipping_aggregator_shipment_id)->toBeNull()
+        ->and($order->shipping_tracking_number)->toBeNull();
 });
