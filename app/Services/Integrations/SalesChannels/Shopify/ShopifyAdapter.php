@@ -368,6 +368,81 @@ class ShopifyAdapter implements SalesChannelAdapter
         return $allProducts;
     }
 
+    /**
+     * Sync only stock quantities to Shopify, preserving current Shopify prices.
+     *
+     * @return array{success: bool, synced: int, skipped: int, errors: array}
+     */
+    public function syncStock(Collection $variants): array
+    {
+        $synced = 0;
+        $skipped = 0;
+        $errors = [];
+
+        $locationId = $this->integration->settings['location_id'] ?? null;
+
+        if (! $locationId) {
+            return [
+                'success' => false,
+                'synced' => 0,
+                'skipped' => $variants->count(),
+                'errors' => ['No location_id configured for Shopify integration'],
+            ];
+        }
+
+        foreach ($variants as $variant) {
+            $mapping = $variant->platformMappings()
+                ->where('platform', OrderChannel::SHOPIFY->value)
+                ->first();
+
+            if (! $mapping || ! isset($mapping->platform_data['inventory_item_id'])) {
+                $skipped++;
+
+                continue;
+            }
+
+            $inventoryItemId = $mapping->platform_data['inventory_item_id'];
+            $quantity = max($variant->inventory_quantity ?? 0, 0);
+
+            $response = $this->makeRequest('post', '/inventory_levels/set.json', [
+                'location_id' => $locationId,
+                'inventory_item_id' => $inventoryItemId,
+                'available' => $quantity,
+            ]);
+
+            if ($response->successful()) {
+                $synced++;
+                activity()
+                    ->performedOn($variant)
+                    ->withProperties([
+                        'integration_id' => $this->integration->id,
+                        'inventory_item_id' => $inventoryItemId,
+                        'quantity' => $quantity,
+                    ])
+                    ->log('shopify_inventory_updated');
+            } else {
+                $errors[] = "SKU {$variant->sku}: API error ({$response->status()}): {$response->body()}";
+            }
+        }
+
+        if (empty($errors) && $synced > 0) {
+            activity()
+                ->performedOn($this->integration)
+                ->withProperties([
+                    'synced_count' => $synced,
+                    'skipped_count' => $skipped,
+                ])
+                ->log('shopify_stock_synced');
+        }
+
+        return [
+            'success' => empty($errors),
+            'synced' => $synced,
+            'skipped' => $skipped,
+            'errors' => $errors,
+        ];
+    }
+
     public function updateInventory(ProductVariant $variant): bool
     {
         $mapping = $variant->platformMappings()
@@ -396,7 +471,7 @@ class ShopifyAdapter implements SalesChannelAdapter
         $response = $this->makeRequest('post', '/inventory_levels/set.json', [
             'location_id' => $locationId,
             'inventory_item_id' => $inventoryItemId,
-            'available' => $variant->stock_quantity ?? 0,
+            'available' => $variant->inventory_quantity ?? 0,
         ]);
 
         if ($response->successful()) {
@@ -405,7 +480,7 @@ class ShopifyAdapter implements SalesChannelAdapter
                 ->withProperties([
                     'integration_id' => $this->integration->id,
                     'inventory_item_id' => $inventoryItemId,
-                    'quantity' => $variant->stock_quantity,
+                    'quantity' => $variant->inventory_quantity,
                 ])
                 ->log('shopify_inventory_updated');
         }

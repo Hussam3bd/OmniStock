@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Product\Products\Tables;
 use App\Enums\Inventory\InventoryMovementType;
 use App\Enums\Order\OrderChannel;
 use App\Filament\Actions\AdjustStockAction;
+use App\Filament\Actions\Integration\SyncShopifyStockAction;
 use App\Filament\Actions\Integration\SyncTrendyolStockAction;
 use App\Forms\Components\MoneyInput;
 use App\Models\Integration\Integration;
@@ -14,6 +15,7 @@ use App\Models\Inventory\LocationInventory;
 use App\Models\Product\ProductVariant;
 use App\Models\Product\VariantOption;
 use App\Services\BarcodeService;
+use App\Services\Integrations\SalesChannels\Shopify\ShopifyAdapter;
 use App\Services\Integrations\SalesChannels\Trendyol\TrendyolAdapter;
 use App\Tables\Columns\MoneyInputColumn;
 use Filament\Actions\Action;
@@ -285,6 +287,56 @@ class ProductVariantsTable
                             ->default(0),
                     ]),
 
+                Action::make('sync_all_shopify_stock')
+                    ->label(__('Sync All Stock to Shopify'))
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading(__('Sync All Stock to Shopify'))
+                    ->modalDescription(__('This will push current stock quantities for all variants with Shopify mappings. Shopify prices will be preserved.'))
+                    ->modalSubmitActionLabel(__('Sync All'))
+                    ->visible(function () {
+                        return Integration::where('provider', 'shopify')
+                            ->where('is_active', true)
+                            ->exists();
+                    })
+                    ->action(function () use ($livewire) {
+                        $product = $livewire->getOwnerRecord();
+                        $variants = $product->variants()->get();
+
+                        $integration = Integration::where('provider', 'shopify')
+                            ->where('is_active', true)
+                            ->first();
+
+                        try {
+                            $adapter = new ShopifyAdapter($integration);
+                            $result = $adapter->syncStock($variants);
+
+                            if ($result['success']) {
+                                Notification::make()
+                                    ->title(__('Stock synced to Shopify'))
+                                    ->body(__(':synced variants synced, :skipped skipped', [
+                                        'synced' => $result['synced'],
+                                        'skipped' => $result['skipped'],
+                                    ]))
+                                    ->success()
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title(__('Stock sync completed with errors'))
+                                    ->body(implode('; ', $result['errors']))
+                                    ->warning()
+                                    ->send();
+                            }
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title(__('Error syncing stock'))
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+
                 Action::make('sync_all_trendyol_stock')
                     ->label(__('Sync All Stock to Trendyol'))
                     ->icon('heroicon-o-arrow-up-tray')
@@ -370,6 +422,8 @@ class ProductVariantsTable
                 AdjustStockAction::make(),
 
                 SyncTrendyolStockAction::make(),
+
+                SyncShopifyStockAction::make(),
 
                 Action::make('view_history')
                     ->label(__('History'))
