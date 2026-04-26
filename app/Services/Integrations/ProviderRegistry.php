@@ -36,13 +36,12 @@ class ProviderRegistry
                             'required' => false,
                             'helper' => 'Your custom app\'s API secret key (required for webhook HMAC verification)',
                         ],
-                        'location_id' => [
-                            'label' => 'Default Location',
-                            'type' => 'relationship',
-                            'relationship_name' => 'location',
-                            'relationship_title_attribute' => 'name',
+                        'shopify_location_id' => [
+                            'label' => 'Shopify Location ID',
+                            'type' => 'text',
                             'required' => false,
-                            'helper' => 'Select the inventory location for this Shopify integration',
+                            'placeholder' => '83437650147',
+                            'helper' => 'The Shopify-side location ID where stock is synced. Find it at /admin/api/{version}/locations.json or in the Shopify admin location URL.',
                         ],
                         'api_version' => [
                             'label' => 'API Version',

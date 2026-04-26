@@ -379,7 +379,7 @@ class ShopifyAdapter implements SalesChannelAdapter
         $skipped = 0;
         $errors = [];
 
-        $locationId = $this->integration->settings['location_id'] ?? null;
+        $locationId = $this->integration->settings['shopify_location_id'] ?? null;
 
         if (! $locationId) {
             return [
@@ -454,7 +454,7 @@ class ShopifyAdapter implements SalesChannelAdapter
         }
 
         $inventoryItemId = $mapping->platform_data['inventory_item_id'];
-        $locationId = $this->integration->settings['location_id'] ?? null;
+        $locationId = $this->integration->settings['shopify_location_id'] ?? null;
 
         if (! $locationId) {
             activity()
