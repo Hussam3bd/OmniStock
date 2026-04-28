@@ -43,6 +43,13 @@ class ProviderRegistry
                             'placeholder' => '83437650147',
                             'helper' => 'The Shopify-side location ID where stock is synced. Find it at /admin/api/{version}/locations.json or in the Shopify admin location URL.',
                         ],
+                        'auto_sync_stock' => [
+                            'label' => 'Auto-Sync Stock to Shopify',
+                            'type' => 'toggle',
+                            'required' => false,
+                            'default' => false,
+                            'helper' => 'Automatically push stock changes (sales, returns, cancellations, purchase receipts) to Shopify. Prices are never changed.',
+                        ],
                         'api_version' => [
                             'label' => 'API Version',
                             'type' => 'select',
@@ -85,6 +92,13 @@ class ProviderRegistry
                             'type' => 'text',
                             'required' => true,
                             'helper' => 'Your Trendyol supplier ID',
+                        ],
+                        'auto_sync_stock' => [
+                            'label' => 'Auto-Sync Stock to Trendyol',
+                            'type' => 'toggle',
+                            'required' => false,
+                            'default' => false,
+                            'helper' => 'Automatically push stock changes (sales, returns, cancellations, purchase receipts) to Trendyol. Prices are never changed.',
                         ],
                     ],
                     'documentation_url' => 'https://developers.trendyol.com/',
